@@ -1877,7 +1877,7 @@ async function coverPages(bundle) {
 
     }
     // table
-    const cols = [['#', 60], ['הזמנה', 140], ['תמונה', 150], ['פריט', B ? 330 : 380], ['סוג', 130], ['מידות', 150], ['כמות', 130], ['גיליון', 120], ['סטטוס', 0]];
+    const cols = [['#', 50], ['הזמנה', 120], ['תמונה', 140], ['פריט', B ? 290 : 330], ['סוג', 115], ['מידות', 135], ['כמות', 115], ['גיליון', 105], ['לקוח', 0]];
     const tw = W - 2 * M; cols[cols.length - 1][1] = tw - cols.slice(0, -1).reduce((a, c2) => a + c2[1], 0);
     x.fillStyle = BLUE; x.fillRect(M, y, tw, 62);
     let cx = W - M; for (const [h, w] of cols) { txt(h, cx - 16, y + 42, 25, { w: 700, c: '#fff' }); cx -= w; }
@@ -1903,18 +1903,29 @@ async function coverPages(bundle) {
         } else {
           const num = j === 0 || j === 1 || j === 5 || j === 6 || j === 7;
           const split = j === 3 && B ? splitNote(r) : '';
-          const who = j === 3 && (k === 0 || !items[i - 1] || items[i - 1].order !== r.order) ? custLine(info.get(r.order)) : '';
-          if (j === 3 && (isFullRow || split || who)) {
-            const lines = [isFullRow && 'שטיח רוחב מלא! ללא נקודות', split].filter(Boolean);
-            const n = lines.length + (who ? 1 : 0);
-            const y0 = y + rh / 2 - 4 - n * 15;
-            txt(v, cx - 16, y0, 25, { w: 600 });
-            lines.forEach((t, li) => txt(t, cx - 16, y0 + 36 + li * 29, B ? 21 : 25, { w: 800, c: '#c02828' }));
-            if (who) { x.save(); x.font = `400 19px ${F}`; const mw = w - 24; let t = who; while (x.measureText(t).width > mw && t.length > 4) t = t.slice(0, -2); if (t !== who) t = t.trim() + '…'; x.restore(); txt(t, cx - 16, y0 + 36 + lines.length * 29, 19, { c: MUT }); }
+          const bad = j === 3 && !isFullRow && rowState(r)[0] === 'bad' ? (r.match && r.match.kind === 'size' ? '⚠ אין קובץ בגודל הזה' : '⚠ חסר קובץ') : '';
+          if (j === 8) {
+            // customer: name, and the phone under it (first row of every order)
+            const first = k === 0 || !items[i - 1] || items[i - 1].order !== r.order, h = first && info.get(r.order);
+            if (h) {
+              const fit = (t, size, wt) => { x.save(); x.font = `${wt} ${size}px ${F}`; let u = t; while (x.measureText(u).width > w - 24 && u.length > 4) u = u.slice(0, -2); x.restore(); return u === t ? t : u.trim() + '…'; };
+              const nm = h.cust || h.contact || '', ph = h.phone || '';
+              const extra = h.contact && h.cust && h.contact !== h.cust ? h.contact : '';
+              const ls = [[nm, 23, 600, INK], [extra, 19, 400, MUT], [ph, 21, 400, INK]].filter(a => a[0]);
+              const y0 = y + rh / 2 + 8 - (ls.length - 1) * 15;
+              ls.forEach(([t, sz, wt, c], li) => txt(fit(t, sz, wt), cx - 16, y0 + li * 30, sz, { w: wt, c, mono: t === ph, ltr: t === ph }));
+            }
+          } else if (j === 3 && (isFullRow || split || bad)) {
+            const lines = [isFullRow && 'שטיח רוחב מלא! ללא נקודות', bad, split].filter(Boolean);
+            const y0 = y + rh / 2 - 4 - lines.length * 15;
+            const fs = (t, size, wt) => { x.save(); x.font = `${wt} ${size}px ${F}`; const tw = x.measureText(t).width; x.restore(); return tw > w - 24 ? Math.max(14, size * (w - 24) / tw) : size; };
+            txt(v, cx - 16, y0, fs(v, 25, 600), { w: 600 });
+            lines.forEach((t, li) => txt(t, cx - 16, y0 + 36 + li * 29, fs(t, B ? 21 : 23, 800), { w: 800, c: '#c02828' }));
           } else {
             const redQ = j === 6 && (q || 0) >= 2;
             if (redQ) { x.font = `700 25px ${FN}`; const tw = x.measureText(v).width; x.fillStyle = '#c62828'; x.beginPath(); x.roundRect(cx - 16 - tw - 12, y + rh / 2 - 20, tw + 24, 40, 6); x.fill(); }
-            txt(v, cx - 16, y + rh / 2 + 9, j === 7 && v.length > 4 ? 19 : 25, { mono: num, ltr: j === 7, w: j === 3 || redQ ? 700 : 400, c: redQ ? '#ffffff' : j === 8 ? stc : INK });
+            let sz0 = j === 7 && v.length > 4 ? 19 : 25; if (j === 3) { x.save(); x.font = `700 25px ${F}`; const tw = x.measureText(v).width; x.restore(); if (tw > w - 24) sz0 = Math.max(14, 25 * (w - 24) / tw); }
+            txt(v, cx - 16, y + rh / 2 + 9, sz0, { mono: num, ltr: j === 7, w: j === 3 || redQ ? 700 : 400, c: redQ ? '#ffffff' : j === 8 ? stc : INK });
           }
         }
         x.restore(); cx -= w;
