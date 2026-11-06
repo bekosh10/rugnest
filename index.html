@@ -340,7 +340,7 @@ svg .hitr.droptgt{fill:rgba(37,99,235,.25);stroke:#2563eb;stroke-width:4;vector-
 <div class="modal" id="jobsDlg" dir="rtl" hidden><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="jobsTtl">
   <header><h2 id="jobsTtl">העבודות שלי</h2><button class="icon-btn" id="jobsX" aria-label="סגור">✕</button></header>
   <div class="body"><p class="hint">כל עבודה נשמרת לבד בזמן שעובדים, בדפדפן הזה. פתיחת עבודה אחרת לא מוחקת את הנוכחית.</p><div id="jobsList" style="display:flex;flex-direction:column;gap:6px"></div></div>
-  <footer><button class="btn primary" id="jobsNew" type="button">+ עבודה חדשה</button><label class="btn" for="inJobFile">פתיחה מקובץ…</label><input type="file" id="inJobFile" accept=".zip,application/zip"><span style="flex:1"></span><button class="btn" id="jobsClose" type="button">סגירה</button></footer>
+  <footer><button class="btn primary" id="jobsNew" type="button">+ עבודה חדשה</button><label class="btn" for="inJobFile">פתיחה מקובץ…</label><input type="file" id="inJobFile" accept=".rugjob,.zip,application/zip"><span style="flex:1"></span><button class="btn" id="jobsClose" type="button">סגירה</button></footer>
 </div></div>
 <div class="modal" id="saveAsDlg" dir="rtl" hidden><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="saTtl">
   <header><h2 id="saTtl">שמירה בשם</h2><button class="icon-btn" id="saX" aria-label="סגור">✕</button></header>
@@ -2191,7 +2191,7 @@ async function downloadJobFile(rec, name) {
   data.orderFiles = (orders || []).map(([no, f], i) => { const fn = `orders/${String(i + 1).padStart(3, '0')}_${String(no).replace(/[^\w.-]/g, '_')}.pdf`; zip.file(fn, f); return [no, fn, f.name || '']; });
   zip.file('job.json', JSON.stringify(data, null, 1));
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  await save(blob, `${name.replace(/[\\/:*?"<>|]/g, '-')}.rugjob.zip`);
+  await save(blob, `${name.replace(/[\\/:*?"<>|]/g, '-')}.rugjob`);
 }
 async function openJobFile(file) {
   try {
@@ -2205,7 +2205,7 @@ async function openJobFile(file) {
     if (!jobManual && data.name) { jobManual = true; $('jobName').value = data.name; }
     workReady = true; await doSave(); update();
     $('jobsDlg').hidden = true; setStatus(`נפתחה העבודה ${jobName()} מהקובץ`);
-  } catch (e) { setStatus(`לא הצלחתי לפתוח את הקובץ (${e.message || e}). צריך קובץ .rugjob.zip שנשמר מהכלי`); }
+  } catch (e) { setStatus(`לא הצלחתי לפתוח את הקובץ (${e.message || e}). צריך קובץ ‎.rugjob‎ שנשמר מהכלי`); }
 }
 $('inJobFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openJobFile(f); };
 $('saveAsBtn').onclick = () => {
@@ -2244,7 +2244,12 @@ if (window.rugdesk) (async () => {
   save = async (bytes, name) => {
     try {
       const data = new Uint8Array(bytes instanceof Blob ? await bytes.arrayBuffer() : bytes);
-      lastSaved = await DESK.saveFile(jobName(), name, data, /\.rugjob\.zip$/i.test(name) ? 'job' : 'out');
+      if (/\.rugjob(\.zip)?$/i.test(name)) {
+        const where = await DESK.saveAs(name, data);
+        setStatus(where ? `נשמר: ${where}` : 'השמירה בוטלה');
+        return;
+      }
+      lastSaved = await DESK.saveFile(jobName(), name, data, 'out');
       setStatus(`נשמר: ${name}`);
     } catch (e) { setStatus(`השמירה נכשלה (${e.message || e})`); }
   };

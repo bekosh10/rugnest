@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('rugdesk', {
   listPdfs: dir => ipcRenderer.invoke('list-pdfs', dir),
   readFile: p => ipcRenderer.invoke('read-file', p),
   saveFile: (job, name, data, kind) => ipcRenderer.invoke('save-file', { job, name, data, kind }),
+  saveAs: (name, data) => ipcRenderer.invoke('save-as', { name, data }),
   reveal: p => ipcRenderer.invoke('reveal', p),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   applyUpdate: () => ipcRenderer.invoke('update:apply'),

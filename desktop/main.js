@@ -106,6 +106,18 @@ ipcMain.handle('save-file', async (e, { job, name, data, kind }) => {
   await fsp.writeFile(file, Buffer.from(data));
   return file;
 });
+// job file: always ask where to save (starts in the last folder used)
+ipcMain.handle('save-as', async (e, { name, data }) => {
+  const c = readCfg();
+  const start = c.lastJobDir && fs.existsSync(c.lastJobDir) ? c.lastJobDir : c.jobsDir;
+  try { fs.mkdirSync(start, { recursive: true }); } catch (err) {}
+  const r = await dialog.showSaveDialog(win, { title: 'שמירת עבודה', defaultPath: path.join(start, name.replace(/\.zip$/i, '')), filters: [{ name: 'עבודת שטיחים', extensions: ['rugjob'] }], properties: ['createDirectory', 'showOverwriteConfirmation'] });
+  if (r.canceled || !r.filePath) return null;
+  let file = r.filePath; if (!/\.rugjob$/i.test(file)) file += '.rugjob';
+  await fsp.writeFile(file, Buffer.from(data));
+  writeCfg({ ...c, lastJobDir: path.dirname(file) });
+  return file;
+});
 ipcMain.handle('reveal', (e, p) => { if (p && fs.existsSync(p)) { if (fs.statSync(p).isDirectory()) shell.openPath(p); else shell.showItemInFolder(p); return true; } return false; });
 
 /* ---------- updates ---------- */
