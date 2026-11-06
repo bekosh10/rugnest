@@ -205,7 +205,8 @@ svg .lblbg{fill:rgba(255,255,255,.82)}
 .empty strong{color:var(--ink);font-size:15px}
 
 .thumbbar{display:flex;align-items:stretch;border-top:1px solid var(--line);min-width:0}
-.thumbs{flex:1;min-width:0;display:flex;gap:8px;align-items:center;justify-content:safe center;padding:8px 10px 6px;overflow-x:scroll;scrollbar-width:auto;scrollbar-color:var(--accent) var(--line)}
+.thumbs{flex:1;min-width:0;display:flex;gap:8px;align-items:center;justify-content:flex-start;padding:8px 10px 6px;overflow-x:scroll;overflow-y:hidden}
+@supports not selector(::-webkit-scrollbar){.thumbs{scrollbar-width:auto;scrollbar-color:var(--accent) var(--line)}}
 .thumbs::-webkit-scrollbar{height:12px;-webkit-appearance:none}
 .thumbs::-webkit-scrollbar-track{background:var(--line);border-radius:6px}
 .thumbs::-webkit-scrollbar-thumb{background:var(--accent);border-radius:6px;border:2px solid var(--line)}
@@ -2329,5 +2330,11 @@ if (window.rugdesk) (async () => {
     if (!r.ok) { ub.disabled = false; ub.textContent = 'העדכון נכשל – לנסות שוב'; setStatus(r.error || ''); }
   };
   check(true);
+})();
+
+// sheet strip: the mouse wheel scrolls it sideways, and the selected sheet is always brought into view
+(() => { const el = $('sheets'); if (!el) return;
+  el.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); el.scrollBy({ left: -e.deltaY, behavior: 'auto' }); } }, { passive: false });
+  new MutationObserver(() => { const a = el.querySelector('.sthumb.on, .sthumb.active, .sthumb[aria-current="true"]'); if (a) a.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }).observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 })();
 </script>
