@@ -20,7 +20,7 @@
   --ok:#1b7a45; --ok-soft:rgba(27,122,69,.13); --warn:#a2650a; --warn-soft:rgba(162,101,10,.15); --bad:#c02828; --bad-soft:rgba(192,40,40,.14);
   --k-rug:#7b3fe4; --k-runner:#1f9d55; --k-placemat:#38bdf8;
   --f-ui:"Google Sans","Noto Sans Hebrew","Segoe UI",Arial,sans-serif;
-  --f-num:"Google Sans Code","Google Sans","Noto Sans Hebrew",ui-monospace,Menlo,Consolas,monospace;
+  --f-num:"Google Sans","Noto Sans Hebrew",Arial,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#141719; --panel:#1b1f22; --raise:#23282b; --ink:#e6e9eb; --muted:#99a2a8; --line:#30373b;
@@ -38,7 +38,7 @@
   color-scheme:dark }
 
 [hidden]{display:none!important}
-html,body{height:100%}
+html,body{font-variant-numeric:tabular-nums;height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0;box-sizing:border-box}
 *,*::before,*::after{box-sizing:border-box}
@@ -1714,8 +1714,8 @@ function missingList() {
     .map(r => ({ r, why: r.match && r.match.kind === 'size' ? 'אין בגודל הזה' : 'אין קובץ', have: r.match && r.match.kind === 'size' ? r.match.sizes.join(', ') : '' }));
 }
 async function missingReportPdf() {
-  try { await document.fonts.load('600 24px "Noto Sans Hebrew"'); await document.fonts.load('700 24px "Google Sans Code"'); } catch (e) {}
-  const F = '"Noto Sans Hebrew","Google Sans",Arial,sans-serif', FN = '"Google Sans Code","Noto Sans Hebrew",Menlo,monospace';
+  try { await document.fonts.load('600 24px "Noto Sans Hebrew"'); await document.fonts.load('700 24px "Google Sans"'); } catch (e) {}
+  const F = '"Noto Sans Hebrew","Google Sans",Arial,sans-serif', FN = '"Google Sans","Noto Sans Hebrew",Arial,sans-serif';
   const W = 1654, H = 2339, M = 120, BLUE = '#1e5bd8', RED = '#c02828', INK = '#182024', MUT = '#5a656d', LINE = '#d0d6da';
   const list = missingList(), per = 30, pagesN = Math.max(1, Math.ceil(list.length / per));
   const now = new Date(), dstr = now.toLocaleDateString('he-IL'), tstr = now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
@@ -1757,8 +1757,8 @@ const cutName = sh => `${jobName()}_${sheetNo(sh)}${cpx(sh)}_cut.pdf`;
 // a bundle needs its own cover unless it is one order, one sheet, printed once
 const needsBundlePage = b => b.sh && (b.orders.length > 1 || (b.sh.copies || 1) > 1);
 async function coverPages(bundle) {
-  try { await document.fonts.load('600 24px "Noto Sans Hebrew"'); await document.fonts.load('700 24px "Google Sans Code"'); } catch (e) {}
-  const F = '"Noto Sans Hebrew","Google Sans",Arial,sans-serif', FN = '"Google Sans Code","Noto Sans Hebrew",Menlo,monospace';
+  try { await document.fonts.load('600 24px "Noto Sans Hebrew"'); await document.fonts.load('700 24px "Google Sans"'); } catch (e) {}
+  const F = '"Noto Sans Hebrew","Google Sans",Arial,sans-serif', FN = '"Google Sans","Noto Sans Hebrew",Arial,sans-serif';
   const W = 1654, H = 2339, M = bundle && bundle.sh ? Math.round(51.6 * 1654 / 595.28) : 120;   // A4 at 200 dpi
   const BLUE = '#1e5bd8', INK = '#182024', MUT = '#5a656d', LINE = '#d0d6da';
   const B = bundle && bundle.sh, here = new Map();
