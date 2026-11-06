@@ -1757,6 +1757,34 @@ const printName = sh => `${jobName()}_${sheetNo(sh)}${cpx(sh)}_print${sh.group =
 const cutName = sh => `${jobName()}_${sheetNo(sh)}${cpx(sh)}_cut.pdf`;
 // a bundle needs its own cover unless it is one order, one sheet, printed once
 const needsBundlePage = b => b.sh && (b.orders.length > 1 || (b.sh.copies || 1) > 1);
+// customer, contact and phone from the top of an order PDF (so the summary page is enough without the orders)
+const headCache = new Map();
+async function orderHeadInfo(no) {
+  if (headCache.has(no)) return headCache.get(no);
+  let res = null;
+  try {
+    const f = orderFiles.get(no);
+    if (f) {
+      const buf = new Uint8Array(await f.arrayBuffer());
+      if (new TextDecoder('latin1').decode(buf.slice(0, 1024)).includes('%PDF')) {
+        const pdf = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise;
+        const tc = await (await pdf.getPage(1)).getTextContent(); pdf.destroy();
+        const all = tc.items.filter(i => i.str && i.str.trim()).map(i => ({ str: i.str, x: i.transform[4], y: i.transform[5], w: i.width || 0 }));
+        const val = re => {
+          const lab = all.find(i => re.test(i.str.trim())); if (!lab) return '';
+          const R = lab.x + lab.w, below = all.filter(i => i.y < lab.y - 3 && i.y > lab.y - 24 && i.x + i.w <= R + 4 && i.x + i.w > R - 200);
+          if (!below.length) return '';
+          const vy = Math.max(...below.map(i => i.y)), line = below.filter(i => Math.abs(i.y - vy) < 2 && i.x > R - 220);
+          const near = line.filter(i => Math.abs(i.x + i.w - R) < 4).length ? line : [];
+          return near.length ? logicalLine(near).replace(/\s+/g, ' ').trim() : '';
+        };
+        res = { cust: val(/^לקוח$/), contact: val(/^איש קשר$/), phone: val(/^טלפון איש קשר$/) };
+      }
+    }
+  } catch (e) { res = null; }
+  headCache.set(no, res); return res;
+}
+const custLine = h => { if (!h) return ''; const p = [h.cust]; if (h.contact && h.contact !== h.cust) p.push(h.contact); if (h.phone) p.push(h.phone); return p.filter(Boolean).join(' · '); };
 async function coverPages(bundle) {
   try { await document.fonts.load('600 24px "Noto Sans Hebrew"'); await document.fonts.load('700 24px "Google Sans"'); } catch (e) {}
   const F = '"Noto Sans Hebrew","Google Sans",Arial,sans-serif', FN = '"Google Sans","Noto Sans Hebrew",Arial,sans-serif';
@@ -1782,6 +1810,8 @@ async function coverPages(bundle) {
   const imgs = new Map();
   await Promise.all([...new Set(items.map(r => r.fileKey).filter(k => k && thumbs.get(k)))].map(k => new Promise(res => { const im = new Image(); im.onload = () => { imgs.set(k, im); res(); }; im.onerror = res; im.src = thumbs.get(k); })));
   const perFirst = B ? 9 : 11, perNext = 15;
+  const info = new Map();
+  for (const no of new Set(items.map(r => r.order).filter(Boolean))) info.set(no, await orderHeadInfo(no));
   const pagesN = items.length <= perFirst ? 1 : 1 + Math.ceil((items.length - perFirst) / perNext);
   const out = []; let i = 0;
   const g = k => sheets.filter(s => s.group === k).reduce((a, s) => a + (s.copies || 1), 0);
@@ -1873,11 +1903,14 @@ async function coverPages(bundle) {
         } else {
           const num = j === 0 || j === 1 || j === 5 || j === 6 || j === 7;
           const split = j === 3 && B ? splitNote(r) : '';
-          if (j === 3 && (isFullRow || split)) {
+          const who = j === 3 && (k === 0 || !items[i - 1] || items[i - 1].order !== r.order) ? custLine(info.get(r.order)) : '';
+          if (j === 3 && (isFullRow || split || who)) {
             const lines = [isFullRow && 'שטיח רוחב מלא! ללא נקודות', split].filter(Boolean);
-            const y0 = y + rh / 2 - 12 - (lines.length - 1) * 14;
+            const n = lines.length + (who ? 1 : 0);
+            const y0 = y + rh / 2 - 4 - n * 15;
             txt(v, cx - 16, y0, 25, { w: 600 });
-            lines.forEach((t, li) => txt(t, cx - 16, y0 + 38 + li * 30, B ? 21 : 27, { w: 800, c: '#c02828' }));
+            lines.forEach((t, li) => txt(t, cx - 16, y0 + 36 + li * 29, B ? 21 : 25, { w: 800, c: '#c02828' }));
+            if (who) { x.save(); x.font = `400 19px ${F}`; const mw = w - 24; let t = who; while (x.measureText(t).width > mw && t.length > 4) t = t.slice(0, -2); if (t !== who) t = t.trim() + '…'; x.restore(); txt(t, cx - 16, y0 + 36 + lines.length * 29, 19, { c: MUT }); }
           } else {
             const redQ = j === 6 && (q || 0) >= 2;
             if (redQ) { x.font = `700 25px ${FN}`; const tw = x.measureText(v).width; x.fillStyle = '#c62828'; x.beginPath(); x.roundRect(cx - 16 - tw - 12, y + rh / 2 - 20, tw + 24, 40, 6); x.fill(); }
