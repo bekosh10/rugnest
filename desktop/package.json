@@ -1,0 +1,26 @@
+{
+  "name": "rugnest",
+  "productName": "Rugs Zund",
+  "version": "1.0.0",
+  "description": "סידור שטיחים לזונד",
+  "main": "main.js",
+  "author": "Campus",
+  "license": "UNLICENSED",
+  "scripts": { "start": "electron ." },
+  "build": {
+    "appId": "il.campus.rugnest",
+    "productName": "Rugs Zund",
+    "files": ["main.js", "preload.js", "app/**/*"],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [{ "target": "dir", "arch": ["arm64", "x64"] }],
+      "identity": null,
+      "icon": "build/icon.png",
+      "fileAssociations": [{ "ext": "rugjob.zip", "name": "Rug Job", "role": "Editor" }],
+      "extendInfo": { "LSMinimumSystemVersion": "11.0" }
+    },
+    "directories": { "output": "dist" }
+  },
+  "devDependencies": { "electron": "33.2.1", "electron-builder": "25.1.8" }
+}

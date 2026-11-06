@@ -1,0 +1,2307 @@
+<title>שטיחים לזונד - חבילות</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<style>
+/* Layout: work table (same system as שולחן הפריסה) — orders & rugs on the right, the sheet in the middle with sheet thumbs + bottom bar, alerts strip on the left */
+:root{
+  --bg:#e8ebed; --panel:#f6f7f8; --raise:#ffffff; --ink:#182024; --muted:#5a656d; --line:#d0d6da;
+  --accent:#7b3fe4; --accent-ink:#ffffff; --accent-soft:rgba(123,63,228,.12);
+  --cut:#d10a85; --table:#d6dce0; --grid:rgba(24,32,36,.07); --sheet:#ffffff; --sheet-edge:#8f9ba3;
+  --rug:#efe7d6; --rug-ink:#3e3420; --miss:#fbe3e3;
+  --ok:#1b7a45; --ok-soft:rgba(27,122,69,.13); --warn:#a2650a; --warn-soft:rgba(162,101,10,.15); --bad:#c02828; --bad-soft:rgba(192,40,40,.14);
+  --k-rug:#7b3fe4; --k-runner:#1f9d55; --k-placemat:#38bdf8;
+  --f-ui:"Google Sans","Noto Sans Hebrew","Segoe UI",Arial,sans-serif;
+  --f-num:"Google Sans Code","Google Sans","Noto Sans Hebrew",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141719; --panel:#1b1f22; --raise:#23282b; --ink:#e6e9eb; --muted:#99a2a8; --line:#30373b;
+  --accent:#a77bff; --accent-ink:#160b2b; --accent-soft:rgba(167,123,255,.18);
+  --cut:#ff4fb3; --table:#1f2528; --grid:rgba(230,233,235,.05); --sheet:#ecebe6; --sheet-edge:#5f6a70;
+  --rug:#dccfb3; --rug-ink:#2e2716; --miss:#f3cfcf;
+  --ok:#4cc483; --ok-soft:rgba(76,196,131,.15); --warn:#e2a843; --warn-soft:rgba(226,168,67,.16); --bad:#f26a6a; --bad-soft:rgba(242,106,106,.16);
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#141719; --panel:#1b1f22; --raise:#23282b; --ink:#e6e9eb; --muted:#99a2a8; --line:#30373b;
+  --accent:#a77bff; --accent-ink:#160b2b; --accent-soft:rgba(167,123,255,.18);
+  --cut:#ff4fb3; --table:#1f2528; --grid:rgba(230,233,235,.05); --sheet:#ecebe6; --sheet-edge:#5f6a70;
+  --rug:#dccfb3; --rug-ink:#2e2716; --miss:#f3cfcf;
+  --ok:#4cc483; --ok-soft:rgba(76,196,131,.15); --warn:#e2a843; --warn-soft:rgba(226,168,67,.16); --bad:#f26a6a; --bad-soft:rgba(242,106,106,.16);
+  color-scheme:dark }
+
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0;box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box}
+.mono{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:12px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{height:100%;display:flex;flex-direction:column;gap:10px;padding-block:12px}
+.top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;margin-inline-end:auto;min-width:0}
+.brand h1{font-size:19px;font-weight:700;margin:0;letter-spacing:-.01em}
+.drop{position:relative}
+.drop.busy{pointer-events:none}
+.busyov{position:absolute;inset:0;border-radius:10px;background:color-mix(in srgb,var(--raise) 92%,transparent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:2}
+.busyov b{font-size:14px}
+.busyov .pbar{width:70%;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.busyov .pbar i{display:block;height:100%;background:var(--accent);transition:width .2s}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--accent-soft);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
+.jobrow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;background:var(--raise);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+.jobrow.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--raise))}
+.jinfo{display:flex;flex-direction:column;gap:2px;min-width:0}.jinfo b{font-size:15px}.jinfo small{font-size:12px;color:var(--muted)}
+.expopt{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--raise);cursor:pointer}
+.expopt input{width:20px;height:20px;accent-color:var(--accent);margin-top:2px;flex:none}
+.expopt span{display:flex;flex-direction:column;gap:2px}.expopt b{font-size:14px}.expopt small{font-size:12px;color:var(--muted)}
+.expopt.sub{background:transparent;border-style:dashed}
+.jobname{font-family:var(--f-num);font-weight:700;font-size:15px;width:190px;direction:ltr;text-align:center;border-color:var(--accent)!important;color:var(--accent)}
+.brand .tag{font-size:12px;color:var(--muted)}
+.vsep{width:1px;height:22px;background:var(--line)}
+select,input[type=number],input[type=text]{background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:5px 8px;min-width:0}
+input[type=number]{text-align:center;direction:ltr;font-family:var(--f-num)}
+.btn{border:1px solid var(--line);background:var(--raise);border-radius:7px;padding:6px 11px;font-weight:500;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.ghost{background:transparent}
+.btn.sm{padding:3px 8px;font-size:12.5px}
+.btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.expbtn2{font-weight:700;border-color:var(--accent);background:var(--accent);color:#fff}.expbtn2:hover{filter:brightness(1.08)}
+.expbtn2.alt{background:var(--raise);color:var(--accent)}
+.tgroup{display:inline-flex;align-items:stretch;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:2px;gap:2px}
+.tbtn{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--ink);font-size:13px;font-weight:500;padding:5px 10px;border-radius:8px;white-space:nowrap}
+.tbtn svg{color:var(--muted);flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tbtn:hover{background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.08)}.tbtn:hover svg{color:var(--accent)}
+.xdel{width:24px;height:24px;flex:none;border:1.5px solid var(--bad);border-radius:50%;background:transparent;color:var(--bad);display:grid;place-items:center;padding:0}
+.xdel svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}.xdel:hover{background:var(--bad);color:#fff}
+
+.work{flex:1;min-height:0;display:grid;grid-template-columns:370px minmax(0,1fr) 260px;gap:10px}
+.side,.stage,.strip{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:0;min-width:0}
+.side{display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:none;padding:13px 4px;font-size:15px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;display:inline-flex;justify-content:center;align-items:center;gap:6px}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs .cnt{font-family:var(--f-num);font-size:11px;font-weight:600;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:0 6px;color:var(--muted)}
+.pane{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+
+.drop{border:2px dashed var(--accent);border-radius:12px;padding:12px 14px;text-align:center;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;background:var(--accent-soft);cursor:pointer;transition:background .15s;flex-shrink:0}
+.drop:hover,.drop.over{background:color-mix(in srgb,var(--accent) 18%,var(--raise))}
+.drop svg{width:24px;height:24px;fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.drop strong{font-weight:700;font-size:14px}
+.drop .dsub{font-size:12px;color:var(--muted)}
+.drop .btns{display:flex;gap:6px;margin-top:6px}
+input[type=file]{display:none}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pgtools{flex-shrink:0;font-size:12.5px;justify-content:space-between}
+.sample-note{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--accent-soft);padding:6px 9px;border-radius:7px;flex-shrink:0}
+
+.items{display:flex;flex-direction:column;gap:8px}
+.item{background:var(--raise);border:1px solid var(--line);border-radius:9px;padding:8px;display:flex;flex-direction:column;gap:7px;transition:box-shadow .18s ease,transform .18s ease,border-color .18s ease}
+.item:hover{box-shadow:0 4px 14px rgba(40,30,80,.10),0 1px 3px rgba(40,30,80,.06);transform:translateY(-1px)}
+.item.bad{border-inline-start:4px solid var(--bad)}.item.warn{border-inline-start:4px solid var(--warn)}.item.ok{border-inline-start:4px solid var(--ok)}.item.full{border-inline-start:4px solid var(--accent)}
+.item-main{display:flex;align-items:center;gap:7px}
+.thumb{width:40px;height:40px;object-fit:contain;background:var(--table);border-radius:5px;flex:none;display:grid;place-items:center;color:var(--muted);font-size:10px;font-family:var(--f-num);overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:contain}
+.item-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.item-info .nm{font-weight:600;font-size:13px;border:1px solid transparent;background:transparent;padding:1px 4px;border-radius:5px;width:100%}
+.item-info .nm:hover,.item-info .nm:focus{border-color:var(--line);background:var(--raise)}
+.ordno{font-family:var(--f-num);font-size:11px;color:var(--muted);padding-inline-start:4px}
+.item-ctrls{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+.dim{display:flex;align-items:center;gap:3px;direction:ltr}
+.dim input{width:50px;height:28px;padding:2px;font-size:13.5px}
+.dim span{color:var(--muted);font-size:12px}
+.qtyctl{display:inline-flex;align-items:center}
+.qtyctl input[type=number]{width:36px;height:28px;padding:2px 1px;font-size:14px;border-radius:0;border-inline:0;-moz-appearance:textfield}
+.qtyctl input::-webkit-inner-spin-button,.qtyctl input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.qtyctl button{width:24px;height:28px;border:1px solid var(--line);background:var(--raise);font-size:15px;line-height:1;display:grid;place-items:center;padding:0}
+.qtyctl button:first-child{border-start-start-radius:7px;border-end-start-radius:7px}
+.qtyctl button:last-child{border-start-end-radius:7px;border-end-end-radius:7px}
+.qtyctl button:hover{border-color:var(--accent);color:var(--accent)}
+.filesel{width:100%;font-size:12.5px;padding:4px 6px}
+.pc{font-size:11.5px;padding:2px 7px;border-radius:5px;font-weight:600;white-space:nowrap;margin-inline-start:auto}
+.st-ok{color:var(--ok);background:var(--ok-soft)} .st-part{color:var(--warn);background:var(--warn-soft)} .st-none{color:var(--bad);background:var(--bad-soft)} .st-fill{color:var(--accent);background:var(--accent-soft)}
+
+.libstats{display:grid;grid-template-columns:1fr auto;gap:4px 10px;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px}
+.libstats span{color:var(--muted)} .libstats b{font-family:var(--f-num);font-weight:600;text-align:left;direction:ltr}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.liblist{display:flex;flex-direction:column;gap:4px}
+.libitem{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:5px 7px;font-size:12.5px}
+.libitem .thumb{width:34px;height:34px}
+.libitem b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbn{display:flex;flex-direction:column;min-width:0}
+.fixdir{border:1.5px solid var(--accent);border-radius:10px;background:var(--raise);padding:10px;display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.fdrow{display:flex;align-items:center;gap:8px;font-size:13px}.fdrow svg{width:18px;height:18px;fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.8;flex:none}
+.fixdir .btns{display:flex;gap:6px;flex-wrap:wrap}
+.lfold{border:1px solid var(--line);border-radius:8px;background:var(--raise)}
+.lfold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 9px;font-weight:600;font-size:13px}
+.lfold>summary::-webkit-details-marker{display:none}
+.lfold>summary svg{width:16px;height:16px;fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.8;flex:none}
+.lfold>summary .fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:right}
+.lfold>summary .fc{font-family:var(--f-num);font-size:11px;color:var(--muted);font-weight:500}
+.lfold[open]>summary{border-bottom:1px solid var(--line)}
+.lsub{display:flex;flex-direction:column;gap:4px;padding:6px 8px}
+.lsubh{font-size:12px;font-weight:700;color:var(--muted);padding:2px 2px 0;direction:ltr;text-align:right}
+.lfold .libitem{background:var(--panel)}
+.lbn small{font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:right}
+.libitem .mono{font-size:11.5px;color:var(--muted)}
+.libitem.used{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--raise))}
+
+.kv{display:grid;grid-template-columns:1fr 90px;gap:8px 12px;align-items:center;font-size:13px}
+.kv input[type=number],.kv input[type=text]{width:100%}
+.kv input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);justify-self:start}
+
+.stage{display:flex;flex-direction:column;overflow:hidden}
+.toolbar{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap;min-height:44px}
+.toolbar .sep{width:1px;height:20px;background:var(--line)}
+.toolbar .ttl{font-weight:700;font-size:14px}
+.chip{font-family:var(--f-num);font-size:12px;background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+.chip b{font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-inline-start:auto}
+.seg button{border:0;background:var(--raise);padding:4px 10px;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.wrap{flex:1;min-height:0;overflow:auto;position:relative;background-color:var(--table);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;display:flex;padding:18px}
+#svg{display:block;margin:auto;max-width:100%;max-height:100%;width:auto;height:100%}
+svg .sheet{fill:var(--sheet);stroke:var(--sheet-edge);stroke-width:1;vector-effect:non-scaling-stroke}
+svg .rugbox{fill:var(--rug)}
+svg .rugbox.miss{fill:var(--miss)}
+svg .cutl{fill:none;stroke:var(--cut);stroke-width:1.2;vector-effect:non-scaling-stroke}
+svg .mk{fill:#000}
+svg .wl{fill:var(--rug-ink);font-family:var(--f-ui);font-weight:700}
+svg .selr{fill:rgba(37,99,235,.12);stroke:#2563eb;stroke-width:4;vector-effect:non-scaling-stroke;pointer-events:none}
+svg .hitr{fill:transparent;cursor:pointer}
+.item{cursor:pointer}
+.item.sel{outline:3px solid #2563eb;outline-offset:1px}
+.pickbtn{align-self:flex-start;color:var(--accent);border-color:var(--accent)}.pickbtn svg{width:15px;height:15px;stroke:var(--accent)}
+.againbtn{color:var(--ink)}
+.swapbtn{border:1px solid var(--line);background:var(--raise);border-radius:6px;width:24px;height:24px;padding:0;font-size:14px;line-height:1;color:var(--accent);cursor:pointer;flex:none}
+.swapbtn:hover{border-color:var(--accent);background:var(--accent-soft)}
+.stretchwarn{font-size:12px;font-weight:600;color:var(--bad);background:var(--bad-soft);border-radius:6px;padding:4px 8px}
+.item.stretch{border-inline-start:4px solid var(--bad)}
+.sugbtn{border:1px dashed var(--warn);background:var(--warn-soft);color:var(--warn);border-radius:7px;padding:4px 8px;font-size:12px;font-weight:600;text-align:start;font-family:var(--f-ui)}
+.sugbtn:hover{border-style:solid}
+.shchip{align-self:flex-start;border:1px solid var(--line);background:var(--raise);color:var(--accent);border-radius:6px;padding:1px 7px;font-size:11.5px;font-weight:600;font-family:var(--f-ui)}
+.shchip:hover{border-color:var(--accent)}
+svg .slbl{fill:#000;font-family:Helvetica,Arial,sans-serif;font-weight:700;direction:ltr;unicode-bidi:plaintext}
+svg .wo{fill:var(--accent);font-family:var(--f-num);font-weight:600}
+svg .wd{fill:var(--rug-ink);font-family:var(--f-num)}
+svg .lblbg{fill:rgba(255,255,255,.82)}
+.empty{color:var(--muted);text-align:center;max-width:340px;display:flex;flex-direction:column;gap:10px;align-items:center;margin:auto}
+.empty strong{color:var(--ink);font-size:15px}
+
+.thumbbar{display:flex;align-items:stretch;border-top:1px solid var(--line);min-width:0}
+.thumbs{flex:1;min-width:0;display:flex;gap:8px;align-items:center;justify-content:safe center;padding:8px 10px 6px;overflow-x:scroll;scrollbar-width:auto;scrollbar-color:var(--accent) var(--line)}
+.thumbs::-webkit-scrollbar{height:12px;-webkit-appearance:none}
+.thumbs::-webkit-scrollbar-track{background:var(--line);border-radius:6px}
+.thumbs::-webkit-scrollbar-thumb{background:var(--accent);border-radius:6px;border:2px solid var(--line)}
+.sthumb{border:2px solid transparent;border-radius:7px;background:var(--raise);padding:3px;display:flex;flex-direction:column;align-items:stretch;gap:2px;flex:none;width:96px;cursor:pointer}
+.sthumb.on{border-color:var(--accent)}
+.sthumb svg{display:block;height:58px;width:100%}
+.sthumb .n{font-size:11px;font-family:var(--f-num);display:flex;justify-content:space-between;gap:6px;padding-inline:3px}
+.sthumb .n i{font-style:normal;color:var(--muted)}
+.updbox{display:inline-flex;gap:8px;align-items:center;margin-inline-start:auto;padding-inline-start:12px}
+.sthumb .n .cpx{font-style:normal;color:#fff;background:var(--bad,#c62828);border-radius:4px;padding:0 4px;margin-inline-start:3px}
+.bottombar{display:flex;align-items:center;gap:12px;padding:6px 12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.bottombar b{color:var(--ink);font-weight:600}
+.bottombar #status{margin-inline-start:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+
+.strip{display:flex;flex-direction:column;overflow:visible;position:relative}
+.strip>.strip-list,.strip>.strip-spots{overflow:auto}
+.libtab{position:absolute;top:120px;left:-15px;right:auto;width:15px;height:150px;border:1px solid var(--accent);border-inline-start:0;background:var(--accent);color:#fff;border-radius:0 8px 8px 0;writing-mode:vertical-rl;transform:rotate(180deg);font-size:11.5px;font-weight:700;padding:0;z-index:6;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.libtab[aria-expanded="true"]{background:var(--ink);border-color:var(--ink)}
+.libdrawer{position:absolute;inset:0;background:var(--panel);border-radius:10px;z-index:5;display:flex;flex-direction:column;gap:8px;padding:10px;box-shadow:0 8px 28px rgba(0,0,0,.18)}
+.ldhead{display:flex;align-items:center;gap:8px}.ldhead b{font-size:15px;flex:1}
+.ldtree{flex:1;overflow:auto;display:flex;flex-direction:column;gap:6px;min-height:0}
+.ldtree .libitem{cursor:grab}
+.ldtree .libitem:active{cursor:grabbing}
+.ldtree .libitem .thumb{width:44px;height:44px}
+.libitem.dragging{opacity:.5}
+.item.droptgt{outline:3px dashed #2563eb;outline-offset:1px;background:rgba(37,99,235,.06)}
+svg .hitr.droptgt{fill:rgba(37,99,235,.25);stroke:#2563eb;stroke-width:4;vector-effect:non-scaling-stroke}
+@media (max-width:1100px){.libtab{left:0;top:-15px;width:150px;height:15px;writing-mode:horizontal-tb;transform:none;border-radius:8px 8px 0 0}}
+.strip-head{padding:12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.strip-head .lbl{font-size:12px;color:var(--muted);letter-spacing:.03em}
+.big{font-family:var(--f-num);font-size:30px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:15px;color:var(--muted);font-weight:500}
+.qbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--line);margin:2px 0}
+.qbar .qok{background:#16a34a;transition:width .3s}.qbar .qmiss{background:repeating-linear-gradient(-45deg,#fca5a5 0 4px,#fecaca 4px 8px);transition:width .3s}
+.qleg{display:flex;justify-content:space-between;font-size:11.5px;font-weight:600}.qleg span:first-child{color:var(--ok)}.qleg span:last-child{color:var(--bad)}
+.strip-list{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:7px}
+.al{border-radius:8px;padding:7px 9px;font-size:12.5px;border:1px solid var(--line);background:var(--raise);display:flex;flex-direction:column;gap:2px;border-inline-start:4px solid}
+.al b{font-size:12.5px}
+.al.bad{border-inline-start-color:var(--bad)}.al.bad b{color:var(--bad)}
+.al.warn{border-inline-start-color:var(--warn)}.al.warn b{color:var(--warn)}
+.al.ok{border-inline-start-color:var(--ok)}.al.ok b{color:var(--ok)}
+.al.info{border-inline-start-color:var(--accent)}.al.info b{color:var(--accent)}
+.agrp{display:flex;flex-direction:column;gap:6px}
+.agrp>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;padding:4px 2px}
+.agrp>summary::-webkit-details-marker{display:none}
+.agrp>summary::before{content:'▾';margin-inline-end:6px;color:var(--muted);display:inline-block;transition:transform .15s}
+.agrp:not([open])>summary::before{transform:rotate(90deg)}
+.agrp>summary>span:first-child{flex:1}
+.agrp.bad>summary{color:var(--bad)}.agrp.warn>summary{color:var(--warn)}.agrp.ok>summary{color:var(--ok)}.agrp.info>summary{color:var(--accent)}
+.acnt{font-family:var(--f-num);font-size:11px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:0 7px;color:var(--ink)}
+.gtag{font-size:12px;font-weight:600;border-radius:6px;padding:2px 8px;background:var(--accent-soft);color:var(--accent)}
+.gtag.table,.gsep.table{background:color-mix(in srgb,var(--k-runner) 15%,transparent);color:var(--k-runner)}
+.gtag.pm,.gsep.pm{background:color-mix(in srgb,var(--k-placemat) 18%,transparent);color:#0b7fb3}
+.gtag.full,.gsep.full{background:var(--line);color:var(--ink)}
+.gsep{font-size:11.5px;font-weight:700;padding:4px 8px;border-radius:6px;background:var(--accent-soft);color:var(--accent);flex:none;align-self:center;white-space:nowrap}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid var(--line);font-size:12px;font-weight:600;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.kdot{display:inline-block;width:11px;height:11px;border-radius:50%;flex:none;border:0;padding:0}
+.k-rug{background:var(--k-rug)}.k-runner{background:var(--k-runner)}.k-placemat{background:var(--k-placemat)}
+.kbtn{cursor:pointer;width:13px;height:13px}.kbtn:hover{box-shadow:0 0 0 3px var(--accent-soft)}
+.ogrp{display:flex;flex-direction:column;gap:6px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px}
+.ogrp.bad{border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+.ohead{display:flex;align-items:center;gap:8px}
+.ono{font-family:var(--f-num);font-size:17px;font-weight:700;letter-spacing:.01em}
+.olink{cursor:pointer;text-decoration:underline;text-decoration-color:var(--accent-soft);text-underline-offset:3px;text-decoration-thickness:2px}
+.olink:hover{color:var(--accent);text-decoration-color:var(--accent)}
+.orddlg{width:min(820px,100%);height:min(900px,92vh)}
+.orddlg .body{background:var(--table);align-items:center}
+.orddlg header h2{min-width:120px;text-align:center}
+.orddlg header .icon-btn{font-size:20px}
+.ordpage{display:block;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);border-radius:3px;max-width:100%}
+.okinds{display:inline-flex;gap:3px}
+.ocnt{font-size:12px;color:var(--muted)}
+.odel{margin-inline-start:auto;padding:2px 6px;font-size:12px;color:var(--muted)}
+.ostat{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
+.ogrp.ok .ostat{background:var(--ok);color:#fff}.ogrp.bad .ostat{background:var(--bad);color:#fff}.ogrp.wait .ostat{background:var(--line);color:var(--muted)}
+.onote{font-size:12px;color:var(--bad);background:var(--bad-soft);border-radius:6px;padding:4px 8px}
+.oitems{display:flex;flex-direction:column;gap:6px;padding-inline-start:12px;border-inline-start:3px solid var(--accent-soft);margin-inline-start:4px}
+.ogrp .item{background:var(--panel);padding:6px}
+.ogrp .item:hover{transform:none}
+.nmrow{display:flex;align-items:center;gap:5px}
+.item-info .item-ctrls{gap:6px;margin-top:3px;flex-wrap:nowrap}
+.nmrow .nm{flex:1;min-width:0}.nmrow .pc{margin-inline-start:0}
+.ogrp .item-main{align-items:flex-start}
+.atabs{display:flex;flex-wrap:wrap;gap:4px;position:sticky;top:-10px;background:var(--panel);padding:2px 0 6px;z-index:1}
+.atab{border:1px solid var(--line);background:var(--raise);border-radius:7px;padding:4px 8px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.atab:hover{border-color:var(--muted);color:var(--ink)}
+.atab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.atab .acount{color:var(--bad);font-family:var(--f-num);font-weight:700}
+.atab[aria-selected="true"] .acount{color:#fff}
+.apanel{display:flex;flex-direction:column;gap:7px}
+.strip-spots{flex:none;max-height:40%;overflow:auto;padding:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.spot-h{font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline}
+.srow{display:grid;grid-template-columns:34px 1fr;gap:2px 8px;align-items:center;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:6px}
+.srow .thumb{width:34px;height:34px;grid-row:span 2}
+.srow .nm{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .mono{font-size:11.5px;color:var(--muted)}
+
+.modal{position:fixed;inset:0;background:rgba(10,14,16,.45);display:grid;place-items:center;z-index:40;padding:16px}
+.dlg{background:var(--panel);border-radius:12px;width:min(520px,100%);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.dlg>header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);gap:10px}
+.dlg h2{margin:0;font-size:16px;font-weight:700}
+.dlg .body{overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.dlg>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+.icon-btn{border:1px solid transparent;background:none;border-radius:6px;min-width:28px;height:28px;display:grid;place-items:center;color:var(--muted);padding:0 4px}
+.icon-btn:hover{border-color:var(--line);color:var(--ink)}
+
+@media (max-width:1100px){
+  html,body{height:auto}
+  .app{height:auto}
+  .work{grid-template-columns:1fr}
+  .side{max-height:none}.pane{max-height:70vh}
+  .stage{min-height:70vh}
+  .strip-list{max-height:50vh}
+}
+@media (prefers-reduced-motion:reduce){.item{transition:none}.item:hover{transform:none}}
+</style>
+
+<div class="modal" id="ordDlg" dir="rtl" hidden><div class="dlg orddlg" role="dialog" aria-modal="true" aria-labelledby="ordTtl">
+  <header><button class="icon-btn" id="ordPrev" aria-label="ההזמנה הקודמת" title="הקודמת">›</button><h2 id="ordTtl" class="mono">הזמנה</h2><button class="icon-btn" id="ordNext" aria-label="ההזמנה הבאה" title="הבאה">‹</button><span style="flex:1"></span><button class="icon-btn" id="ordX" aria-label="סגור">✕</button></header>
+  <div class="body" id="ordBody"></div>
+</div></div>
+<div class="modal" id="expDlg" dir="rtl" hidden><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="expTtl">
+  <header><h2 id="expTtl">ייצוא <span class="mono" id="expJob"></span></h2><button class="icon-btn" id="expX" aria-label="סגור">✕</button></header>
+  <div class="body">
+    <label class="expopt"><input type="checkbox" id="exOrders" checked><span><b>הזמנות</b><small id="exOrdersInfo"></small></span></label>
+    <label class="expopt"><input type="checkbox" id="exPrint" checked><span><b>פרינט</b><small id="exPrintInfo"></small></span></label>
+    <label class="expopt"><input type="checkbox" id="exCut" checked><span><b>קאט</b><small id="exCutInfo"></small></span></label>
+    <label class="expopt"><input type="checkbox" id="exMiss"><span><b>דוח חוסרים</b><small id="exMissInfo"></small></span></label>
+    <label class="expopt sub"><input type="checkbox" id="exZip" checked><span><b>הכול בקובץ ZIP אחד</b><small>אישור הורדה אחד בלבד. בלי סימון: כל קובץ יורד בנפרד</small></span></label>
+    <p class="hint" id="expMsg"></p>
+  </div>
+  <footer><button class="btn primary" id="expGo" type="button">ייצוא</button><button class="btn" id="expCancel" type="button">ביטול</button></footer>
+</div></div>
+<div class="modal" id="jobsDlg" dir="rtl" hidden><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="jobsTtl">
+  <header><h2 id="jobsTtl">העבודות שלי</h2><button class="icon-btn" id="jobsX" aria-label="סגור">✕</button></header>
+  <div class="body"><p class="hint">כל עבודה נשמרת לבד בזמן שעובדים, בדפדפן הזה. פתיחת עבודה אחרת לא מוחקת את הנוכחית.</p><div id="jobsList" style="display:flex;flex-direction:column;gap:6px"></div></div>
+  <footer><button class="btn primary" id="jobsNew" type="button">+ עבודה חדשה</button><label class="btn" for="inJobFile">פתיחה מקובץ…</label><input type="file" id="inJobFile" accept=".zip,application/zip"><span style="flex:1"></span><button class="btn" id="jobsClose" type="button">סגירה</button></footer>
+</div></div>
+<div class="modal" id="saveAsDlg" dir="rtl" hidden><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="saTtl">
+  <header><h2 id="saTtl">שמירה בשם</h2><button class="icon-btn" id="saX" aria-label="סגור">✕</button></header>
+  <div class="body">
+    <label class="field" for="saName" style="font-size:13px">שם העבודה<input type="text" id="saName" class="mono" style="direction:ltr;text-align:center;font-size:16px;font-weight:700;padding:8px"></label>
+    <label class="expopt"><input type="checkbox" id="saFile" checked><span><b>גם לשמור כקובץ במחשב</b><small>קובץ ZIP עם ההזמנות וכל ההגדרות שלהן. אפשר לפתוח אותו בכל מחשב דרך ״העבודות שלי״ ← ״פתיחה מקובץ״</small></span></label>
+    <p class="hint">העבודה הנוכחית נשארת כמו שהיא. נוצרת עבודה חדשה בשם הזה, והיא זו שתישאר פתוחה.</p>
+  </div>
+  <footer><button class="btn primary" id="saGo" type="button">שמירה</button><button class="btn" id="saCancel" type="button">ביטול</button></footer>
+</div></div>
+<div class="modal" id="setDlg" dir="rtl" hidden><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="setTtl">
+  <header><h2 id="setTtl">הגדרות גיליון וחיתוך</h2><button class="icon-btn" id="setX" aria-label="סגור">✕</button></header>
+  <div class="body">
+    <div class="kv">
+      <label for="sMaxW">רוחב דף מקסימלי (ס״מ)</label><input type="number" id="sMaxW" step="0.5" value="199">
+      <label for="sMaxL">אורך דף מקסימלי (ס״מ)</label><input type="number" id="sMaxL" step="0.5" value="295">
+      <label for="sPmW">רוחב דף לראנרים ופלייסמנטים (ס״מ)</label><input type="number" id="sPmW" step="0.5" value="320">
+      <label for="sPmMx">שוליים בצדדים לראנרים ופלייסמנטים (ס״מ)</label><input type="number" id="sPmMx" step="0.5" value="5">
+      <label for="sGap">רווח בין שטיחים (ס״מ)</label><input type="number" id="sGap" step="0.1" value="0.7">
+      <label for="sMx">שוליים בצדדים (ס״מ)</label><input type="number" id="sMx" step="0.05" value="4.75">
+      <label for="sMy">שוליים למעלה ולמטה (ס״מ)</label><input type="number" id="sMy" step="0.05" value="2">
+      <label for="sFull">גודל שיוצא כמו שהוא</label><input type="text" id="sFull" value="200x300" class="mono" style="direction:ltr;text-align:center">
+      <label for="sFullW">רוחב מדיה לשטיח ברוחב מלא (ס״מ)</label><input type="number" id="sFullW" step="0.5" value="201">
+      <label for="sLabel">שם העבודה ומספר הגיליון בשולי הפרינט</label><input type="checkbox" id="sLabel" checked>
+      <label for="sDotsPrint">נקודות שחורות גם בקובץ הפרינט</label><input type="checkbox" id="sDotsPrint" checked>
+      <label for="sDotD">קוטר נקודה (ס״מ)</label><input type="number" id="sDotD" step="0.1" value="0.6">
+      <label for="sDotE">מרחק מרכז הנקודה מקצה הגיליון (ס״מ)</label><input type="number" id="sDotE" step="0.1" value="0.8">
+      <label for="sDot5">נקודה חמישית: מרחק מהנקודה הימנית התחתונה, שמאלה (ס״מ)</label><input type="number" id="sDot5" step="0.01" value="5.08">
+      <label for="sDotG">מרווח בין נקודות האורך לשטיח (ס״מ)</label><input type="number" id="sDotG" step="0.1" value="0.8">
+      <label for="sLayR">שם שכבת הנקודות בקובץ הקאט</label><input type="text" id="sLayR" value="REGISTER" style="direction:ltr;text-align:center">
+      <label for="sLayC">שם שכבת קווי החיתוך בקובץ הקאט</label><input type="text" id="sLayC" value="THRUCUT" style="direction:ltr;text-align:center">
+      <label for="sDotS">מרחק בין נקודות אורך לאורך שטיח (ס״מ)</label><input type="number" id="sDotS" step="1" value="50">
+    </div>
+    <p class="hint">ברירות המחדל לנקודות זהות לקובץ של Griffin (RUGS 26-10). קובץ הקאט: מלבנים נטו בספוט Thru-cut, והנקודות באותו ספוט.</p>
+  </div>
+  <footer><button class="btn primary" id="setOk">סגור</button></footer>
+</div></div>
+
+<div class="app" dir="rtl">
+  <header class="top">
+    <div class="brand"><h1>סידור שטיחים לזונד</h1><input type="text" id="jobName" class="jobname" aria-label="שם העבודה" title="שם העבודה: נכנס לשמות הקבצים, לשולי הגיליונות ולדף הריכוז. נמחק = חוזר לשם האוטומטי" spellcheck="false"><span class="tag" id="savedLbl" style="color:var(--ok)"></span><span class="tag">גיליונות של עד <span class="mono" id="limTxt">199×295</span> ס״מ</span></div>
+    <div class="tgroup" role="group" aria-label="עבודה">
+      <button class="tbtn" id="jobsBtn" type="button" title="כל העבודות השמורות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>העבודות שלי</span></button>
+      <button class="tbtn" id="newJobBtn" type="button" title="פתיחת עבודה חדשה. הנוכחית נשמרת"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg><span>חדשה</span></button>
+      <button class="tbtn" id="saveJobBtn" type="button" title="שמירת השינויים בעבודה הפתוחה (Cmd+S)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3M7 21v-7h10v7"/></svg><span>שמירה</span></button>
+      <button class="tbtn" id="saveAsBtn" type="button" title="שמירה כעבודה חדשה בשם אחר, ואפשר גם כקובץ במחשב"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l3 3v6"/><path d="M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"/><path d="M7 3v5h8V3"/><path d="M14 20l6-6 2 2-6 6h-2z"/></svg><span>שמירה בשם</span></button>
+    </div>
+    <div class="tgroup" role="group" aria-label="כלים">
+      <button class="tbtn" id="setBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>הגדרות</span></button>
+    </div>
+    <span class="vsep"></span>
+    <button class="btn expbtn2" id="expBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 18v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1"/></svg>ייצוא</button>
+  </header>
+
+  <main class="work">
+    <aside class="side" aria-label="הזמנות ושטיחים">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="orders" id="tabOrders">הזמנות <span class="cnt" id="cntOrders">0</span></button>
+        <button role="tab" aria-selected="false" data-tab="rugs" id="tabRugs">שטיחים <span class="cnt" id="cntRugs">0</span></button>
+      </div>
+      <div class="pane" data-pane="orders">
+        <label class="drop" id="dropOrders" for="inOrders">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
+          <strong>העלאת הזמנות</strong>
+          <span class="dsub">גררי הזמנות לכאן (PDF או SVG) או לחצי לבחירה</span>
+        </label>
+        <input type="file" id="inOrders" accept=".pdf,.svg,application/pdf,image/svg+xml" multiple>
+        <div class="row pgtools"><span class="muted" id="ordSum"></span><span style="display:flex;gap:6px"><button class="btn sm" id="addRow" type="button">+ שורה ידנית</button><button class="btn sm" id="clearAll" type="button" style="color:var(--bad)">ניקוי הזמנות</button></span></div>
+        <div class="sample-note" id="exampleNote" hidden><span>שורות דוגמה מההזמנות ששלחת בצ׳אט</span><button class="btn sm ghost" id="clearEx" type="button">ניקוי</button></div>
+        <div class="items" id="rows"></div>
+      </div>
+      <div class="pane" data-pane="rugs" hidden>
+        <div class="drop" id="dropRugs">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <strong>תיקיית השטיחים</strong>
+          <span class="dsub">גררי את התיקייה מהדסקטופ, או בחרי</span>
+          <span class="btns"><label class="btn sm primary" for="inRugDir">בחירת תיקייה</label><label class="btn sm" for="inRugs">בחירת קבצים</label></span>
+        </div>
+        <div class="fixdir" id="fixDir" hidden>
+          <div class="fdrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span><b>תיקייה קבועה</b> <span class="mono" id="fixName">—</span></span></div>
+          <div class="btns"><button type="button" class="btn sm primary" id="fixOpen" hidden>אישור וטעינה</button><button type="button" class="btn sm" id="fixReload" hidden>רענון תיקייה</button><button type="button" class="btn sm" id="fixSet">קביעת תיקייה קבועה</button><button type="button" class="btn sm ghost" id="fixForget" hidden>ביטול</button></div>
+          <p class="hint" id="fixMsg"></p>
+        </div>
+        <input type="file" id="inRugs" accept=".pdf,application/pdf" multiple>
+        <input type="file" id="inPick" accept=".pdf,application/pdf">
+        <input type="file" id="inRugDir" webkitdirectory multiple>
+        <div class="libstats" id="libStats"></div>
+        <div class="sample-note" id="aliasHelp" hidden style="display:block;line-height:1.55"><b>בחירת תיקיית רשת במק</b><br>1. בחלון הבחירה לחצי ⌘⇧G (Cmd+Shift+G).<br>2. הקלידי את הנתיב האמיתי, למשל <span class="mono" style="direction:ltr;display:inline-block">/Volumes/שם-השרת/שטיחים</span> ולחצי Enter, ואז ״העלאה״.<br>3. את הנתיב רואים כך: ב-Finder פותחים את התיקייה דרך קיצור הדרך, ולוחצים ⌘I. השורה ״מיקום״ היא הנתיב.<br>אפשרות נוספת: לפתוח את התיקייה ב-Finder ולגרור את האייקון שלה משורת הכותרת של החלון אל המסגרת הסגולה.</div>
+        <p class="hint" id="rugSummary">הקבצים נקראים רק במחשב שלך ולא עולים לשום מקום. פורמט שם: <span class="mono">שם_120x180cm_bleed3mm.pdf</span></p>
+        <div class="row pgtools"><input type="text" id="libQ" placeholder="חיפוש בספרייה" aria-label="חיפוש בספרייה" style="flex:1"><button class="btn sm ghost" id="clearRugs" type="button">ניקוי</button></div>
+        <div class="liblist" id="libList"></div>
+      </div>
+    </aside>
+
+    <section class="stage" aria-label="תצוגת גיליון">
+      <div class="toolbar" id="toolbar"></div>
+      <div class="wrap" id="wrap"><svg id="svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="הגיליון הנבחר"></svg>
+        <div class="empty" id="empty" hidden><strong>אין גיליונות עדיין</strong><span>העלי הזמנות בטאב ״הזמנות״, והסידור יופיע כאן.</span></div></div>
+      <div class="thumbbar"><div class="thumbs" id="sheets"></div></div>
+      <div class="bottombar"><span id="sheetSum"></span><span id="status">מוכן</span></div>
+    </section>
+
+    <aside class="strip" aria-label="התראות">
+      <button type="button" class="libtab" id="libTab" aria-expanded="false" aria-controls="libDrawer" title="ספריית השטיחים: לגרור שטיח להזמנה או לגיליון">ספריית שטיחים</button>
+      <div class="libdrawer" id="libDrawer" hidden>
+        <div class="ldhead"><b>ספריית שטיחים</b><span class="mono small muted" id="ldCount"></span><button type="button" class="icon-btn" id="ldClose" aria-label="סגירת הספרייה">✕</button></div>
+        <input type="text" id="ldQ" placeholder="חיפוש שם, קוד או תיקייה" aria-label="חיפוש בספרייה">
+        <p class="hint">גוררים שטיח אל כרטיס בהזמנות או אל שטיח בגיליון, והוא משויך אליו.</p>
+        <div class="ldtree" id="ldTree"></div>
+      </div>
+      <div class="legend" aria-label="מקרא"><span><i class="kdot k-rug"></i>שטיח</span><span><i class="kdot k-runner"></i>ראנר</span><span><i class="kdot k-placemat"></i>פלייסמנט</span></div>
+      <div class="strip-head">
+        <span class="lbl">התראות</span>
+        <div class="big" id="alertBig">0</div>
+        <div class="qbar" aria-hidden="true"><i class="qok" id="qOk" style="width:0"></i><i class="qmiss" id="qMiss" style="width:0"></i></div>
+        <div class="qleg"><span id="qOkTxt"></span><span id="qMissTxt"></span></div>
+      </div>
+      <div class="strip-list" id="alerts"></div>
+      <div class="strip-spots" id="fullBox" hidden>
+        <div class="spot-h"><span>יוצאים כמו שהם</span><span class="mono small muted" id="fullCnt"></span></div>
+        <div id="fullList" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+
+'use strict';
+const { PDFDocument, PDFName, PDFString, cmyk, rgb, degrees } = PDFLib;
+const PT = 72 / 2.54;
+const $ = id => document.getElementById(id);
+
+/* ---------- state ---------- */
+let rows = [];          // {id, order, name, w, l, qty, fileKey|null, auto:boolean, example}
+let rugFiles = new Map(); // key -> {file, name, w, l, norm}
+let trimCheck = new Map(); // fileKey -> {tw, th} cm (filled when read)
+let parseNotes = [];    // alerts from parsing orders
+let sheets = [], fullRoll = [], tooBig = [];
+let nextId = 1;
+const orderFiles = new Map();   // order number -> original order file (for the combined export)
+
+const S = () => ({
+  maxW: +$('sMaxW').value || 199, maxL: +$('sMaxL').value || 295,
+  gap: Math.max(0, +$('sGap').value || 0), mx: +$('sMx').value || 4.75, my: +$('sMy').value || 2,
+  full: ($('sFull').value.match(/(\d+(?:\.\d+)?)\s*[x×X*]\s*(\d+(?:\.\d+)?)/) || []).slice(1).map(Number),
+  dotsPrint: $('sDotsPrint').checked, pmW: +$('sPmW').value || 320, pmMx: +$('sPmMx').value || 5, label: $('sLabel').checked, fullW: +$('sFullW').value || 201,
+  dotD: Math.max(0.1, +$('sDotD').value || 0.6), dotEdge: +$('sDotE').value || 0.8, dot5: +$('sDot5').value || 5.08, dotGap: Math.max(0, +$('sDotG').value || 0), dotStep: Math.max(10, +$('sDotS').value || 50), layerReg: ($('sLayR').value || 'REGISTER').trim(), layerCut: ($('sLayC').value || 'THRUCUT').trim()
+});
+
+/* ---------- names ---------- */
+const norm = s => (s || '').toLowerCase().normalize('NFC')
+  .replace(/[֑-ׇ]/g, '')
+  .replace(/["'`׳״’”\-–_.,()\[\]{}:;!?/\\]/g, '').replace(/\s+/g, '');
+const PREFIX = norm('שטיח פי וי סי');
+const sameSize = (a, b) => (a.w === b.w && a.l === b.l) || (a.w === b.l && a.l === b.w);
+
+function parseRugFileName(fname, relPath) {
+  const base = fname.normalize('NFC').replace(/\.pdf$/i, '');
+  const parts = (relPath || '').normalize('NFC').split('/').slice(0, -1);
+  const SZ = /(?<!\d)(\d{2,3}(?:\.\d+)?)\s*(?:cm)?\s*[x×X*:\/]\s*(\d{2,3}(?:\.\d+)?)\s*(?:cm)?|(?<!\d)([1-4]\d{2})([1-4]\d{2})(?!\d)/i;
+  const clean = s => s.replace(/bleed\s*\d+\s*mm/ig, ' ').replace(/copy|עותק/ig, ' ').replace(/[_\-–]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let m = base.match(SZ), name = '';
+  if (m) name = clean(base.slice(0, m.index)) || clean(base.slice(m.index + m[0].length));
+  else { for (let i = parts.length - 1; i >= 0 && !m; i--) { const mm = parts[i].match(SZ); if (mm) { m = mm; name = clean(base); } } }
+  if (!m) return null;
+  if (!name) { for (let i = parts.length - 1; i >= 0 && !name; i--) name = clean(parts[i].replace(SZ, ' ')); }
+  if (!name) return null;
+  const a = +(m[1] || m[3]), b = +(m[2] || m[4]);
+  return { name, w: Math.min(a, b), l: Math.max(a, b) };
+}
+
+/* ---------- order parsing (PDF, also PDFs saved with a wrong extension such as .svg, and real SVG) ---------- */
+const SIZE_RE = /(\d{2,3}(?:\.\d)?)\s*[x×X*]\s*(\d{2,3}(?:\.\d)?)/;
+const PVC = /פי\s*וי\s*סי|pvc/i;
+const kindOf = txt => /פלייסמנט|פלייסמט|פליסמנט|placemat|place\s*mat|תחתית/i.test(txt) ? 'placemat' : /ראנר|רנר|runner/i.test(txt) ? 'runner' : 'rug';
+function cleanName(txt) {
+  let t = txt.replace(/\(?\s*מידות\s*:?/g, ' ').replace(/[()]/g, ' ').replace(/[…]|\.\.\./g, ' ');
+  t = t.replace(new RegExp(SIZE_RE.source, 'g'), ' ').replace(/(^|\s)[x×X*](?=\s|$)/g, ' ');
+  const parts = t.split(/\s+[-–]\s+|\s*[–]\s*|^\s*-\s*|\s*-\s*$/).map(p => p.trim()).filter(p => p && /[א-תA-Za-z]/.test(p) && !PVC.test(p));
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+const isX = s => /^\s*[x×X*]\s*$/.test(s);
+/* pdf text comes as pieces in visual order. Rebuild the reading order of a right-to-left line:
+   pieces right-to-left, but each run of non-Hebrew pieces (Latin names, codes, sizes) left-to-right */
+const HEB = /[֐-׿]/;
+function logicalLine(items) {
+  const desc = [...items].sort((a, b) => b.x - a.x); const out = []; let run = [];
+  const flush = () => { if (run.length) { out.push(...run.sort((a, b) => a.x - b.x).map(i => i.str)); run = []; } };
+  for (const it of desc) { if (HEB.test(it.str)) { flush(); out.push(it.str); } else run.push(it); }
+  flush();
+  return out.join(' ').replace(/\s+/g, ' ').trim();
+}
+const fixName = n => n.replace(/[()]/g, ' ').replace(/^[\s\-–:]+|[\s\-–:…]+$/g, '').replace(/\s+-\s*(\d)/g, '-$1').replace(/\s+/g, ' ').trim();
+function rowFromLogical(t) {
+  // "<product> פי וי סי - NAME - WxH (מידות: …)"
+  const m = t.match(/פי\s*וי\s*סי\s*[-–]\s*(.+?)\s+[-–]\s*[()\s]*(\d{2,3}(?:\.\d)?)\s*[x×X*]\s*(\d{2,3}(?:\.\d)?)/)
+         || t.match(/פי\s*וי\s*סי\s*[-–]\s*(.+?)\s+[-–]\s*[^\d]*?(?:\d\s*·\s*)?(\d{2,3}(?:\.\d)?)\s*[x×X*]\s*(\d{2,3}(?:\.\d)?)/);
+  if (!m) return null;
+  const name = fixName(m[1]); if (!name || !/[֐-׿A-Za-z]/.test(name)) return null;
+  const w = +m[2], l = +m[3];
+  return { name, w: Math.min(w, l), l: Math.max(w, l), kind: kindOf(t) };
+}
+// quantity = the number printed right next to "יח'" in the quantity column (never a size or a date)
+function qtyFromItems(items) {
+  const u = items.find(i => /^\s*\d*\s*יח['׳]?\s*\d*\s*$/.test(i.str));
+  if (!u) return 1;
+  const inl = u.str.match(/\d+/); if (inl) return +inl[0];
+  const nums = items.filter(i => /^\s*\d{1,4}\s*$/.test(i.str) && Math.abs(i.x - u.x) < 40).sort((a, b) => Math.abs(a.x - u.x) - Math.abs(b.x - u.x));
+  return nums.length ? +nums[0].str : 1;
+}
+function linesToRows(lines, allText) {
+  const found = [];
+  for (const items of lines) {
+    if (items.length && typeof items[0] === 'object') {
+      const t = logicalLine(items);
+      if (/משלוח|הדוגמה|דוגמה:/.test(t)) continue;
+      const r = rowFromLogical(t);
+      if (r) {
+        let units = 1; const uu = items.find(i => /יחידות/.test(i.str));
+        if (uu) { const inl = uu.str.match(/(\d+)\s*יחידות/); if (inl) units = +inl[1]; else { const nn = items.filter(i => /^\s*\d{1,2}\s*$/.test(i.str) && Math.abs(i.x - uu.x) < 40).sort((a, b) => Math.abs(a.x - uu.x) - Math.abs(b.x - uu.x)); if (nn.length) units = +nn[0].str; } }
+        const q = qtyFromItems(items);
+        found.push({ ...r, qty: q * units, units: units > 1 ? units : undefined }); continue;
+      }
+    }
+    const strs = items.map(i => typeof i === 'object' ? i.str : i);
+    let txt = strs.join(' ');
+    if (/חיטש/.test(txt) && !/שטיח/.test(txt)) txt = [...txt].reverse().join('');
+    if (!SIZE_RE.test(txt) || /משלוח|הדוגמה|דוגמה:/.test(txt)) continue;
+    const qm = txt.match(/יח['׳]?\s*(\d+)/) || txt.match(/(\d+)\s*יח/);
+    let desc = strs.filter(x => /[א-תA-Za-z]/.test(x) && !isX(x) && !/^\s*['׳]?\s*יח['׳]?\s*\d*\s*$/.test(x)).join(' ');
+    if (/חיטש/.test(desc) && !/שטיח/.test(desc)) desc = [...desc].reverse().join('');
+    const dims = [...txt.matchAll(new RegExp(SIZE_RE.source, 'g'))].map(m => [+m[1], +m[2]]);
+    const [w, l] = dims[dims.length - 1];
+    found.push({ name: cleanName(desc), w: Math.min(w, l), l: Math.max(w, l), qty: qm ? +qm[1] : 1, kind: kindOf(desc) });
+  }
+  if (!found.length && allText) {   // fallback: "(מידות: WxH)" anywhere + name from the "הדוגמה:" caption
+    const dm = allText.match(/מידות\s*:?\s*(\d{2,3})\s*[x×X*]\s*(\d{2,3})/) || allText.match(SIZE_RE);
+    const cap = allText.match(/הדוגמה\s*:\s*([^\n]+?)(?:\s{2,}|$|קמפוס)/);
+    if (dm && cap) { const w = +dm[1], l = +dm[2]; found.push({ name: cleanName(cap[1]), w: Math.min(w, l), l: Math.max(w, l), qty: 1, kind: kindOf(cap[1]), guessed: true }); }
+  }
+  return found.filter(x => x.name);
+}
+async function parseOrderFile(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const head = new TextDecoder('latin1').decode(buf.slice(0, 1024));
+  let lines = [], all = '', orderNo = '', textless = false;
+  if (head.includes('%PDF')) {
+    const pdf = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise;
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const tc = await (await pdf.getPage(p)).getTextContent();
+      const items = tc.items.filter(i => i.str && i.str.trim());
+      all += items.map(i => i.str).join(' ') + '\n';
+      const m = new Map();
+      for (const it of items) { const k = Math.round(it.transform[5] / 4); if (!m.has(k)) m.set(k, []); m.get(k).push({ str: it.str, x: it.transform[4] }); }
+      lines.push(...m.values());
+    }
+    pdf.destroy();
+  } else if (/<svg/i.test(head) || /\.svg$/i.test(file.name)) {
+    const doc = new DOMParser().parseFromString(new TextDecoder('utf-8').decode(buf), 'image/svg+xml');
+    const m = new Map();
+    for (const t of doc.querySelectorAll('text')) {
+      const str = t.textContent.trim(); if (!str) continue;
+      const tr = (t.getAttribute('transform') || '').match(/translate\(\s*[-\d.]+[\s,]+([-\d.]+)/) || (t.getAttribute('transform') || '').match(/matrix\((?:[^,\s]+[\s,]+){5}([-\d.]+)/);
+      const y = parseFloat(t.getAttribute('y') || (t.querySelector('tspan') && t.querySelector('tspan').getAttribute('y')) || (tr && tr[1]) || 0);
+      const k = Math.round(y / 4); if (!m.has(k)) m.set(k, []); const x = parseFloat(t.getAttribute('x') || 0); m.get(k).push({ str, x }); all += str + ' ';
+    }
+    lines = [...m.values()];
+  } else throw new Error('הקובץ אינו PDF ואינו SVG');
+  textless = !all.trim();
+  const om = all.match(/SO\s*(\d{6,})/) || file.name.match(/SO\s*(\d{6,})/);
+  orderNo = om ? 'SO' + om[1] : file.name.replace(/\.[a-z]+$/i, '');
+  return { orderNo, found: linesToRows(lines, all), textless };
+}
+
+/* ---------- matching ---------- */
+// a near-identical name in the right size (one or two letters different). Only offered, never used on its own
+function lev(a, b) { if (Math.abs(a.length - b.length) > 2) return 9; const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+// manual: open the computer's file window and use the chosen PDF for this row
+let pickRow = null;
+// the browser only sees the folder as it was when it was chosen, so a file added later needs a new look at the folder
+async function searchAgain(r) {
+  const label = `${r.name} ${r.w}×${r.l}`;
+  if (typeof fixHandle !== 'undefined' && fixHandle) {
+    setStatus(`מחפש מחדש בתיקייה: ${label}…`); await loadFixed(true);
+    setStatus(r.fileKey ? `נמצא: ${label}` : `עדיין לא נמצא ${label}. בדקי ששם הקובץ כתוב בדיוק כמו בהזמנה, או בחרי אותו מהמחשב`);
+  } else {
+    pendingAgain = r;
+    setStatus(`בחרי שוב את תיקיית השטיחים כדי שהכלי יראה קבצים חדשים (${label})`);
+    $('inRugDir').click();
+  }
+}
+let pendingAgain = null;
+function pickFileFor(r) { pickRow = r; $('inPick').value = ''; $('inPick').click(); }
+function attachPicked(f) {
+  const r = pickRow; pickRow = null; if (!r || !f) return;
+  const nm = f.name.normalize('NFC'), path = (f.webkitRelativePath || nm).normalize('NFC'), key = 'manual/' + path + '|' + f.size;
+  const p = parseRugFileName(nm, path) || { name: nm.replace(/\.pdf$/i, ''), w: r.w, l: r.l };
+  rugFiles.set(key, { file: f, ...p, norm: norm(p.name), path: 'נבחר ידנית/' + nm, aliases: rugAliases(p.name, path) });
+  r.fileKey = key; r.manual = true; trimCheck.delete(key);
+  setStatus(`${nm} שויך ל-${r.order || 'שורה'}: ${r.name} ${r.w}×${r.l}`);
+  update();
+  // check the real size of the chosen file against the order
+  f.arrayBuffer().then(b => PDFDocument.load(b, { ignoreEncryption: true, updateMetadata: false })).then(doc => { const tb = doc.getPage(0).getTrimBox(); trimCheck.set(key, { tw: tb.width / PT, th: tb.height / PT }); renderAlerts(); }).catch(() => {});
+}
+function suggestFile(row) {
+  const n = norm(stripType(row.name)); if (n.length < 3) return null;
+  let best = null;
+  for (const [k, f] of rugFiles) {
+    if (!sameSize(f, row)) continue;
+    for (const a of [f.norm, ...(f.aliases || [])]) { const dd = lev(n, a); if (dd <= 2 && (!best || dd < best.d)) best = { k, f, d: dd }; }
+  }
+  return best;
+}
+function autoMatch(row) {
+  const n0 = norm(row.name), n1 = norm(stripType(row.name));
+  const n = n0;
+  if (!n) return { key: null, kind: 'none' };
+  let exact = null, nameOnly = [];
+  for (const [k, f] of rugFiles) {
+    if (f.norm === n0 || f.norm === n1 || (f.aliases && (f.aliases.has(n0) || f.aliases.has(n1)))) { if (sameSize(f, row)) { exact = k; break; } nameOnly.push(f); }
+  }
+  if (exact) return { key: exact, kind: 'exact' };
+  // product code in the name (AO-3, MORT-3, RWFP003): a file or folder named exactly with that code
+  const cm = [...row.name.matchAll(/(?:^|[^A-Za-z])([A-Za-z]{1,6})\s*[-_]?\s*(\d{1,4})(?![\d])/g)].pop();
+  if (cm) {
+    const code = norm(cm[1] + cm[2]); let byCode = null; const codeSizes = [];
+    for (const [k, f] of rugFiles) {
+      if (f.norm === code || (f.aliases && f.aliases.has(code))) { if (sameSize(f, row)) { byCode = k; break; } codeSizes.push(f); }
+    }
+    if (byCode) return { key: byCode, kind: 'code', code: cm[1].toUpperCase() + '-' + cm[2] };
+    if (!nameOnly.length && codeSizes.length) return { key: null, kind: 'size', sizes: codeSizes.map(f => `${f.w}×${f.l}`) };
+  }
+  if (nameOnly.length) return { key: null, kind: 'size', sizes: nameOnly.map(f => `${f.w}×${f.l}`) };
+  return { key: null, kind: 'none' };
+}
+function rematchAll() {
+  for (const r of rows) {
+    if (r.manual && r.fileKey && rugFiles.has(r.fileKey)) { r.match = { key: r.fileKey, kind: 'manual' }; continue; }
+    r.manual = false;
+    r.match = autoMatch(r); r.fileKey = r.match.key;
+  }
+}
+
+/* ---------- packing (MaxRects, several heuristics, keep best) ---------- */
+class Bin {
+  constructor(W, H) { this.W = W; this.H = H; this.free = [{ x: 0, y: 0, w: W, h: H }]; this.used = []; }
+  find(w, h, heur) {
+    let best = null;
+    for (const f of this.free) for (const [ww, hh, rot] of [[w, h, false], [h, w, true]]) {
+      if (ww > f.w + 1e-9 || hh > f.h + 1e-9) continue;
+      let s1, s2;
+      if (heur === 'bl') { s1 = f.y + hh; s2 = f.x; }
+      else if (heur === 'cp') { s1 = -this.contact(f.x, f.y, ww, hh); s2 = f.y + hh; }
+      else if (heur === 'baf') { s1 = f.w * f.h - ww * hh; s2 = Math.min(f.w - ww, f.h - hh); }
+      else { s1 = Math.min(f.w - ww, f.h - hh); s2 = Math.max(f.w - ww, f.h - hh); }
+      if (!best || s1 < best.s1 - 1e-9 || (Math.abs(s1 - best.s1) < 1e-9 && s2 < best.s2)) best = { x: f.x, y: f.y, w: ww, h: hh, rot, s1, s2 };
+    }
+    return best;
+  }
+  contact(x, y, w, h) {
+    const ov = (a1, a2, b1, b2) => Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
+    let c = 0;
+    if (x === 0 || Math.abs(x + w - this.W) < 1e-9) c += h;
+    if (y === 0 || Math.abs(y + h - this.H) < 1e-9) c += w;
+    for (const u of this.used) {
+      if (Math.abs(u.x - (x + w)) < 1e-9 || Math.abs(u.x + u.w - x) < 1e-9) c += ov(u.y, u.y + u.h, y, y + h);
+      if (Math.abs(u.y - (y + h)) < 1e-9 || Math.abs(u.y + u.h - y) < 1e-9) c += ov(u.x, u.x + u.w, x, x + w);
+    }
+    return c;
+  }
+  place(n) {
+    const out = [];
+    for (const f of this.free) {
+      if (n.x >= f.x + f.w || n.x + n.w <= f.x || n.y >= f.y + f.h || n.y + n.h <= f.y) { out.push(f); continue; }
+      if (n.x > f.x) out.push({ x: f.x, y: f.y, w: n.x - f.x, h: f.h });
+      if (n.x + n.w < f.x + f.w) out.push({ x: n.x + n.w, y: f.y, w: f.x + f.w - n.x - n.w, h: f.h });
+      if (n.y > f.y) out.push({ x: f.x, y: f.y, w: f.w, h: n.y - f.y });
+      if (n.y + n.h < f.y + f.h) out.push({ x: f.x, y: n.y + n.h, w: f.w, h: f.y + f.h - n.y - n.h });
+    }
+    this.free = out.filter((a, i) => !out.some((b, j) => j !== i && a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h && (j < i || a.w !== b.w || a.h !== b.h || a.x !== b.x || a.y !== b.y)));
+    this.used.push(n);
+  }
+}
+function pack(items, s) {
+  const W = s.maxW - 2 * s.mx + s.gap, H = s.maxL - 2 * s.my + s.gap;
+  const sorts = [
+    (a, b) => b.w * b.l - a.w * a.l,
+    (a, b) => Math.max(b.w, b.l) - Math.max(a.w, a.l),
+    (a, b) => Math.min(b.w, b.l) - Math.min(a.w, a.l),
+    (a, b) => (b.w + b.l) - (a.w + a.l),
+  ];
+  // free "puzzle" nesting (rugs interlock, not only straight rows): many orders x heuristics, keep the best
+  let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const orders = sorts.map(so => [...items].sort(so));
+  for (let t = 0; t < 40; t++) { const o = [...items].sort(sorts[t % sorts.length]); for (let i = o.length - 1; i > 0; i--) if (rnd() < 0.35) { const j = Math.max(0, i - 1 - Math.floor(rnd() * 3)); [o[i], o[j]] = [o[j], o[i]]; } orders.push(o); }
+  let best = null;
+  for (const heur of ['bl', 'bssf', 'baf', 'cp']) for (const order0 of orders) {
+    const order = order0; const bins = [];
+    for (const it of order) {
+      const w = it.w + s.gap, h = it.l + s.gap;
+      let pick = null, pb = null;
+      for (const b of bins) { const p = b.find(w, h, heur); if (p) { pick = p; pb = b; break; } }
+      if (!pick) { pb = new Bin(W, H); bins.push(pb); pick = pb.find(w, h, heur); }
+      pb.place(pick); pick.item = it;
+    }
+    const len = bins.reduce((a, b) => a + Math.max(...b.used.map(u => u.y + u.h)), 0);
+    const score = [bins.length, len];
+    if (!best || score[0] < best.score[0] || (score[0] === best.score[0] && score[1] < best.score[1] - 1e-6)) best = { score, bins };
+  }
+  return (best ? best.bins : []).map(b => {
+    const its = b.used.map(u => ({ ...u.item, x: u.x, y: u.y, pw: u.w - s.gap, pl: u.h - s.gap, rot: u.rot }));
+    const Wc = Math.max(...its.map(i => i.x + i.pw)), Lc = Math.max(...its.map(i => i.y + i.pl));
+    const sh = { W: Wc + 2 * s.mx, H: Lc + 2 * s.my, items: its };
+    its.forEach(i => { i.X = s.mx + i.x; i.Y = s.my + i.y; });
+    sh.dots = marks(sh);
+    return sh;
+  });
+}
+
+/* ---------- registration dots (cm, top-left origin) — copied from the Griffin sample ---------- */
+function marks(sh) {
+  const st = S(), c = st.dotEdge, g = st.dotGap, { W, H } = sh;
+  const dots = [[c, c], [W - c, c], [c, H - c], [W - c, H - c], [W - c - st.dot5, H - c]];
+  const boxes = sh.items.map(i => [i.X, i.Y, i.X + i.pw, i.Y + i.pl]);
+  const free = (px, py) => boxes.every(([x0, y0, x1, y1]) => !(x0 - .4 < px && px < x1 + .4 && y0 - .4 < py && py < y1 + .4));
+  const along = (a, b, fixed, vert) => { const n = Math.max(1, Math.floor((b - a) / st.dotStep)), r = []; for (let k = 1; k <= n; k++) { const t = a + (b - a) * k / (n + 1); r.push(vert ? [fixed, t] : [t, fixed]); } return r; };
+  for (const [x0, y0, x1, y1] of boxes) {
+    const cand = [...along(y0, y1, x0 - g, true), ...along(y0, y1, x1 + g, true), ...along(x0, x1, y0 - g, false), ...along(x0, x1, y1 + g, false)];
+    for (const p of cand) if (free(...p) && p[0] > .6 && p[0] < W - .6 && p[1] > .6 && p[1] < H - .6 && dots.every(q => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 > 25)) dots.push(p);
+  }
+  return dots;
+}
+
+/* ---------- PDF output ---------- */
+const f4 = v => (v * PT).toFixed(4);
+function circleOps(cx, cy, r) {
+  const k = 0.5523 * r, f = v => v.toFixed(3);
+  return `${f(cx + r)} ${f(cy)} m ${f(cx + r)} ${f(cy + k)} ${f(cx + k)} ${f(cy + r)} ${f(cx)} ${f(cy + r)} c ${f(cx - k)} ${f(cy + r)} ${f(cx - r)} ${f(cy + k)} ${f(cx - r)} ${f(cy)} c ${f(cx - r)} ${f(cy - k)} ${f(cx - k)} ${f(cy - r)} ${f(cx)} ${f(cy - r)} c ${f(cx + k)} ${f(cy - r)} ${f(cx + r)} ${f(cy - k)} ${f(cx + r)} ${f(cy)} c f`;
+}
+async function buildCut(sheetList) {
+  // two layers: registration dots and cut lines, each on its own layer (names from the settings)
+  const st = S();
+  const doc = await PDFDocument.create(); const ctx = doc.context;
+  const fnCut = ctx.register(ctx.obj({ FunctionType: 2, Domain: [0, 1], C0: [0, 0, 0, 0], C1: [0.7, 0.85, 0, 0], N: 1 }));
+  const csCut = ctx.obj([PDFName.of('Separation'), PDFName.of('Thru-cut'), PDFName.of('DeviceCMYK'), fnCut]);
+  const fnReg = ctx.register(ctx.obj({ FunctionType: 2, Domain: [0, 1], C0: [0, 0, 0, 0], C1: [1, 1, 1, 1], N: 1 }));
+  const csReg = ctx.obj([PDFName.of('Separation'), PDFName.of('All'), PDFName.of('DeviceCMYK'), fnReg]);
+  const mkOcg = name => { const d = ctx.obj({ Type: 'OCG' }); d.set(PDFName.of('Name'), PDFString.of(name)); return ctx.register(d); };
+  const ocgReg = mkOcg(st.layerReg), ocgCut = mkOcg(st.layerCut);
+  doc.catalog.set(PDFName.of('OCProperties'), ctx.obj({ OCGs: [ocgReg, ocgCut], D: { ON: [ocgReg, ocgCut], Order: [ocgReg, ocgCut] } }));
+  for (const sh of sheetList) {
+    const page = doc.addPage([sh.W * PT, sh.H * PT]);
+    const ops = ['/OC /Reg BDC', 'q /CSR cs 1 scn'];
+    for (const [x, y] of sh.dots) ops.push(circleOps(x * PT, (sh.H - y) * PT, st.dotD / 2 * PT));
+    ops.push('Q', 'EMC', '/OC /Cut BDC', 'q /CSC CS 1 SCN 1 w 0 J 0 j');
+    for (const i of sh.items) ops.push(`${f4(i.X)} ${f4(sh.H - i.Y - i.pl)} ${f4(i.pw)} ${f4(i.pl)} re S`);
+    ops.push('Q', 'EMC');
+    page.node.set(PDFName.of('Resources'), ctx.obj({ ColorSpace: { CSC: csCut, CSR: csReg }, Properties: { Reg: ocgReg, Cut: ocgCut } }));
+    page.node.set(PDFName.of('Contents'), ctx.register(ctx.stream(ops.join('\n'))));
+    page.setTrimBox(0, 0, sh.W * PT, sh.H * PT);
+  }
+  return doc.save();
+}
+// Some rug PDFs carry an empty text block that points at a non-embedded Helvetica ("BT /F1 12 Tf ... ET", draws nothing).
+// RIPs such as Caldera stop on it, so strip text blocks that show no text, and drop fonts nobody uses any more.
+let cleanedFonts = 0;
+function cleanRugDoc(doc) {
+  try {
+    const pg = doc.getPage(0), node = pg.node, ctx = doc.context;
+    let refs = node.get(PDFName.of('Contents')); if (!refs) return doc;
+    const arr = refs instanceof PDFLib.PDFArray ? refs.asArray() : [refs];
+    let text = '';
+    for (const r of arr) { const st = ctx.lookup(r); text += new TextDecoder('latin1').decode(PDFLib.decodePDFRawStream(st).decode()) + '\n'; }
+    const cleaned = text.replace(/\bBT\b[\s\S]*?\bET\b/g, blk => /(Tj|TJ|'|")\s*$/m.test(blk) || /\)\s*Tj|\]\s*TJ/.test(blk) ? blk : '');
+    if (cleaned !== text) {
+      const bytes = Uint8Array.from(cleaned, ch => ch.charCodeAt(0) & 255);
+      node.set(PDFName.of('Contents'), ctx.register(ctx.flateStream(bytes)));
+      if (!/\bTf\b/.test(cleaned)) { const res = node.Resources(); if (res && res.has(PDFName.of('Font'))) { res.delete(PDFName.of('Font')); cleanedFonts++; } }
+    }
+  } catch (e) {}
+  return doc;
+}
+async function buildPrint(sheetList, s, progress) {
+  const doc = await PDFDocument.create();
+  // the sheet label is drawn as a black image, so the print file carries no font of its own (RIPs complain about unembedded fonts)
+  const lblImg = async (t, pt = 9, rtl = false) => {
+    const px = pt / 72 * 600, c = document.createElement('canvas'), x = c.getContext('2d');
+    x.font = `700 ${px}px Arial, Helvetica, sans-serif`; x.direction = rtl ? 'rtl' : 'ltr'; const w = Math.ceil(x.measureText(t).width) + 4;
+    c.width = w; c.height = Math.ceil(px * 1.3); const y = c.getContext('2d');
+    y.font = `700 ${px}px Arial, Helvetica, sans-serif`; y.fillStyle = '#000'; y.textBaseline = 'middle'; y.direction = rtl ? 'rtl' : 'ltr';
+    if (rtl) { y.textAlign = 'right'; y.fillText(t, c.width - 2, c.height / 2); } else y.fillText(t, 2, c.height / 2);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    return { img: await doc.embedPng(await blob.arrayBuffer()), w: c.width * 72 / 600, h: c.height * 72 / 600 };
+  };
+  const srcCache = new Map(), embCache = new Map();
+  let n = 0; const total = sheetList.reduce((a, b) => a + b.items.length, 0);
+  for (const sh of sheetList) {
+    const FULL_STRIP = 1.2;   // full-width pages: a strip under the graphic for "order · name", no Zund marks
+    const page = doc.addPage([sh.W * PT, (sh.H + (sh.group === 'full' ? FULL_STRIP : 0)) * PT]);
+    if (sh.group === 'full') {
+      const i = sh.items[0]; progress && progress(`ממקם ${++n}/${total}: ${i.name}`);
+      const y0 = FULL_STRIP * PT;
+      { const L = await lblImg(sh.copies > 1 ? `${sheetId(sh)} · ${i.name} · x${sh.copies}` : `${sheetId(sh)} · ${i.order || ''}${i.order ? ' · ' : ''}${i.name}`, 11, true); page.drawImage(L.img, { x: sh.W * PT - 5 * PT - L.w, y: y0 - 0.05 * PT - L.h, width: L.w, height: L.h }); }
+      const f = i.fileKey && rugFiles.get(i.fileKey);
+      if (!f) { page.drawRectangle({ x: 0, y: y0, width: sh.W * PT, height: sh.H * PT, color: cmyk(0, 0, 0, .15) }); continue; }
+      if (!srcCache.has(i.fileKey)) srcCache.set(i.fileKey, cleanRugDoc(await PDFDocument.load(await f.file.arrayBuffer(), { ignoreEncryption: true, updateMetadata: false })));
+      const sp = srcCache.get(i.fileKey).getPage(0), mb = sp.getMediaBox(), tb = sp.getTrimBox();
+      trimCheck.set(i.fileKey, { tw: tb.width / PT, th: tb.height / PT });
+      const emb = await doc.embedPage(sp, { left: mb.x, bottom: mb.y, right: mb.x + mb.width, top: mb.y + mb.height });
+      const PW = sh.W * PT, PH = sh.H * PT, rot = (mb.width > mb.height) !== (PW > PH);
+      const aw = rot ? mb.height : mb.width, ah = rot ? mb.width : mb.height, k = Math.max(PW / aw, PH / ah);
+      const dw = aw * k, dh = ah * k, ox = (PW - dw) / 2, oy = y0 + (PH - dh) / 2;
+      page.pushOperators(PDFLib.pushGraphicsState(), PDFLib.rectangle(0, y0, PW, PH), PDFLib.clip(), PDFLib.endPath());
+      if (rot) page.drawPage(emb, { x: ox + dw, y: oy, width: mb.width * k, height: mb.height * k, rotate: degrees(90) });
+      else page.drawPage(emb, { x: ox, y: oy, width: dw, height: dh });
+      page.pushOperators(PDFLib.popGraphicsState());
+      continue;
+    }
+    for (const i of sh.items) {
+      progress && progress(`ממקם ${++n}/${total}: ${i.name}`);
+      const x = i.X * PT, y = (sh.H - i.Y - i.pl) * PT, w = i.pw * PT, h = i.pl * PT;
+      const f = i.fileKey && rugFiles.get(i.fileKey);
+      if (!f) { page.drawRectangle({ x, y, width: w, height: h, color: cmyk(0, 0, 0, .15) }); continue; }
+      if (!srcCache.has(i.fileKey)) srcCache.set(i.fileKey, cleanRugDoc(await PDFDocument.load(await f.file.arrayBuffer(), { ignoreEncryption: true, updateMetadata: false })));
+      const src = srcCache.get(i.fileKey), sp = src.getPage(0);
+      const mb = sp.getMediaBox(), tb = sp.getTrimBox();
+      const tw = tb.width, th = tb.height;
+      trimCheck.set(i.fileKey, { tw: tw / PT, th: th / PT });
+      const avail = Math.min(tb.x - mb.x, tb.y - mb.y, mb.x + mb.width - tb.x - tw, mb.y + mb.height - tb.y - th);
+      const bb = Math.max(0, Math.min(avail, (s.gap / 2) * PT, 0.3 * PT));
+      const ek = i.fileKey + '|' + bb.toFixed(3);
+      if (!embCache.has(ek)) embCache.set(ek, await doc.embedPage(sp, { left: tb.x - bb, bottom: tb.y - bb, right: tb.x + tw + bb, top: tb.y + th + bb }));
+      const emb = embCache.get(ek);
+      if (i.rot) { const s1 = h / tw, s2 = w / th; page.drawPage(emb, { x: x + w + bb * s2, y: y - bb * s1, width: (tw + 2 * bb) * s1, height: (th + 2 * bb) * s2, rotate: degrees(90) }); }
+      else { const s1 = w / tw, s2 = h / th; page.drawPage(emb, { x: x - bb * s1, y: y - bb * s2, width: (tw + 2 * bb) * s1, height: (th + 2 * bb) * s2 }); }
+    }
+    if (s.label) {   // to the left of the 5th (orientation) dot, on the same line, bottom edge
+      const t = sheetLabel(sh).replace(/[^\x20-\x7e]/g, ''), L = await lblImg(t), tw = L.w;
+      const xEnd = (sh.W - s.dotEdge - s.dot5 - s.dotD / 2 - 4) * PT, yMid = s.dotEdge * PT;
+      page.drawImage(L.img, { x: Math.max(0.5 * PT, xEnd - tw), y: yMid - L.h / 2, width: L.w, height: L.h });
+    }
+    if (s.dotsPrint) for (const [cx, cy] of sh.dots) page.drawCircle({ x: cx * PT, y: (sh.H - cy) * PT, size: s.dotD / 2 * PT, color: cmyk(0, 0, 0, 1), borderWidth: 0 });
+  }
+  return doc.save();
+}
+
+/* ---------- compute + render ---------- */
+const packCache = new Map();
+function compute() {
+  const s = S();
+  const groups = { rug: [], table: [], pm: [] }; fullRoll = []; tooBig = [];
+  const cw = s.maxW - 2 * s.mx, cl = s.maxL - 2 * s.my;
+  for (const r of rows) {
+    if (!(r.w > 0 && r.l > 0 && r.qty > 0)) continue;
+    const isFull = s.full.length === 2 && sameSize(r, { w: s.full[0], l: s.full[1] });
+    for (let q = 0; q < r.qty; q++) {
+      const it = { rowId: r.id, name: r.name || '(ללא שם)', order: r.order, w: r.w, l: r.l, fileKey: r.fileKey, kind: r.kind || 'rug' };
+      if (isFull) { fullRoll.push(it); continue; }
+      const gw = matGroup(r.kind) === 'table' ? s.pmW - 2 * s.pmMx : cw;
+      const fits = (r.w <= gw && r.l <= cl) || (r.l <= gw && r.w <= cl);
+      if (!fits) { tooBig.push(it); continue; }
+      groups[matGroup(it.kind)].push(it);
+    }
+  }
+  sheets = [];
+  for (const g of ['rug', 'table', 'pm']) if (groups[g].length) {
+    const sg = g === 'table' ? { ...s, maxW: s.pmW, mx: s.pmMx } : s;   // runners + placemats run together on the 320 roll
+    const sig = JSON.stringify([sg, groups[g].map(i => [i.rowId, i.w, i.l, i.fileKey, i.name, i.order])]);
+    if (!packCache.has(sig)) { if (packCache.size > 20) packCache.clear(); packCache.set(sig, pack(groups[g], sg)); }
+    sheets.push(...packCache.get(sig).map(sh => ({ ...sh, group: g })));
+  }
+  fullRoll.sort((a, b) => ordNum(a.order) - ordNum(b.order));
+  for (const it of fullRoll) {   // full roll width: one page each, media width x ordered length, art fills the page (cover), nothing else
+    const W = s.fullW, H = Math.max(it.w, it.l);
+    sheets.push({ W, H, group: 'full', dots: [], items: [{ ...it, X: 0, Y: 0, pw: W, pl: H, rot: false, cover: true }] });
+  }
+  // identical sheets (same rugs, same files, same layout) become one sheet printed N times
+  const sigOf = sh => JSON.stringify([sh.group, sh.W, sh.H, sh.items.map(i => [i.fileKey || norm(i.name || ''), i.w, i.l, +i.X.toFixed(2), +i.Y.toFixed(2), i.pw, i.pl, !!i.rot]).sort()]);
+  const bySig = new Map(), merged = [];
+  for (const sh of sheets) {
+    const k = sigOf(sh), first = bySig.get(k);
+    if (first) { first.copies++; first.allItems.push(...sh.items); continue; }
+    const m = { ...sh, copies: 1, allItems: [...sh.items] }; bySig.set(k, m); merged.push(m);
+  }
+  sheets = merged;
+}
+const cpx = sh => (sh.copies > 1 ? `_x${sh.copies}` : '');
+
+/* ---------- thumbnails (rendered locally from the rug PDF with pdf.js) ---------- */
+const thumbs = new Map(); const thumbBusy = new Set();
+const fileDims = new Map();   // key -> {w,h} cm of the file's page, as saved (w = across)
+// will the graphic be stretched? (file lying the other way, or a different size than ordered)
+function stretchInfo(r) {
+  if (!r.fileKey) return null;
+  const tc = trimCheck.get(r.fileKey), d = tc ? { w: tc.tw, h: tc.th } : fileDims.get(r.fileKey);
+  if (!d) return null;
+  const f1 = n => Math.round(n * 10) / 10;
+  if (!isFullSize(r) && ((r.w < r.l - 1 && d.w > d.h + 1) || (r.w > r.l + 1 && d.w < d.h - 1)))
+    return { kind: 'orient', text: `הקובץ שמור ${d.w > d.h ? 'לרוחב' : 'לגובה'} (${f1(d.w)}×${f1(d.h)}) וההזמנה ${r.w}×${r.l}. השטיח יימתח. לחצי ⇄ כדי להחליף רוחב ואורך` };
+  if (!isFullSize(r) && (Math.abs(Math.min(d.w, d.h) - Math.min(r.w, r.l)) > 1.5 || Math.abs(Math.max(d.w, d.h) - Math.max(r.w, r.l)) > 1.5))
+    return { kind: 'size', text: `גודל הקובץ ${f1(d.w)}×${f1(d.h)} שונה מההזמנה ${r.w}×${r.l}. השטיח יימתח` };
+  return null;
+}
+let thumbActive = 0; const thumbWait = [];
+async function ensureThumb(key) {
+  if (!key || thumbs.has(key) || thumbBusy.has(key) || !rugFiles.has(key)) return;
+  thumbBusy.add(key);
+  if (thumbActive >= 2) await new Promise(r => thumbWait.push(r));
+  thumbActive++;
+  try {
+    const f = rugFiles.get(key);
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await f.file.arrayBuffer()), isEvalSupported: false }).promise;
+    const page = await pdf.getPage(1);
+    const v0 = page.getViewport({ scale: 1 }); const scale = 260 / Math.max(v0.width, v0.height);
+    { const vw = page.view, bl = /bleed\s*3\s*mm/i.test(f.file.name || '') ? 0.6 : 0; fileDims.set(key, { w: (vw[2] - vw[0]) / PT - bl, h: (vw[3] - vw[1]) / PT - bl }); }
+    const vp = page.getViewport({ scale });
+    const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    thumbs.set(key, c.toDataURL('image/jpeg', 0.8));
+    pdf.destroy();
+  } catch (e) { thumbs.set(key, ''); }
+  thumbActive--; const nx = thumbWait.shift(); if (nx) nx();
+  thumbBusy.delete(key);
+  scheduleRender();
+}
+let rT = 0; const scheduleRender = () => { clearTimeout(rT); rT = setTimeout(() => { renderRows(); renderSheets(); renderLib(); renderAlerts(); }, 60); };
+const thumbHtml = (key, fallback) => { const t = key && thumbs.get(key); return t ? `<img src="${t}" alt="">` : esc(fallback || ''); };
+
+let curSheet = 0, viewMode = 'art', selRow = null;
+const sheetsOfRow = id => sheets.map((sh, i) => (sh.allItems || sh.items).some(it => it.rowId === id) ? i : -1).filter(i => i >= 0);
+function selectRow(id, fromSheet) {
+  const list = sheetsOfRow(id);
+  if (selRow === id && list.length > 1 && !fromSheet) curSheet = list[(list.indexOf(curSheet) + 1) % list.length];
+  else if (list.length && !fromSheet && !list.includes(curSheet)) curSheet = list[0];
+  selRow = id; renderRows(); renderSheets();
+  if (fromSheet) { const el = document.querySelector(`.item[data-row="${id}"]`); if (el) { showTab('orders'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } }
+}
+const isFullSize = r => { const s = S(); return s.full.length === 2 && sameSize(r, { w: s.full[0], l: s.full[1] }); };
+const ICON_X = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+function rowState(r) {
+  if (isFullSize(r)) { if (!rugFiles.size) return ['full', 'st-fill', 'רוחב מלא']; return r.fileKey ? ['ok', 'st-ok', r.match && r.match.kind === 'code' ? 'רוחב מלא · נמצא לפי קוד' : 'רוחב מלא · נמצא'] : ['bad', 'st-none', r.match && r.match.kind === 'size' ? 'אין בגודל הזה' : 'חסר שטיח · רוחב מלא']; }
+  if (!rugFiles.size) return ['', 'st-part', 'מחכה לתיקייה'];
+  const k = r.match ? r.match.kind : 'none';
+  if (r.match && r.match.kind === 'code') return ['ok', 'st-ok', 'נמצא לפי קוד ' + r.match.code];
+  return { exact: ['ok', 'st-ok', 'נמצא'], manual: ['ok', 'st-ok', 'נבחר ידנית'], size: ['bad', 'st-none', 'אין בגודל הזה'], none: ['bad', 'st-none', 'חסר ' + KINDS[kindKey(r.kind)]] }[k] || ['bad', 'st-none', 'חסר ' + KINDS[kindKey(r.kind)]];
+}
+
+const KINDS = { rug: 'שטיח', runner: 'ראנר', placemat: 'פלייסמנט' };
+const KIND_ORDER = ['rug', 'runner', 'placemat'];
+const kindKey = k => k === 'table' ? 'runner' : (KINDS[k] ? k : 'rug');
+const matGroup = k => kindKey(k) === 'rug' ? 'rug' : 'table';
+const ordNum = o => { const m = String(o || '').match(/(\d{5,})/); return m ? +m[1] : Infinity; };
+
+function renderRows() {
+  const box = $('rows'); const active = document.activeElement && document.activeElement.id;
+  box.innerHTML = '';
+  const fileOpts = [...rugFiles.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name, 'he'));
+  // group rows by order (orders whose PDF could not be read show up too, with no items)
+  const byOrder = new Map();
+  for (const r of rows) { const k = r.order || ''; if (!byOrder.has(k)) byOrder.set(k, []); byOrder.get(k).push(r); }
+  for (const n of parseNotes) if (n.cls === 'bad' && n.order && !byOrder.has(n.order)) byOrder.set(n.order, []);
+  const orders = [...byOrder.keys()].sort((a, b) => (a === '') - (b === '') || ordNum(a) - ordNum(b) || a.localeCompare(b));
+  for (const ord of orders) {
+    const list = byOrder.get(ord);
+    const problems = [];
+    for (const r of list) { const [cls] = rowState(r); if (cls === 'bad') problems.push(`${r.match && r.match.kind === 'size' ? 'אין בגודל' : 'חסר'}: ${r.name} ${r.w}×${r.l}`); else if (stretchInfo(r)) problems.push(`יימתח: ${r.name} ${r.w}×${r.l}`); }
+    const pnote = parseNotes.find(n => n.order === ord && n.cls === 'bad');
+    if (pnote && !list.length) problems.push('לא נקראה מההזמנה אף שורה');
+    const waiting = !rugFiles.size && list.length > 0;
+    const st = problems.length ? 'bad' : waiting ? 'wait' : 'ok';
+    const g = document.createElement('section'); g.className = 'ogrp ' + st;
+    const kinds = KIND_ORDER.filter(k => list.some(r => kindKey(r.kind) === k));
+    g.innerHTML = `<header class="ohead"><span class="ono"></span><span class="okinds">${kinds.map(k => `<i class="kdot k-${k}" title="${KINDS[k]}"></i>`).join('')}</span><span class="ocnt"></span><span class="ostat" aria-hidden="true">${st === 'ok' ? '✓' : st === 'bad' ? '✕' : '…'}</span></header>`;
+    g.querySelector('.ono').textContent = ord || 'ללא מספר הזמנה';
+    if (ord && !orderFiles.has(ord)) { const on = g.querySelector('.ono'); on.title = 'קובץ ההזמנה לא נמצא בעבודה הזו. כדי לראות אותה: ״הסרה״ והעלאה מחדש'; on.style.cursor = 'help'; }
+    if (orderFiles.has(ord)) { const on = g.querySelector('.ono'); on.classList.add('olink'); on.title = 'תצוגה מקדימה של ההזמנה'; on.tabIndex = 0; on.setAttribute('role', 'button'); on.onclick = () => openOrder(ord); on.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openOrder(ord); } }; }
+    const delO = document.createElement('button'); delO.type = 'button'; delO.className = 'btn sm ghost odel'; delO.textContent = 'הסרה';
+    delO.title = 'הסרת ההזמנה מהעבודה';
+    delO.onclick = () => { if (delO.dataset.sure) { rows = rows.filter(r => (r.order || '') !== ord); parseNotes = parseNotes.filter(n => n.order !== ord); orderFiles.delete(ord); if (selRow && !rows.some(r => r.id === selRow)) selRow = null; update(); } else { delO.dataset.sure = 1; delO.textContent = 'להסיר?'; delO.style.color = 'var(--bad)'; setTimeout(() => { if (delO.isConnected) { delete delO.dataset.sure; delO.textContent = 'הסרה'; delO.style.color = ''; } }, 3000); } };
+    g.querySelector('.ostat').before(delO);
+    const q = list.reduce((a, r) => a + (r.qty || 0), 0);
+    g.querySelector('.ocnt').textContent = list.length > 1 || q > 1 ? `${q} פריטים` : '';
+    g.querySelector('.ostat').title = st === 'ok' ? 'כל הפריטים נמצאו' : st === 'bad' ? 'יש בעיה בהזמנה' : 'מחכה לתיקיית השטיחים';
+    if (problems.length) { const p = document.createElement('div'); p.className = 'onote'; p.textContent = problems.join(' · '); g.append(p); }
+    const body = document.createElement('div'); body.className = 'oitems'; g.append(body);
+    for (const r of list) {
+      const [cls, pcls, ptxt] = rowState(r);
+      const kk = kindKey(r.kind);
+      const d = document.createElement('div'); d.className = 'item ' + cls + (selRow === r.id ? ' sel' : ''); d.dataset.row = r.id;
+      const shIdx = sheetsOfRow(r.id);
+      d.innerHTML = `<div class="item-main">
+          <div class="thumb">${thumbHtml(r.fileKey, `${r.w}×${r.l}`)}</div>
+          <div class="item-info"><span class="nmrow"><button type="button" class="kdot k-${kk} kbtn" title="${KINDS[kk]} (לחיצה מחליפה סוג)" aria-label="סוג: ${KINDS[kk]}. לחיצה מחליפה"></button><input class="nm" id="n${r.id}" aria-label="שם שטיח"><span class="pc ${pcls}">${ptxt}</span></span>
+            <span class="item-ctrls">
+              <span class="dim"><input type="number" id="w${r.id}" aria-label="רוחב"><button type="button" class="swapbtn" title="החלפה בין רוחב לאורך" aria-label="החלפה בין רוחב לאורך">⇄</button><input type="number" id="l${r.id}" aria-label="אורך"></span>
+              <span class="qtyctl"><button type="button" data-q="-1" aria-label="פחות">−</button><input type="number" id="q${r.id}" min="1" aria-label="כמות"><button type="button" data-q="1" aria-label="יותר">+</button></span></span></div>
+          <button class="xdel" type="button" aria-label="מחיקת שורה">${ICON_X}</button></div>`;
+      d.querySelector('#n' + r.id).value = r.name;
+      d.querySelector('#w' + r.id).value = r.w || ''; d.querySelector('#l' + r.id).value = r.l || ''; d.querySelector('#q' + r.id).value = r.qty;
+      d.addEventListener('click', e => { if (e.target.closest('input,select,.xdel,.kbtn,[data-q]')) return; selectRow(r.id); });
+      d.querySelector('.swapbtn').onclick = e => { e.stopPropagation(); [r.w, r.l] = [r.l, r.w]; setStatus(`${r.name}: עכשיו ${r.w}×${r.l}`); update(); };
+      const si = stretchInfo(r);
+      if (si) { const wn = document.createElement('div'); wn.className = 'stretchwarn'; wn.textContent = '❗ ' + si.text; d.append(wn); d.classList.add('stretch'); }
+      d.querySelector('.kbtn').onclick = () => { r.kind = KIND_ORDER[(KIND_ORDER.indexOf(kk) + 1) % 3]; update(); };
+      if (cls !== 'ok') {
+        const sug = rugFiles.size ? suggestFile(r) : null;
+        if (sug) {
+          const sb = document.createElement('button'); sb.type = 'button'; sb.className = 'sugbtn';
+          sb.textContent = `אולי: ״${sug.f.name}״ ${sug.f.w}×${sug.f.l}? לחיצה לשימוש`;
+          sb.title = sug.f.path || ''; sb.onclick = e => { e.stopPropagation(); r.fileKey = sug.k; r.manual = true; update(); };
+          d.append(sb);
+        }
+        const pick = document.createElement('button'); pick.type = 'button'; pick.className = 'btn sm pickbtn';
+        pick.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>בחירת קובץ מהמחשב…';
+        pick.onclick = e => { e.stopPropagation(); pickFileFor(r); };
+        const again = document.createElement('button'); again.type = 'button'; again.className = 'btn sm againbtn'; again.textContent = '↻ חיפוש מחדש';
+        again.title = 'הוספת את השטיח לתיקייה? חיפוש מחדש בתיקייה';
+        again.onclick = e => { e.stopPropagation(); searchAgain(r); };
+        const brow = document.createElement('div'); brow.className = 'row'; brow.style.gap = '6px'; brow.append(pick, again); d.append(brow);
+      } else if (r.manual) {
+        const un = document.createElement('button'); un.type = 'button'; un.className = 'btn sm ghost'; un.textContent = 'ביטול בחירה ידנית';
+        un.onclick = () => { r.manual = false; r.fileKey = null; update(); }; d.append(un);
+      }
+      const bind = (id, key, num) => { const el = d.querySelector('#' + id + r.id); el.onchange = () => { r[key] = num ? (+el.value || 0) : el.value.trim(); if (key !== 'qty') r.manual = false; update(); }; };
+      bind('n', 'name'); bind('w', 'w', 1); bind('l', 'l', 1); bind('q', 'qty', 1);
+      d.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { r.qty = Math.max(1, (r.qty || 1) + +b.dataset.q); update(); });
+      d.querySelector('.xdel').onclick = () => { rows = rows.filter(x => x !== r); update(); };
+      body.append(d);
+      if (r.fileKey) ensureThumb(r.fileKey);
+    }
+    if (!list.length) {
+      const add = document.createElement('button'); add.type = 'button'; add.className = 'btn sm'; add.textContent = '+ הוספת שורה ידנית להזמנה';
+      add.onclick = () => { rows.push({ id: nextId++, order: ord, name: '', w: 0, l: 0, qty: 1, kind: 'rug', fileKey: null }); update(); const el = $('n' + (nextId - 1)); el && el.focus(); };
+      body.append(add);
+    }
+    box.append(g);
+  }
+  if (active && $(active)) $(active).focus();
+  $('exampleNote').hidden = !rows.some(r => r.example);
+  const n = rows.reduce((a, r) => a + (r.qty || 0), 0);
+  $('ordSum').textContent = orders.length ? `${orders.filter(Boolean).length} הזמנות · ${n} פריטים` : '';
+  $('cntOrders').textContent = orders.filter(Boolean).length;
+}
+
+function renderLib() {
+  $('cntRugs').textContent = rugFiles.size;
+  const used = new Set(rows.map(r => r.fileKey).filter(Boolean));
+  const need = rows.filter(r => !isFullSize(r)).length;
+  const found = rows.filter(r => !isFullSize(r) && r.fileKey).length;
+  $('libStats').innerHTML = `<span>קבצים בספרייה</span><b>${rugFiles.size}</b><span>שטיחים שנמצאו להזמנות</span><b>${rugFiles.size ? found + ' / ' + need : '—'}</b>`;
+  const qRaw = $('libQ').value.trim().toLowerCase(), q = norm(qRaw);
+  const list = [...rugFiles.entries()].filter(([, f]) => !q || f.norm.includes(q) || (f.path || '').toLowerCase().includes(qRaw));
+  // folder tree: collection folder -> sub-folders -> files
+  const tree = new Map();
+  for (const [key, f] of list) {
+    const parts = (f.path || f.file.name).split('/'); parts.pop();
+    const col = parts.length > 1 ? parts[1] : (parts[0] || 'ללא תיקייה');
+    const sub = parts.slice(2).join(' / ');
+    if (!tree.has(col)) tree.set(col, new Map());
+    const t = tree.get(col); if (!t.has(sub)) t.set(sub, []); t.get(sub).push([key, f]);
+  }
+  const box = $('libList'); box.innerHTML = '';
+  const root = list.length ? (list[0][1].path || '').split('/')[0] : '';
+  if (root) { const h = document.createElement('p'); h.className = 'hint'; h.textContent = `תיקייה ראשית: ${root} · ${tree.size} תיקיות`; box.append(h); }
+  const cols = [...tree.keys()].sort((a, b) => a.localeCompare(b, 'he', { numeric: true }));
+  for (const col of cols) {
+    const t = tree.get(col); const cnt = [...t.values()].reduce((a, v) => a + v.length, 0);
+    const usedHere = [...t.values()].flat().some(([k]) => used.has(k));
+    const det = document.createElement('details'); det.className = 'lfold'; det.open = !!q || usedHere && cols.length <= 6 || openFolders.has(col);
+    det.ontoggle = () => { det.open ? openFolders.add(col) : openFolders.delete(col); if (det.open && !det.dataset.filled) fill(); };
+    const sm = document.createElement('summary'); sm.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="fn"></span><span class="fc"></span>`;
+    sm.querySelector('.fn').textContent = col; sm.querySelector('.fc').textContent = cnt + (usedHere ? ' · בשימוש' : '');
+    det.append(sm);
+    const fill = () => {
+      det.dataset.filled = 1;
+      const subs = [...t.keys()].sort((a, b) => a.localeCompare(b, 'he', { numeric: true }));
+      for (const sub of subs) {
+        const wrap = document.createElement('div'); wrap.className = 'lsub';
+        if (sub) { const sh = document.createElement('div'); sh.className = 'lsubh'; sh.textContent = '📁 ' + sub; wrap.append(sh); }
+        for (const [key, f] of t.get(sub).sort((a, b) => a[1].name.localeCompare(b[1].name, 'he', { numeric: true }) || a[1].w * a[1].l - b[1].w * b[1].l)) {
+          const d = document.createElement('div'); d.className = 'libitem' + (used.has(key) ? ' used' : '');
+          d.innerHTML = `<div class="thumb">${thumbHtml(key, '')}</div><span class="lbn"><b></b><small></small></span><span class="mono">${f.w}×${f.l}</span>`;
+          d.querySelector('b').textContent = f.name; d.querySelector('small').textContent = f.file.name; d.title = f.path || ''; wrap.append(d);
+          if (used.has(key)) ensureThumb(key);
+        }
+        det.append(wrap);
+      }
+    };
+    if (det.open) fill();
+    box.append(det);
+  }
+  if (!list.length && rugFiles.size) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'לא נמצא קובץ שמתאים לחיפוש.'; box.append(p); }
+}
+const openFolders = new Set();
+
+const ALERT_GROUPS = [
+  ['missing', 'bad', 'חסר', 'אין בכלל קובץ בשם הזה בתיקייה'],
+  ['size', 'bad', 'אין בגודל', 'השטיח קיים, אבל לא בגודל שהוזמן'],
+  ['filesize', 'bad', 'מתיחה', 'קבצים שיימתחו: שמורים בכיוון הפוך או בגודל אחר מההזמנה'],
+  ['parse', 'bad', 'קריאת הזמנה', 'הזמנות שלא הצלחתי לקרוא מהן שורה'],
+  ['big', 'bad', 'גדול מדי', 'לא נכנס בגיליון המקסימלי'],
+  ['check', 'warn', 'לבדוק', ''],
+  ['info', 'info', 'מידע', ''],
+  ['ok', 'ok', 'מוכן', ''],
+];
+let alertTab = null;
+function renderAlerts() {
+  const box = $('alerts'); box.innerHTML = '';
+  const G = {}; ALERT_GROUPS.forEach(([k]) => G[k] = []);
+  const add = (g, head, txt) => G[g].push([head, txt]);
+  for (const n of parseNotes) add(n.cls === 'bad' ? 'parse' : 'check', n.order || '', n.txt);
+  if (!rows.length) add('info', 'אין הזמנות', 'העלי הזמנות בטאב ״הזמנות״, או הוסיפי שורה ידנית.');
+  if (!rugFiles.size && rows.length) add('check', 'עדיין לא נבחרה תיקיית שטיחים', 'בטאב ״שטיחים״ בוחרים את התיקייה פעם אחת, וכל השטיחים נמצאים לבד.');
+  let okN = 0, missN = 0;
+  for (const r of rows) {
+    if (!rugFiles.size) continue;
+    const ord = r.order || 'שורה ידנית';
+    const label = `${r.name || '(ללא שם)'} ${r.w}×${r.l}${r.qty > 1 ? ` · ${r.qty} יח׳` : ''}`;
+    const m = r.match || {};
+    if (m.kind === 'size') { add('size', ord, `${label}. בתיקייה יש רק: ${m.sizes.join(', ')}.`); missN += r.qty; continue; }
+    if (m.kind === 'none' || !r.fileKey) { add('missing', ord, `${label}. אין בתיקייה קובץ בשם הזה בדיוק.`); missN += r.qty; continue; }
+    okN += r.qty;
+    const si = stretchInfo(r); if (si) add('filesize', ord, `${label}. ${si.text}.`);
+  }
+  for (const t of tooBig) add('big', t.order || '', `${t.name} ${t.w}×${t.l} לא נכנס בגיליון המקסימלי ולא סודר.`);
+  const bad = ['missing', 'size', 'filesize', 'parse', 'big'].reduce((a, k) => a + G[k].length, 0), warn = G.check.length;
+  if (rows.length && !bad && !warn && rugFiles.size) add('ok', '', 'כל השטיחים נמצאו ותואמים. אפשר להוריד קבצים.');
+  // tabs: the five problem types always shown, with a red count when there is something in them
+  const MAIN = ['missing', 'size', 'filesize', 'parse', 'big'];
+  const extra = ['check', 'info', 'ok'].filter(k => G[k].length);
+  const tabs = [...MAIN, ...extra];
+  if (!alertTab || !tabs.includes(alertTab) || (!G[alertTab].length && tabs.some(k => G[k].length))) alertTab = tabs.find(k => G[k].length) || 'missing';
+  const bar = document.createElement('div'); bar.className = 'atabs'; bar.setAttribute('role', 'tablist');
+  for (const k of tabs) {
+    const [, cls, title] = ALERT_GROUPS.find(g => g[0] === k);
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.className = 'atab ' + cls;
+    b.setAttribute('aria-selected', k === alertTab); b.append(title);
+    if (G[k].length) { const c = document.createElement('span'); c.className = 'acount'; c.textContent = `(${G[k].length})`; b.append(' ', c); }
+    b.onclick = () => { alertTab = k; renderAlerts(); };
+    bar.append(b);
+  }
+  box.append(bar);
+  const [, cls, , desc] = ALERT_GROUPS.find(g => g[0] === alertTab);
+  const panel = document.createElement('div'); panel.className = 'apanel'; panel.setAttribute('role', 'tabpanel');
+  if (desc) { const h = document.createElement('p'); h.className = 'hint'; h.textContent = desc; panel.append(h); }
+  if (!G[alertTab].length) { const e = document.createElement('div'); e.className = 'al ok'; e.textContent = 'אין כאן כלום ✓'; panel.append(e); }
+  else if (alertTab === 'missing' || alertTab === 'size') {
+    const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'btn sm'; rb.style.alignSelf = 'flex-start';
+    if (typeof fixHandle !== 'undefined' && fixHandle) { rb.textContent = '↻ הוספתי קבצים, לחפש שוב'; rb.onclick = () => loadFixed(true); }
+    else { rb.textContent = '↻ הוספתי קבצים, לבחור את התיקייה שוב'; rb.onclick = () => $('inRugDir').click(); }
+    panel.append(rb);
+    if (alertTab === 'missing' || alertTab === 'size') { const mb = document.createElement('button'); mb.type = 'button'; mb.className = 'btn sm'; mb.style.alignSelf = 'flex-start'; mb.textContent = '⬇ הורדת דוח חוסרים'; mb.onclick = async () => { setStatus('בונה דוח חוסרים…'); await save(await missingReportPdf(), `${jobName()}_MISSING.pdf`); }; panel.append(mb); }
+  }
+  for (const [head, txt] of G[alertTab]) {
+    const d = document.createElement('div'); d.className = 'al ' + cls;
+    if (head) { const b = document.createElement('b'); b.textContent = head; d.append(b); }
+    const s2 = document.createElement('span'); s2.textContent = txt; d.append(s2); panel.append(d);
+  }
+  box.append(panel);
+  $('alertBig').innerHTML = bad + warn ? `${bad + warn} <small>${bad ? 'לטיפול' : 'לבדוק'}</small>` : '0 <small>לטיפול</small>';
+  $('alertBig').style.color = bad ? 'var(--bad)' : warn ? 'var(--warn)' : 'var(--ok)';
+  const tot = okN + missN || 1;
+  $('qOk').style.width = (100 * okN / tot) + '%'; $('qMiss').style.width = (100 * missN / tot) + '%';
+  $('qOkTxt').textContent = rugFiles.size ? `${okN} נמצאו` : ''; $('qMissTxt').textContent = rugFiles.size && missN ? `${missN} חסרים` : '';
+  $('fullBox').hidden = true; $('fullCnt').textContent = fullRoll.length;
+  const fl = $('fullList'); fl.innerHTML = '';
+  for (const f of fullRoll) {
+    const row = rows.find(r => r.id === f.rowId); const d = document.createElement('div'); d.className = 'srow';
+    d.innerHTML = `<div class="thumb">${thumbHtml(row && row.fileKey, '')}</div><span class="nm"></span><span class="mono"></span>`;
+    d.querySelector('.nm').textContent = f.name; d.querySelector('.mono').textContent = `${f.w}×${f.l}${f.order ? ' · ' + f.order : ''}`;
+    fl.append(d);
+  }
+}
+
+function sheetSvg(sh, big) {
+  const fs = Math.max(3, Math.min(8, sh.W / 20));
+  let s = `<rect class="sheet" x="0" y="0" width="${sh.W}" height="${sh.H}"/>`;
+  for (const i of sh.items) {
+    const t = big && viewMode === 'art' && i.fileKey && thumbs.get(i.fileKey);
+    s += `<rect class="rugbox${i.fileKey ? '' : ' miss'}" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}"/>`;
+    if (t && i.cover) s += `<image href="${t}" x="0" y="0" width="${i.pw}" height="${i.pl}" preserveAspectRatio="xMidYMid slice"/>`;
+    else if (t) {
+      if (i.rot) s += `<image href="${t}" x="0" y="0" width="${i.pl}" height="${i.pw}" preserveAspectRatio="none" transform="translate(${i.X + i.pw} ${i.Y}) rotate(90)"/>`;
+      else s += `<image href="${t}" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}" preserveAspectRatio="none"/>`;
+    }
+    if (!i.cover) s += `<rect class="cutl" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}"/>`;
+    if (big && i.rowId === selRow) s += `<rect class="selr" x="${i.X + .6}" y="${i.Y + .6}" width="${i.pw - 1.2}" height="${i.pl - 1.2}"/>`;
+    if (big) s += `<rect class="hitr" data-row="${i.rowId}" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}"/>`;
+    if (big) {
+      const cx = i.X + i.pw / 2, cy = i.Y + i.pl / 2, nm = short(i.name, i.pw / fs * 1.8), on = i.order || '';
+      const bw = Math.min(i.pw - 2, Math.max(nm.length * fs * .55, on.length * fs * .52) + 5);
+      if (t) s += `<rect class="lblbg" x="${cx - bw / 2}" y="${cy - fs * 2.05}" width="${bw}" height="${fs * 3.3}" rx="1.5"/>`;
+      if (on) s += `<text class="wo" x="${cx}" y="${cy - fs * 1.05}" text-anchor="middle" font-size="${fs * .78}">${esc(on)}</text>`;
+      s += `<text class="wl" x="${cx}" y="${cy}" text-anchor="middle" font-size="${fs}">${esc(nm)}</text>`;
+      s += `<text class="wd" x="${cx}" y="${cy + fs * 1}" text-anchor="middle" font-size="${fs * .78}">${i.w}×${i.l}</text>`;
+    }
+  }
+  if (big) for (const [x, y] of sh.dots) s += `<circle class="mk" cx="${x}" cy="${y}" r="${S().dotD / 2}"/>`;
+  if (big && sh.group !== 'full' && S().label && typeof sheetLabel === 'function') { const st = S(); s += `<text class="slbl" x="${sh.W - st.dotEdge - st.dot5 - st.dotD / 2 - 4}" y="${sh.H - st.dotEdge + 0.3}" text-anchor="end" font-size="0.9">${esc(sheetLabel(sh))}</text>`; }
+  return s;
+}
+
+function renderSheets() {
+  const svg = $('svg'), tb = $('toolbar'), th = $('sheets');
+  if (!sheets.length) {
+    svg.innerHTML = ''; svg.hidden = true; $('empty').hidden = false; th.innerHTML = ''; tb.innerHTML = '<span class="ttl">גיליון</span><span class="muted small">אין שטיחים לסידור</span>';
+    $('sheetSum').innerHTML = ''; return;
+  }
+  curSheet = Math.min(curSheet, sheets.length - 1);
+  const sh = sheets[curSheet];
+  svg.hidden = false; $('empty').hidden = true;
+  const pad = 3;
+  svg.setAttribute('viewBox', `${-pad} ${-pad} ${sh.W + 2 * pad} ${sh.H + 2 * pad}`);
+  svg.innerHTML = sheetSvg(sh, true);
+  svg.onclick = e => { const h = e.target.closest('.hitr'); if (h) selectRow(+h.dataset.row, true); };
+  const used = sh.items.reduce((a, i) => a + i.pw * i.pl, 0);
+  tb.innerHTML = `<span class="ttl mono" title="השם שמודפס בשולי הגיליון">${esc(typeof sheetLabel === 'function' ? sheetLabel(sh) : 'גיליון ' + (curSheet + 1))}</span><span class="gtag ${sh.group}">${{ rug: 'שטיחים', table: 'ראנרים ופלייסמנטים', pm: 'פלייסמנטים', full: 'רוחב מלא' }[sh.group]}</span><span class="chip"><b>${sh.W.toFixed(1)} × ${sh.H.toFixed(1)}</b> ס״מ</span>${sh.group === 'full' ? '<span class="chip">ממלא את הדף, בלי נקודות ובלי קאט</span>' : `<span class="chip">${sh.items.length} שטיחים</span><span class="chip">פחת <b>${Math.round(100 - 100 * used / (sh.W * sh.H))}%</b></span>`}
+    <span class="seg" role="group" aria-label="תצוגה"><button type="button" data-v="art" aria-pressed="${viewMode === 'art'}">גרפיקה</button><button type="button" data-v="box" aria-pressed="${viewMode === 'box'}">מסגרות</button></span>`;
+  tb.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { viewMode = b.dataset.v; renderSheets(); });
+  th.innerHTML = ''; let lastG = null;
+  sheets.forEach((s, idx) => {
+    if (s.group !== lastG) { lastG = s.group; const lb = document.createElement('span'); lb.className = 'gsep ' + s.group; lb.textContent = { rug: 'שטיחים', table: 'ראנרים', pm: 'פלייסמנטים', full: 'רוחב מלא' }[s.group]; th.append(lb); }
+    const d = document.createElement('button'); d.type = 'button'; d.className = 'sthumb' + (idx === curSheet ? ' on' : '');
+    d.setAttribute('aria-label', `גיליון ${idx + 1}`);
+    d.innerHTML = `<svg viewBox="-2 -2 ${s.W + 4} ${s.H + 4}" preserveAspectRatio="xMidYMid meet">${sheetSvg(s, false)}</svg><span class="n"><b>${String(idx + 1).padStart(3, '0')}${s.copies > 1 ? ` <em class="cpx">×${s.copies}</em>` : ''}</b><i>${(s.H / 100).toFixed(2)} מ׳</i></span>`;
+    d.onclick = () => { curSheet = idx; renderSheets(); };
+    th.append(d);
+  });
+  const totL = sheets.reduce((a, s) => a + s.H * (s.copies || 1), 0), n = sheets.reduce((a, s) => a + (s.allItems || s.items).length, 0);
+  $('sheetSum').innerHTML = `<b>${sheets.length}</b> גיליונות · <b>${n}</b> שטיחים · <b>${(totL / 100).toFixed(2)}</b> מ׳ אורך${fullRoll.length ? ` · מתוכם <b>${fullRoll.length}</b> ברוחב מלא` : ''}`;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const short = (s, n) => s.length > n ? s.slice(0, Math.max(3, Math.floor(n) - 1)) + '…' : s;
+
+function update() {
+  if (typeof renderDrawer === 'function' && $('libDrawer') && !$('libDrawer').hidden) setTimeout(renderDrawer, 0);
+  rematchAll(); compute(); if (typeof refreshJobName === 'function') refreshJobName(); renderRows(); renderLib(); renderAlerts(); renderSheets();
+  $('limTxt').textContent = `${S().maxW}×${S().maxL}`;
+  $('expBtn').disabled = !sheets.length && !orderFiles.size;
+  saveWork();
+}
+/* ---------- jobs: every job is kept in this browser and saved as you work ---------- */
+let workReady = false, saveT = 0, jobId = null;
+const realRows = () => rows.filter(r => !r.example);
+function saveWork() { if (!workReady) return; clearTimeout(saveT); saveT = setTimeout(doSave, 500); }
+async function doSave() {
+  clearTimeout(saveT);
+  const keep = realRows().map(({ match, ...r }) => r);
+  if (!keep.length && !jobId) return;
+  if (!jobId) jobId = 'j' + Date.now();
+  const rec = { rows: keep, parseNotes, nextId, job: jobManual ? $('jobName').value : '', at: Date.now(), orders: [...orderFiles.entries()] };
+  const meta = { id: jobId, name: jobName(), at: rec.at, orders: new Set(keep.map(r => r.order).filter(Boolean)).size, items: keep.reduce((a, r) => a + (r.qty || 0), 0) };
+  try {
+    const list = (await idb('readonly', st => st.get('jobs'))) || [];
+    const i = list.findIndex(j => j.id === jobId); if (i >= 0) list[i] = meta; else list.push(meta);
+    await idb('readwrite', st => { st.put(rec, 'job:' + jobId); st.put(list, 'jobs'); st.put(jobId, 'current'); });
+    $('savedLbl').textContent = 'נשמר';
+  } catch (e) { $('savedLbl').textContent = ''; }
+}
+function loadRec(rec) {
+  rows = rec.rows || []; parseNotes = rec.parseNotes || [];
+  nextId = Math.max(rec.nextId || 1, 1, ...rows.map(r => r.id + 1));
+  orderFiles.clear(); (rec.orders || []).forEach(([k, f]) => orderFiles.set(k, f));
+  jobManual = !!rec.job; $('jobName').value = rec.job || '';
+  selRow = null; curSheet = 0;
+}
+async function restoreWork() {
+  try {
+    const cur = await idb('readonly', st => st.get('current'));
+    let rec = cur ? await idb('readonly', st => st.get('job:' + cur)) : null;
+    if (rec) jobId = cur;
+    if (!rec) { rec = await idb('readonly', st => st.get('work')); if (rec && !rec.orders) rec.orders = (await idb('readonly', st => st.get('orders'))) || []; }   // older version of the tool
+    if (rec && rec.rows && rec.rows.length) { loadRec(rec); setStatus(`העבודה שוחזרה (נשמרה ${new Date(rec.at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })})`); }
+  } catch (e) {}
+  workReady = true; update();
+}
+async function newJob() {
+  await doSave();
+  rows = []; parseNotes = []; orderFiles.clear(); jobManual = false; $('jobName').value = ''; jobId = null; selRow = null; curSheet = 0;
+  try { await idb('readwrite', st => st.put(null, 'current')); } catch (e) {}
+  $('savedLbl').textContent = ''; update(); showTab('orders');
+  setStatus('עבודה חדשה. העבודה הקודמת שמורה ב״העבודות שלי״');
+}
+async function openJob(id) {
+  await doSave();
+  const rec = await idb('readonly', st => st.get('job:' + id));
+  if (!rec) { setStatus('לא מצאתי את העבודה הזו'); return; }
+  jobId = id; loadRec(rec);
+  try { await idb('readwrite', st => st.put(id, 'current')); } catch (e) {}
+  update(); $('jobsDlg').hidden = true; setStatus(`נפתחה העבודה ${jobName()}`);
+}
+async function deleteJob(id) {
+  const list = ((await idb('readonly', st => st.get('jobs'))) || []).filter(j => j.id !== id);
+  await idb('readwrite', st => { st.delete('job:' + id); st.put(list, 'jobs'); });
+  if (id === jobId) { jobId = null; }
+  renderJobs();
+}
+async function renderJobs() {
+  const box = $('jobsList'); box.innerHTML = '';
+  let list = []; try { list = (await idb('readonly', st => st.get('jobs'))) || []; } catch (e) {}
+  list.sort((a, b) => b.at - a.at);
+  if (!list.length) { box.innerHTML = '<p class="hint">אין עדיין עבודות שמורות. עבודה נשמרת לבד ברגע שמעלים אליה הזמנה.</p>'; return; }
+  for (const j of list) {
+    const d = document.createElement('div'); d.className = 'jobrow' + (j.id === jobId ? ' on' : '');
+    d.innerHTML = `<div class="jinfo"><b class="mono"></b><small></small></div><button type="button" class="btn sm primary">${j.id === jobId ? 'פתוחה עכשיו' : 'פתיחה'}</button><button type="button" class="btn sm jfile" title="הורדת העבודה כקובץ למחשב">קובץ</button><button type="button" class="btn sm ghost jdel">מחיקה</button>`;
+    d.querySelector('b').textContent = j.name;
+    d.querySelector('small').textContent = `${j.orders} הזמנות · ${j.items} פריטים · ${new Date(j.at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}`;
+    const ob = d.querySelector('.primary'); ob.disabled = j.id === jobId; ob.onclick = () => openJob(j.id);
+    d.querySelector('.jfile').onclick = async () => { const rec = await idb('readonly', st => st.get('job:' + j.id)); if (rec) await downloadJobFile(rec, j.name); };
+    const del = d.querySelector('.jdel');
+    del.onclick = () => { if (del.dataset.sure) deleteJob(j.id); else { del.dataset.sure = 1; del.textContent = 'למחוק?'; del.style.color = 'var(--bad)'; setTimeout(() => { if (del.isConnected) { delete del.dataset.sure; del.textContent = 'מחיקה'; del.style.color = ''; } }, 3000); } };
+    box.append(d);
+  }
+}
+
+let ordersBusy = false;
+function busyUI(el, on, text, frac) {
+  el.classList.toggle('busy', on);
+  let ov = el.querySelector('.busyov');
+  if (!on) { if (ov) ov.remove(); return; }
+  if (!ov) { ov = document.createElement('div'); ov.className = 'busyov'; ov.innerHTML = '<span class="spin" aria-hidden="true"></span><b></b><span class="pbar"><i></i></span>'; el.append(ov); }
+  ov.querySelector('b').textContent = text; ov.querySelector('i').style.width = Math.round((frac || 0) * 100) + '%';
+}
+async function addOrders(files) {
+  const pdfs = [...files].filter(f => /\.(pdf|svg)$/i.test(f.name));
+  if (!pdfs.length) { setStatus('לא נבחרו קובצי הזמנה (PDF או SVG)'); return; }
+  if (ordersBusy) { setStatus('עדיין קורא את ההזמנות הקודמות, רגע…'); return; }
+  ordersBusy = true; const dz = $('dropOrders');
+  if (rows.some(r => r.example)) rows = rows.filter(r => !r.example);
+  let k = 0;
+  for (const f of pdfs) {
+    k++; busyUI(dz, true, `קורא הזמנה ${k} מתוך ${pdfs.length}…`, (k - 1) / pdfs.length);
+    setStatus(`קורא הזמנה ${f.name}…`);
+    try {
+      const { orderNo, found, textless } = await parseOrderFile(f);
+      if (!orderFiles.has(orderNo) || found.length) orderFiles.set(orderNo, f);
+      if (!found.length && !rows.some(r => r.order === orderNo) && !parseNotes.some(n => n.order === orderNo && n.cls === 'bad')) parseNotes.push({ cls: 'bad', order: orderNo, txt: textless ? `${f.name}: אין בקובץ טקסט שאפשר לקרוא. כנראה נשמר מחדש באילוסטרייטור והטקסט הפך לצורות. עדיף להעלות את הקובץ המקורי.` : `${f.name}: לא מצאתי בהזמנה שורה עם מידות. אפשר להוסיף שורה ידנית.` });
+      if (!rows.some(r => r.order === orderNo)) for (const x of found) if (x.units) parseNotes.push({ cls: 'warn', order: orderNo, txt: `${orderNo}: ${x.name} ${x.w}×${x.l} הוא סט של ${x.units} יחידות. חושבו ${x.qty} יחידות לחיתוך.` });
+      if (!rows.some(r => r.order === orderNo)) for (const x of found) if (x.qty > 10 && !x.units) parseNotes.push({ cls: 'warn', order: orderNo, txt: `${orderNo}: כמות חריגה (${x.qty}) ל${x.name} ${x.w}×${x.l}. לוודא מול ההזמנה.` });
+      if (found.some(x => x.guessed)) parseNotes.push({ cls: 'warn', order: orderNo, txt: `${orderNo}: השם והגודל נלקחו מכיתוב התמונה בהזמנה. כדאי לוודא.` });
+      const already = found.length && rows.some(r => r.order === orderNo);   // same order uploaded again: keep the first
+      if (already) setStatus(`${orderNo} כבר בעבודה, דילגתי על הקובץ ${f.name}`);
+      else for (const x of found) rows.push({ id: nextId++, order: orderNo, ...x, fileKey: null });
+      if (found.length) parseNotes = parseNotes.filter(n => !(n.cls === 'bad' && n.order === orderNo));
+    } catch (e) { parseNotes.push({ cls: 'bad', txt: `${f.name}: לא הצלחתי לקרוא את הקובץ (${e.message || e}).` }); }
+  }
+  busyUI(dz, true, `נקראו ${pdfs.length} הזמנות ✓`, 1);
+  setTimeout(() => busyUI(dz, false), 1200); ordersBusy = false;
+  setStatus(`נקראו ${pdfs.length} הזמנות`); showTab('orders'); update();
+}
+// exact-name keys for one file: its own name, plus folder names around it
+// (e.g. "Arabic Ornament/AO-3/80x140.pdf" also answers to "Arabic Ornament AO-3")
+const SZ_ANY = /\d{2,3}(?:\.\d+)?\s*(?:cm)?\s*[x×X*]\s*\d{2,3}(?:\.\d+)?\s*(?:cm)?/ig;
+const TYPE_WORDS = /(^|[\s_])(שטיח|שטיחון|ראנר|רנר|פלייסמנט|פלייסמט|פליסמנט|לשולחן|runner|placemat|rug)(?=[\s_]|$)/gi;
+const stripType = s => (s || '').replace(TYPE_WORDS, ' ').trim();
+function rugAliases(name, path) {
+  const dirs = path.split('/').slice(1, -1).map(d => d.replace(SZ_ANY, ' ').trim()).filter(Boolean);
+  const out = new Set([norm(name)]);
+  const n = dirs.length;
+  if (n >= 1) { out.add(norm(dirs[n - 1])); out.add(norm(dirs[n - 1] + name)); }
+  const base = name.replace(/[\s_-]+[A-Za-z]$/, ''); if (base !== name) out.add(norm(base));   // RWFP003_C -> RWFP003
+  if (n >= 2) { out.add(norm(dirs[n - 2] + dirs[n - 1])); out.add(norm(dirs[n - 2] + name)); }
+  for (const a of [...out]) {} // keep
+  out.add(norm(stripType(name)));
+  if (n >= 1) { out.add(norm(stripType(dirs[n - 1]))); out.add(norm(stripType(dirs[n - 1] + ' ' + name))); }
+  out.delete('');
+  return out;
+}
+const unsized = [], sizedKeys = []; let sizing = false;
+async function sizeFromPdf() {   // for PDFs with no size in the name: take it from the PDF itself
+  if (sizing) return; sizing = true; let done = 0;
+  while (unsized.length) {
+    const f = unsized.shift();
+    try {
+      const doc = await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true, updateMetadata: false });
+      const tb = doc.getPage(0).getTrimBox(); const a = Math.round(tb.width / PT), b = Math.round(tb.height / PT);
+      const nm = f.name.normalize('NFC'), path = (f.webkitRelativePath || f._rel || nm).normalize('NFC');
+      const name = nm.replace(/\.pdf$/i, '').replace(/bleed\s*\d+\s*mm/ig, ' ').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (a >= 10 && b >= 10 && name) sizedKeys.push(path + '|' + f.size);
+      if (a >= 10 && b >= 10 && name) rugFiles.set(path + '|' + f.size, { file: f, name, w: Math.min(a, b), l: Math.max(a, b), norm: norm(name), path, aliases: rugAliases(name, path), sizeFromPdf: true });
+    } catch (e) {}
+    if (++done % 5 === 0) { $('rugSummary').lastChild && ($('rugSummary').lastChild.textContent = `קורא גודל מתוך ${unsized.length + done} קבצים בלי מידות בשם… ${done}`); update(); }
+  }
+  sizing = false; update();
+  if (sizedKeys.length && sizedKeys.length <= 10) reportAdded(sizedKeys.splice(0));
+  const d = document.createElement('div'); d.style.marginTop = '4px'; d.style.color = 'var(--ok)'; d.textContent = `הגודל של ${done} קבצים בלי מידות בשם נלקח מתוך ה-PDF עצמו.`; $('rugSummary').append(d);
+}
+function addRugs(files) {
+  files = [...files];
+  let n = 0, skipped = [], exts = {}, aliases = 0; const addedKeys = [];
+  for (const f of files) {
+    const nm = (f.name || '').normalize('NFC');
+    if (nm.startsWith('.')) continue;
+    if (!/\.pdf$/i.test(nm)) {
+      const ext = (nm.match(/\.([a-z0-9]{1,5})$/i) || [, 'ללא סיומת'])[1].toLowerCase();
+      if (ext === 'ללא סיומת') aliases++;
+      exts[ext] = (exts[ext] || 0) + 1; continue;
+    }
+    const p = parseRugFileName(nm, f.webkitRelativePath || f._rel || '');
+    if (!p) { skipped.push(nm); unsized.push(f); continue; }
+    const key = (f.webkitRelativePath || nm) + '|' + f.size;
+    const path = (f.webkitRelativePath || f._rel || nm).normalize('NFC');
+    rugFiles.set(key, { file: f, ...p, norm: norm(p.name), path, aliases: rugAliases(p.name, path) }); n++; addedKeys.push(key);
+  }
+  const box = $('rugSummary'); box.innerHTML = '';
+  const line = (t, cls) => { const d = document.createElement('div'); d.textContent = t; if (cls) d.style.color = `var(--${cls})`; d.style.marginTop = '4px'; box.append(d); };
+  line(`הדפדפן העביר ${files.length} קבצים. ${n} שטיחים נוספו לספרייה (סה״כ ${rugFiles.size}).`, n ? 'ok' : 'bad');
+  const other = Object.entries(exts).sort((a, b) => b[1] - a[1]);
+  if (other.length) line(`קבצים שאינם PDF ודולגו: ${other.slice(0, 6).map(([e, c]) => `${e} (${c})`).join(', ')}`, 'warn');
+  if (skipped.length) { line(`${skipped.length} קובצי PDF בלי מידות בשם (למשל: ${skipped.slice(0, 3).join(' · ')}). קורא את הגודל מתוך הקבצים…`, 'warn'); setTimeout(sizeFromPdf, 50); }
+  if (!files.length || (!n && aliases && aliases === files.length)) {
+    line('לא הגיעו קבצים מהתיקייה. כנראה נבחר קיצור דרך (Alias) ולא התיקייה עצמה: הדפדפן לא נכנס דרך קיצורי דרך. ראי את ההסבר למטה.', 'bad');
+    $('aliasHelp').hidden = false;
+  } else $('aliasHelp').hidden = !!n;
+  update();
+  if (addedKeys.length && addedKeys.length <= 10) reportAdded(addedKeys);
+}
+// a few files added by hand: say for each one whether it filled an order, and if not, why
+function reportAdded(keys) {
+  const box = $('rugSummary');
+  for (const k of keys) {
+    const f = rugFiles.get(k); if (!f) continue;
+    const used = rows.filter(r => r.fileKey === k);
+    const d = document.createElement('div'); d.style.marginTop = '4px';
+    if (used.length) { d.style.color = 'var(--ok)'; d.textContent = `✓ ${f.name} ${f.w}×${f.l} → ${[...new Set(used.map(r => r.order))].join(', ')}`; }
+    else {
+      d.style.color = 'var(--bad)';
+      const sameSz = rows.filter(r => !r.fileKey && sameSize(r, f));
+      const sameNm = rows.filter(r => !r.fileKey && (f.aliases.has(norm(r.name)) || f.aliases.has(norm(stripType(r.name)))));
+      d.textContent = `✕ ${f.name} ${f.w}×${f.l} לא התאים לאף הזמנה.` +
+        (sameNm.length ? ` השם מתאים ל-${sameNm[0].order}, אבל שם הוזמן ${sameNm[0].w}×${sameNm[0].l}.` :
+         sameSz.length ? ` בגודל הזה חסר: ${sameSz.slice(0, 3).map(r => `״${r.name}״ (${r.order})`).join(', ')}. השם בקובץ צריך להיות בדיוק כמו בהזמנה, או לבחור אותו ידנית בכרטיס.` :
+         ' אין הזמנה פתוחה בשם ובגודל האלה.');
+    }
+    box.append(d);
+  }
+  const done = keys.filter(k => rows.some(r => r.fileKey === k)).length;
+  setStatus(done ? `${done} קבצים חדשים הותאמו להזמנות` : 'הקובץ החדש לא הותאם לאף הזמנה. הפירוט בלשונית ״שטיחים״');
+  if (!done) showTab('rugs');
+}
+/* ---------- fixed rug folder (Chrome: the browser remembers the folder; next time only "allow") ---------- */
+const FS_OK = typeof window.showDirectoryPicker === 'function';
+const idb = (mode, fn) => new Promise((res, rej) => {
+  const rq = indexedDB.open('rugnest', 1);
+  rq.onupgradeneeded = () => rq.result.createObjectStore('kv');
+  rq.onerror = () => rej(rq.error);
+  rq.onsuccess = () => { const tx = rq.result.transaction('kv', mode); const st = tx.objectStore('kv'); const r = fn(st); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error); };
+});
+const getDir = () => idb('readonly', st => st.get('rugDir')).catch(() => null);
+const putDir = h => idb('readwrite', st => st.put(h, 'rugDir')).catch(() => null);
+const delDir = () => idb('readwrite', st => st.delete('rugDir')).catch(() => null);
+let fixHandle = null;
+const fileCache = new Map();   // path -> File, so a rescan only opens new files
+let lastScan = 0, scanning = false;
+async function scanDir(dh) {
+  const out = []; let seen = 0;
+  async function walk(h, path) {
+    for await (const [name, e] of h.entries()) {
+      if (name.startsWith('.')) continue;
+      if (e.kind === 'directory') await walk(e, path + '/' + name);
+      else if (/\.pdf$/i.test(name)) {
+        const rel = path + '/' + name; let f = fileCache.get(rel);
+        if (!f) { const h = e; f = { name, _rel: rel, size: 0, lazy: true, arrayBuffer: async () => (await h.getFile()).arrayBuffer() }; fileCache.set(rel, f); }
+        out.push(f); if (++seen % 100 === 0) { const t = `קורא את התיקייה… ${seen} קבצים`; $('fixMsg').textContent = t; busyUI($('dropRugs'), true, t, 0); }
+      }
+    }
+  }
+  await walk(dh, dh.name);
+  return out;
+}
+async function loadFixed(ask) {
+  if (!fixHandle) return;
+  try {
+    let perm = await fixHandle.queryPermission({ mode: 'read' });
+    if (perm !== 'granted' && ask) perm = await fixHandle.requestPermission({ mode: 'read' });
+    if (perm !== 'granted') { $('fixOpen').hidden = false; $('fixMsg').textContent = 'לחצי ״אישור וטעינה״ והדפדפן יבקש אישור לקרוא את התיקייה.'; return; }
+    if (scanning) return; scanning = true;
+    $('fixOpen').hidden = true; $('fixMsg').textContent = 'קורא את התיקייה…'; busyUI($('dropRugs'), true, 'קורא את התיקייה…', 0);
+    const before = rugFiles.size;
+    let files; try { files = await scanDir(fixHandle); } finally { busyUI($('dropRugs'), false); }
+    rugFiles.clear(); trimCheck.clear();
+    addRugs(files);
+    lastScan = Date.now(); scanning = false; $('fixReload').hidden = false;
+    const diff = rugFiles.size - before;
+    $('fixMsg').textContent = `נטען ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })} · ${rugFiles.size} שטיחים${before && diff > 0 ? ` · ${diff} חדשים` : ''}. הכלי בודק שוב לבד כשחוזרים לחלון.`;
+  } catch (e) { scanning = false; $('fixOpen').hidden = false; $('fixMsg').textContent = `לא הצלחתי לפתוח את התיקייה (${e.name || e.message}). אפשר לבחור אותה מחדש.`; }
+}
+async function initFixed() {
+  if (!FS_OK) return;
+  $('fixDir').hidden = false;
+  fixHandle = await getDir();
+  if (fixHandle) { $('fixName').textContent = fixHandle.name; $('fixSet').textContent = 'החלפת תיקייה'; $('fixForget').hidden = false; await loadFixed(false); }
+  else $('fixMsg').textContent = 'בוחרים פעם אחת את תיקיית השטיחים, ומאז הכלי זוכר אותה. בכל פתיחה רק מאשרים.';
+}
+$('fixSet').onclick = async () => {
+  try {
+    const h = await window.showDirectoryPicker({ id: 'rugs', mode: 'read' });
+    fixHandle = h; await putDir(h);
+    $('fixName').textContent = h.name; $('fixSet').textContent = 'החלפת תיקייה'; $('fixForget').hidden = false;
+    await loadFixed(true);
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    $('fixMsg').textContent = `הדפדפן לא מאפשר כאן תיקייה קבועה (${e.name}). השתמשי ב״בחירת תיקייה״ הרגילה למעלה.`;
+    $('fixSet').disabled = true;
+  }
+};
+$('fixOpen').onclick = () => loadFixed(true);
+$('fixReload').onclick = () => loadFixed(true);
+// back to the window (e.g. after adding a missing rug to the folder): rescan if something is still missing
+const missingNow = () => rows.some(r => !r.fileKey);
+const autoRescan = () => { if (fixHandle && document.visibilityState === 'visible' && missingNow() && Date.now() - lastScan > 10000) loadFixed(false); };
+window.addEventListener('focus', autoRescan); document.addEventListener('visibilitychange', autoRescan);
+$('fixForget').onclick = async () => { await delDir(); fixHandle = null; $('fixName').textContent = '—'; $('fixOpen').hidden = true; $('fixForget').hidden = true; $('fixSet').textContent = 'קביעת תיקייה קבועה'; $('fixMsg').textContent = 'התיקייה הקבועה בוטלה.'; };
+if (!window.rugdesk) initFixed();
+
+function setupDrop(el, cb) {
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('over'));
+  el.addEventListener('drop', async e => {
+    e.preventDefault(); el.classList.remove('over');
+    const out = [];
+    const walk = async entry => {
+      if (entry.isFile) { const fl = await new Promise(r => entry.file(r)); try { fl._rel = entry.fullPath.replace(/^\//, ''); } catch (e) {} out.push(fl); }
+      else if (entry.isDirectory) { const rd = entry.createReader(); let batch; do { batch = await new Promise(r => rd.readEntries(r)); for (const en of batch) await walk(en); } while (batch.length); }
+    };
+    const entries = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    if (entries.length) { for (const en of entries) await walk(en); cb(out); } else cb([...e.dataTransfer.files]);
+  });
+}
+setupDrop($('dropOrders'), addOrders); setupDrop($('dropRugs'), addRugs);
+$('inOrders').onchange = e => { addOrders(e.target.files); e.target.value = ''; };
+/* ---------- library drawer: browse rugs with pictures, drag onto an order or a rug on the sheet ---------- */
+const ldOpen = new Set();
+let ldObs = null;
+function attachKey(r, key, how) {
+  if (!r || !rugFiles.has(key)) return;
+  const f = rugFiles.get(key); r.fileKey = key; r.manual = true;
+  setStatus(`${f.name} ${f.w}×${f.l} שויך ל-${r.order || 'שורה'}: ${r.name} ${r.w}×${r.l}${sameSize(f, r) ? '' : ' (שימי לב: גודל שונה)'}`);
+  update();
+}
+function renderDrawer() {
+  if ($('libDrawer').hidden) return;
+  const tree = $('ldTree'); const keepScroll = tree.scrollTop; tree.innerHTML = '';
+  requestAnimationFrame(() => { tree.scrollTop = keepScroll; });
+  $('ldCount').textContent = rugFiles.size ? `${rugFiles.size} קבצים` : '';
+  if (!rugFiles.size) { tree.innerHTML = '<p class="hint">עדיין לא נבחרה תיקיית שטיחים. בוחרים אותה בטאב ״שטיחים״ מימין.</p>'; return; }
+  const qRaw = $('ldQ').value.trim().toLowerCase(), q = norm(qRaw);
+  const groups = new Map();
+  for (const [key, f] of rugFiles) {
+    if (q && !f.norm.includes(q) && !(f.path || '').toLowerCase().includes(qRaw)) continue;
+    const parts = (f.path || '').split('/'); parts.pop();
+    const col = parts.length > 1 ? parts.slice(1).join(' / ') : (parts[0] || 'ללא תיקייה');
+    if (!groups.has(col)) groups.set(col, []); groups.get(col).push([key, f]);
+  }
+  if (ldObs) ldObs.disconnect();
+  ldObs = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const k = e.target.dataset.key; ensureThumb(k); ldObs.unobserve(e.target); } }), { root: tree });
+  const cols = [...groups.keys()].sort((a, b) => a.localeCompare(b, 'he', { numeric: true }));
+  if (!cols.length) { tree.innerHTML = '<p class="hint">לא נמצא.</p>'; return; }
+  for (const col of cols) {
+    const det = document.createElement('details'); det.className = 'lfold'; det.open = !!q || ldOpen.has(col) || cols.length === 1;
+    const sm = document.createElement('summary'); sm.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="fn"></span><span class="fc"></span>';
+    sm.querySelector('.fn').textContent = col; sm.querySelector('.fc').textContent = groups.get(col).length; det.append(sm);
+    const fill = () => {
+      if (det.dataset.filled) return; det.dataset.filled = 1;
+      const wrap = document.createElement('div'); wrap.className = 'lsub';
+      for (const [key, f] of groups.get(col).sort((a, b) => a[1].name.localeCompare(b[1].name, 'he', { numeric: true }) || a[1].w * a[1].l - b[1].w * b[1].l)) {
+        const d = document.createElement('div'); d.className = 'libitem'; d.draggable = true; d.dataset.key = key; d.title = f.path || '';
+        d.innerHTML = `<div class="thumb">${thumbHtml(key, '…')}</div><span class="lbn"><b></b><small></small></span><span class="mono">${f.w}×${f.l}</span>`;
+        d.querySelector('b').textContent = f.name; d.querySelector('small').textContent = f.file.name;
+        d.addEventListener('dragstart', e => { e.dataTransfer.setData('text/rugkey', key); e.dataTransfer.effectAllowed = 'copy'; d.classList.add('dragging'); });
+        d.addEventListener('dragend', () => d.classList.remove('dragging'));
+        wrap.append(d); if (!thumbs.has(key)) ldObs.observe(d);
+      }
+      det.append(wrap);
+    };
+    det.ontoggle = () => { det.open ? (ldOpen.add(col), fill()) : ldOpen.delete(col); };
+    if (det.open) fill();
+    tree.append(det);
+  }
+}
+// refresh pictures in the drawer as they arrive
+const _sr = scheduleRender;
+function toggleDrawer(open) {
+  const d = $('libDrawer'); d.hidden = !open; $('libTab').setAttribute('aria-expanded', open);
+  if (open) { renderDrawer(); $('ldQ').focus(); }
+}
+$('libTab').onclick = () => toggleDrawer($('libDrawer').hidden);
+$('ldClose').onclick = () => toggleDrawer(false);
+$('ldQ').addEventListener('input', renderDrawer);
+setInterval(() => { if (!$('libDrawer').hidden) document.querySelectorAll('#ldTree .libitem').forEach(el => { const t = thumbs.get(el.dataset.key); const th = el.querySelector('.thumb'); if (t && !th.querySelector('img')) th.innerHTML = `<img src="${t}" alt="">`; }); }, 700);
+// drop targets: order cards and rugs on the sheet
+const isRugDrag = e => [...(e.dataTransfer.types || [])].includes('text/rugkey');
+document.addEventListener('dragover', e => {
+  if (!isRugDrag(e)) return;
+  const t = e.target.closest && (e.target.closest('.item[data-row]') || e.target.closest('.hitr'));
+  document.querySelectorAll('.droptgt').forEach(x => x !== t && x.classList.remove('droptgt'));
+  if (t) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; t.classList.add('droptgt'); }
+});
+document.addEventListener('dragleave', e => { if (e.target.classList && e.target.classList.contains('droptgt')) e.target.classList.remove('droptgt'); });
+document.addEventListener('drop', e => {
+  if (!isRugDrag(e)) return;
+  const t = e.target.closest && (e.target.closest('.item[data-row]') || e.target.closest('.hitr'));
+  document.querySelectorAll('.droptgt').forEach(x => x.classList.remove('droptgt'));
+  if (!t) return; e.preventDefault();
+  const id = +(t.dataset.row); attachKey(rows.find(r => r.id === id), e.dataTransfer.getData('text/rugkey'));
+});
+$('inPick').onchange = e => { attachPicked(e.target.files[0]); e.target.value = ''; };
+$('inRugs').onchange = e => { addRugs(e.target.files); e.target.value = ''; };
+// the browser lists every file of a network folder before it hands them over: show that something is happening
+document.querySelector('label[for="inRugDir"]').addEventListener('click', () => {
+  busyUI($('dropRugs'), true, 'ממתין לדפדפן… (בתיקיית רשת גדולה זה יכול לקחת דקה)', 0);
+  const off = () => setTimeout(() => { if (!pickingDone) busyUI($('dropRugs'), false); }, 60000);
+  pickingDone = false; off();
+});
+let pickingDone = true;
+$('inRugDir').addEventListener('cancel', () => { pickingDone = true; busyUI($('dropRugs'), false); setStatus('בחירת התיקייה בוטלה'); });
+$('inRugDir').onchange = e => {
+  pickingDone = true; const fl = e.target.files; const n = fl.length;
+  busyUI($('dropRugs'), true, `קורא ${n} קבצים…`, 0.5);
+  setTimeout(() => { try { addRugs(fl); } finally { e.target.value = ''; busyUI($('dropRugs'), false);
+    if (pendingAgain) { const r = pendingAgain; pendingAgain = null; showTab('orders'); setStatus(r.fileKey ? `נמצא: ${r.name} ${r.w}×${r.l}` : `עדיין לא נמצא ${r.name} ${r.w}×${r.l}. בדקי ששם הקובץ כתוב בדיוק כמו בהזמנה, או בחרי אותו מהמחשב`); }
+  } }, 30);
+  if (!n) setStatus('הדפדפן לא העביר קבצים מהתיקייה. אם זו תיקיית רשת, בחרי את התיקייה עצמה ולא קיצור דרך');
+};
+$('clearRugs').onclick = () => { rugFiles.clear(); trimCheck.clear(); thumbs.clear(); $('rugSummary').textContent = 'הספרייה רוקנה. בחרי תיקייה מחדש.'; update(); };
+function showTab(t) { document.querySelectorAll('.tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t)); document.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== t); }
+document.querySelectorAll('.tabs [data-tab]').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+$('setBtn').onclick = () => { $('setDlg').hidden = false; $('sMaxW').focus(); };
+$('setX').onclick = $('setOk').onclick = () => { $('setDlg').hidden = true; $('setBtn').focus(); };
+$('setDlg').addEventListener('click', e => { if (e.target === $('setDlg')) $('setDlg').hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('setDlg').hidden) $('setDlg').hidden = true; if (e.key === 'Escape' && !$('expDlg').hidden) $('expDlg').hidden = true; });
+/* ---------- job name + cover page ---------- */
+const short4 = o => { const m = String(o || '').match(/(\d{4})$/); return m ? m[1] : String(o || ''); };
+function autoJobName() {
+  const t = (typeof jobId === 'string' && /^j\d+$/.test(jobId)) ? new Date(+jobId.slice(1)) : new Date();
+  const p2 = n => String(n).padStart(2, '0');
+  return `botta${p2(t.getDate())}${p2(t.getMonth() + 1)}${p2(t.getFullYear() % 100)}`;
+}
+let jobManual = false;
+const jobName = () => (($('jobName') && $('jobName').value.trim()) || autoJobName()).replace(/[\\/:*?"<>|]/g, '-');
+function refreshJobName() { if (!jobManual && $('jobName')) $('jobName').value = autoJobName(); }
+const sheetNo = sh => String(sheets.indexOf(sh) + 1).padStart(3, '0');
+const sheetId = sh => `${jobName()}-${sheetNo(sh)}`;
+const sheetLabel = sh => sheetId(sh) + (sh.copies > 1 ? ` x${sh.copies}` : '');
+
+function missingList() {
+  return [...rows].filter(r => rugFiles.size && !r.fileKey).sort((a, b) => ordNum(a.order) - ordNum(b.order))
+    .map(r => ({ r, why: r.match && r.match.kind === 'size' ? 'אין בגודל הזה' : 'אין קובץ', have: r.match && r.match.kind === 'size' ? r.match.sizes.join(', ') : '' }));
+}
+async function missingReportPdf() {
+  try { await document.fonts.load('600 24px "Noto Sans Hebrew"'); await document.fonts.load('700 24px "Google Sans Code"'); } catch (e) {}
+  const F = '"Noto Sans Hebrew","Google Sans",Arial,sans-serif', FN = '"Google Sans Code","Noto Sans Hebrew",Menlo,monospace';
+  const W = 1654, H = 2339, M = 120, BLUE = '#1e5bd8', RED = '#c02828', INK = '#182024', MUT = '#5a656d', LINE = '#d0d6da';
+  const list = missingList(), per = 30, pagesN = Math.max(1, Math.ceil(list.length / per));
+  const now = new Date(), dstr = now.toLocaleDateString('he-IL'), tstr = now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  const doc = await PDFDocument.create(); let i = 0;
+  for (let pg = 0; pg < pagesN; pg++) {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+    const txt = (t, px, py, size, o = {}) => { x.font = `${o.w || 400} ${size}px ${o.mono ? FN : F}`; x.fillStyle = o.c || INK; x.textAlign = o.a || 'right'; x.direction = o.ltr ? 'ltr' : 'rtl'; x.fillText(t, px, py); };
+    txt('קמפוס לדפוס דיגיטלי', W - M, M + 40, 46, { w: 700, c: BLUE });
+    txt('דוח חוסרים: שטיחים בלי קובץ הדפסה', W - M, M + 88, 28, { w: 600, c: RED });
+    txt(jobName(), M, M + 46, 56, { w: 700, mono: true, a: 'left', ltr: true });
+    txt(`תאריך: ${dstr}  ${tstr}${pagesN > 1 ? `   ·   עמוד ${pg + 1}/${pagesN}` : ''}`, M, M + 90, 24, { c: MUT, a: 'left' });
+    x.fillStyle = RED; x.fillRect(M, M + 118, W - 2 * M, 6);
+    let y = M + 165;
+    if (pg === 0) { txt(list.length ? `${list.length} פריטים חסרים (${list.reduce((a, m) => a + m.r.qty, 0)} יחידות), ב-${new Set(list.map(m => m.r.order)).size} הזמנות` : 'אין חוסרים ✓', W - M, y, 30, { w: 600 }); y += 45; }
+    const cols = [['#', 60], ['הזמנה', 160], ['שם', 400], ['סוג', 130], ['מידות', 150], ['כמות', 90], ['סיבה', 160], ['קיים בגדלים', 0]];
+    const tw = W - 2 * M; cols[cols.length - 1][1] = tw - cols.slice(0, -1).reduce((a, k) => a + k[1], 0);
+    x.fillStyle = RED; x.fillRect(M, y, tw, 60);
+    let cx = W - M; for (const [h, w] of cols) { txt(h, cx - 14, y + 40, 24, { w: 700, c: '#fff' }); cx -= w; }
+    y += 60;
+    for (let k = 0; k < per && i < list.length; k++, i++) {
+      const { r, why, have } = list[i], rh = 58;
+      if (k % 2) { x.fillStyle = '#fdf4f4'; x.fillRect(M, y, tw, rh); }
+      x.fillStyle = LINE; x.fillRect(M, y + rh - 1, tw, 1);
+      const vals = [String(i + 1), r.order || '—', r.name || '(ללא שם)', KINDS[kindKey(r.kind)], `${r.w}×${r.l}`, String(r.qty), why, have || '—'];
+      cx = W - M;
+      vals.forEach((v, j) => { const w = cols[j][1]; x.save(); x.beginPath(); x.rect(cx - w, y, w, rh); x.clip(); txt(v, cx - 14, y + 38, j === 1 ? 21 : 24, { mono: [0, 1, 4, 5, 7].includes(j), w: j === 2 ? 600 : 400, c: j === 6 ? RED : INK }); x.restore(); cx -= w; });
+      y += rh;
+    }
+    x.fillStyle = LINE; x.fillRect(M, H - M - 10, W - 2 * M, 2);
+    txt('קמפוס לדפוס דיגיטלי — דוח חוסרים', W - M, H - M + 26, 22, { c: MUT });
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    const img = await doc.embedPng(await blob.arrayBuffer()); const page = doc.addPage([595.28, 841.89]); page.drawImage(img, { x: 0, y: 0, width: 595.28, height: 841.89 });
+  }
+  return doc.save();
+}
+const printName = sh => `${jobName()}_${sheetNo(sh)}${cpx(sh)}_print${sh.group === 'full' ? '_fullwidth' : ''}.pdf`;
+const cutName = sh => `${jobName()}_${sheetNo(sh)}${cpx(sh)}_cut.pdf`;
+// a bundle needs its own cover unless it is one order, one sheet, printed once
+const needsBundlePage = b => b.sh && (b.orders.length > 1 || (b.sh.copies || 1) > 1);
+async function coverPages(bundle) {
+  try { await document.fonts.load('600 24px "Noto Sans Hebrew"'); await document.fonts.load('700 24px "Google Sans Code"'); } catch (e) {}
+  const F = '"Noto Sans Hebrew","Google Sans",Arial,sans-serif', FN = '"Google Sans Code","Noto Sans Hebrew",Menlo,monospace';
+  const W = 1654, H = 2339, M = bundle && bundle.sh ? Math.round(51.6 * 1654 / 595.28) : 120;   // A4 at 200 dpi
+  const BLUE = '#1e5bd8', INK = '#182024', MUT = '#5a656d', LINE = '#d0d6da';
+  const B = bundle && bundle.sh, here = new Map();
+  if (B) for (const it of (B.allItems || B.items)) here.set(it.rowId, (here.get(it.rowId) || 0) + 1);
+  const items = (B ? rows.filter(r => here.has(r.id)) : [...rows]).sort((a, b) => ordNum(a.order) - ordNum(b.order));
+  const qtyOf = r => B ? here.get(r.id) : r.qty;
+  const bIdx = B ? sheets.indexOf(B) : -1;
+  // order that also has rugs on other sheets: say so on its row in the bundle page
+  const splitNote = r => {
+    const mine = rows.filter(o => o.order && o.order === r.order); const tot = mine.reduce((a, o) => a + (o.qty || 0), 0);
+    const inHere = mine.reduce((a, o) => a + (here.get(o.id) || 0), 0); if (tot <= inHere) return '';
+    const oth = [...new Set(mine.flatMap(o => sheetsOfRow(o.id)).filter(j => j !== bIdx))].sort((a, b) => a - b).map(j => sheetNo(sheets[j]));
+    return `⚠ עוד בגיליון ${oth.join(',')} · בהזמנה ${tot}`;
+  };
+  const st = r => { const [c] = rowState(r); if (c === 'ok' && isFullSize(r)) return ['✓ רוחב מלא', '#1b7a45']; return c === 'ok' ? ['✓', '#1b7a45'] : c === 'bad' ? [r.match && r.match.kind === 'size' ? 'אין בגודל' : 'חסר', '#c02828'] : ['—', MUT]; };
+  // make sure every matched rug has its picture ready
+  const need = [...new Set(items.map(r => r.fileKey).filter(k => k && !thumbs.has(k)))];
+  need.forEach(k => ensureThumb(k));
+  for (let t = 0; t < 100 && need.some(k => !thumbs.has(k)); t++) await new Promise(r => setTimeout(r, 150));
+  const imgs = new Map();
+  await Promise.all([...new Set(items.map(r => r.fileKey).filter(k => k && thumbs.get(k)))].map(k => new Promise(res => { const im = new Image(); im.onload = () => { imgs.set(k, im); res(); }; im.onerror = res; im.src = thumbs.get(k); })));
+  const perFirst = B ? 9 : 11, perNext = 15;
+  const pagesN = items.length <= perFirst ? 1 : 1 + Math.ceil((items.length - perFirst) / perNext);
+  const out = []; let i = 0;
+  const g = k => sheets.filter(s => s.group === k).reduce((a, s) => a + (s.copies || 1), 0);
+  const totalLen = sheets.reduce((a, s) => a + s.H * (s.copies || 1), 0) / 100;
+  const nOrders = new Set(rows.map(r => r.order).filter(Boolean)).size;
+  const nItems = rows.reduce((a, r) => a + (r.qty || 0), 0);
+  const nMissing = rows.filter(r => !isFullSize(r) && rowState(r)[0] === 'bad').reduce((a, r) => a + r.qty, 0);
+  for (let pg = 0; pg < pagesN; pg++) {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.direction = 'rtl';
+    const txt = (t, px, py, size, opt = {}) => { x.font = `${opt.w || 400} ${size}px ${opt.mono ? FN : F}`; x.fillStyle = opt.c || INK; x.textAlign = opt.a || 'right'; x.direction = opt.ltr ? 'ltr' : 'rtl'; x.fillText(t, px, py); };
+    let y;
+    if (B) {
+      // bundle page: header + info box laid out exactly like a work order
+      const k = W / 595.28, P = v => v * k, L = 51.6, R = 543.6;
+      const GR = '#6b7280', DK = '#111827', OB = '#2563eb';
+      txt('קמפוס לדפוס דיגיטלי', P(R), P(69), P(17), { w: 700, c: OB });
+      txt('דף חבילה לגיליון · לדפוס ולחיתוך', P(R), P(85), P(8), { c: GR });
+      txt(sheetId(B), P(L), P(69), P(19), { w: 800, c: DK, a: 'left', ltr: true });
+      txt(`הופק: ${new Date().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}${pagesN > 1 ? `   ·   עמוד ${pg + 1}/${pagesN}` : ''}`, P(L), P(88), P(8), { c: GR, a: 'left' });
+      x.fillStyle = OB; x.fillRect(P(L), P(103), P(R - L), P(2.6));
+      if (pg === 0) {
+        const top = 119, bot = 273;
+        x.fillStyle = '#f3f6fc'; x.strokeStyle = '#d6dde8'; x.lineWidth = P(0.8);
+        x.beginPath(); x.roundRect(P(L), P(top), P(R - L), P(bot - top), P(7)); x.fill(); x.stroke();
+        const cp = B.copies || 1, ords = bundle.orders.map(short4).join(', ');
+        const right = [['הזמנות בחבילה', ords], ['פריטים בגיליון', String((B.allItems || B.items).length)], ['סוג', { rug: 'שטיחים', table: 'ראנרים ופלייסמנטים', pm: 'פלייסמנטים', full: 'רוחב מלא · ישר לשליח' }[B.group]], ['אורך גיליון', `${(B.H / 100).toFixed(2)} מ׳ · רוחב ${B.W} ס״מ`]];
+        const left = [[null, sheetId(B)], ['עותקים להדפסה', cp > 1 ? `⚠ ${cp} עותקים` : '1'], ['קובץ הדפסה', printName(B)], ['קובץ חיתוך', B.group === 'full' ? 'אין חיתוך' : cutName(B)]];
+        const colR = [530, 288.6];
+        [right, left].forEach((col, ci) => col.forEach(([lab, val], ri) => {
+          const ly = 136 + ri * 34.3, vy = ly + 14.5, xr = P(colR[ci]);
+          if (lab) txt(lab, xr, P(ly), P(8), { c: GR });
+          x.font = `700 ${P(10)}px ${F}`; let fs = P(10); const maxW = P(colR[ci] - (ci ? L + 10 : 300));
+          x.direction = 'rtl'; const tw0 = x.measureText(val).width; if (tw0 > maxW) fs *= maxW / tw0;
+          const red = ci === 1 && ri === 1 && cp > 1, isName = ci === 1 && ri >= 2;
+          txt(val, xr, P(vy), fs, { w: 700, c: red ? '#c62828' : DK, ltr: isName || (ci === 1 && ri === 0) || (ci === 0 && ri === 0) });
+          if (ci === 1 && ri === 0) { x.font = `700 ${fs}px ${F}`; const tw = x.measureText(val).width; x.strokeStyle = DK; x.lineWidth = P(1); x.strokeRect(xr - tw - P(3), P(vy) - P(10) * 0.95, tw + P(6), P(10) * 1.42); }
+        }));
+        y = P(bot) + P(24);
+      } else y = P(119);
+    } else {
+    // header (same layout as the work orders)
+    txt('קמפוס לדפוס דיגיטלי', W - M, M + 40, 46, { w: 700, c: BLUE });
+    txt(B ? 'דף חבילה לגיליון · לדפוס ולחיתוך' : 'ריכוז עבודת שטיחים לייצור', W - M, M + 88, 26, { c: MUT });
+    txt(B ? sheetId(B) : jobName(), M, M + 46, 60, { w: 700, mono: true, a: 'left', ltr: true });
+    txt(`הופק: ${new Date().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}${pagesN > 1 ? `   ·   עמוד ${pg + 1}/${pagesN}` : ''}`, M, M + 90, 24, { c: MUT, a: 'left' });
+    x.fillStyle = BLUE; x.fillRect(M, M + 118, W - 2 * M, 6);
+    y = M + 160;
+    }
+    if (pg === 0 && !B) {
+      // summary box
+      const bh = 150; x.fillStyle = '#eef4fd'; x.strokeStyle = '#c9daf5'; x.lineWidth = 2;
+      x.beginPath(); x.roundRect(M, y, W - 2 * M, bh, 18); x.fill(); x.stroke();
+      const cells = B ? [['הזמנות בחבילה', bundle.orders.length], ['פריטים בגיליון', (B.allItems || B.items).length], ['עותקים להדפסה', B.copies || 1], ['סוג', { rug: 'שטיחים', table: 'ראנרים', pm: 'פלייסמנטים', full: 'רוחב מלא' }[B.group]], ['אורך גיליון (מ׳)', (B.H / 100).toFixed(2)], ['רוחב (ס״מ)', B.W]]
+                      : [['הזמנות', nOrders], ['פריטים', nItems], ['גיליונות', g('rug') + g('table') + g('pm')], ['רוחב מלא', g('full')], ['אורך כולל (מ׳)', totalLen.toFixed(2)], ['חסרים', nMissing]];
+      const cw = (W - 2 * M) / cells.length;
+      cells.forEach(([k, v], j) => {
+        const cx = W - M - j * cw - 30, cy = y + 60;
+        txt(k, cx, cy, 24, { c: MUT });
+        txt(String(v), cx, cy + 52, 44, { w: 700, mono: typeof v === 'number' || /^\d/.test(v), c: (k === 'חסרים' && v) || (k === 'עותקים להדפסה' && v > 1) ? '#c02828' : INK });
+      });
+      y += bh + 50;
+
+    }
+    // table
+    const cols = [['#', 60], ['הזמנה', 140], ['תמונה', 150], ['פריט', B ? 330 : 380], ['סוג', 130], ['מידות', 150], ['כמות', 130], ['גיליון', 120], ['סטטוס', 0]];
+    const tw = W - 2 * M; cols[cols.length - 1][1] = tw - cols.slice(0, -1).reduce((a, c2) => a + c2[1], 0);
+    x.fillStyle = BLUE; x.fillRect(M, y, tw, 62);
+    let cx = W - M; for (const [h, w] of cols) { txt(h, cx - 16, y + 42, 25, { w: 700, c: '#fff' }); cx -= w; }
+    y += 62;
+    const per = pg === 0 ? perFirst : perNext;
+    for (let k = 0; k < per && i < items.length; k++, i++) {
+      const r = items[i], rh = 140;   // picture up to ~1.6 cm tall
+      const isFullRow = isFullSize(r);
+      if (isFullRow) { x.fillStyle = '#ffe9a8'; x.fillRect(M, y, tw, rh); x.fillStyle = '#c02828'; x.fillRect(W - M - 10, y, 10, rh); }
+      else if (k % 2) { x.fillStyle = '#f5f8fd'; x.fillRect(M, y, tw, rh); }
+      x.fillStyle = LINE; x.fillRect(M, y + rh - 1, tw, 1);
+      const sh = sheetsOfRow(r.id).map(j => String(j + 1).padStart(3, '0')).join(',');
+      const [stt, stc] = st(r);
+      const q = qtyOf(r);
+      const vals = [String(i + 1), short4(r.order) || '—', '', r.name || '(ללא שם)', KINDS[kindKey(r.kind)], `${r.w}×${r.l}`, r.units && !B ? `${q} · סט` : String(q), sh || '—', stt];
+      cx = W - M;
+      vals.forEach((v, j) => {
+        const w = cols[j][1]; x.save(); x.beginPath(); x.rect(cx - w, y, w, rh); x.clip();
+        if (j === 2) {
+          const im = r.fileKey && imgs.get(r.fileKey), bw = w - 24, bh = rh - 18;
+          if (im) { const k2 = Math.min(bw / im.width, bh / im.height), dw = im.width * k2, dh = im.height * k2; x.drawImage(im, cx - 12 - bw / 2 - dw / 2, y + 9 + (bh - dh) / 2, dw, dh); }
+          else { x.fillStyle = '#eef0f2'; x.fillRect(cx - 12 - bw, y + 9, bw, bh); txt('אין קובץ', cx - 12 - bw / 2, y + rh / 2 + 8, 20, { c: MUT, a: 'center' }); }
+        } else {
+          const num = j === 0 || j === 1 || j === 5 || j === 6 || j === 7;
+          const split = j === 3 && B ? splitNote(r) : '';
+          if (j === 3 && (isFullRow || split)) {
+            const lines = [isFullRow && 'שטיח רוחב מלא! ללא נקודות', split].filter(Boolean);
+            const y0 = y + rh / 2 - 12 - (lines.length - 1) * 14;
+            txt(v, cx - 16, y0, 25, { w: 600 });
+            lines.forEach((t, li) => txt(t, cx - 16, y0 + 38 + li * 30, B ? 21 : 27, { w: 800, c: '#c02828' }));
+          } else {
+            const redQ = j === 6 && (q || 0) >= 2;
+            if (redQ) { x.font = `700 25px ${FN}`; const tw = x.measureText(v).width; x.fillStyle = '#c62828'; x.beginPath(); x.roundRect(cx - 16 - tw - 12, y + rh / 2 - 20, tw + 24, 40, 6); x.fill(); }
+            txt(v, cx - 16, y + rh / 2 + 9, j === 7 && v.length > 4 ? 19 : 25, { mono: num, ltr: j === 7, w: j === 3 || redQ ? 700 : 400, c: redQ ? '#ffffff' : j === 8 ? stc : INK });
+          }
+        }
+        x.restore(); cx -= w;
+      });
+      y += rh;
+    }
+    if (pg === pagesN - 1 && !B) {
+      y += 40;
+      txt(`גיליון: מספר הגיליון בעבודה ${jobName()} · מופיע בתחתית הגיליון ובראש כל הזמנה בחבילה`, W - M, y, 22, { c: MUT });
+    }
+    x.fillStyle = LINE; x.fillRect(M, H - M - 10, W - 2 * M, 2);
+    txt(B ? `דף חבילה · ${bundle.orders.length} הזמנות מצורפות` : 'קמפוס לדפוס דיגיטלי — ריכוז עבודה לרצפת הייצור', W - M, H - M + 26, 22, { c: MUT });
+    txt(jobName(), M, H - M + 26, 22, { c: MUT, mono: true, a: 'left', ltr: true });
+    out.push(await new Promise(res => c.toBlob(b => res(b), 'image/png')));
+  }
+  return out;
+}
+
+$('jobName').addEventListener('input', () => { jobManual = !!$('jobName').value.trim(); renderSheets(); });
+$('jobName').addEventListener('change', () => { if (!$('jobName').value.trim()) { jobManual = false; refreshJobName(); renderSheets(); } });
+/* ---------- order preview ---------- */
+let ordOpen = null, ordToken = 0;
+const orderList = () => [...orderFiles.keys()].sort((a, b) => ordNum(a) - ordNum(b) || a.localeCompare(b));
+async function openOrder(no) {
+  ordOpen = no; const tok = ++ordToken;
+  $('ordDlg').hidden = false; $('ordTtl').textContent = no;
+  const body = $('ordBody'); body.innerHTML = '<p class="hint">טוען…</p>';
+  const list = orderList(), i = list.indexOf(no);
+  $('ordPrev').disabled = i <= 0; $('ordNext').disabled = i < 0 || i >= list.length - 1;
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await orderFiles.get(no).arrayBuffer()), isEvalSupported: false }).promise;
+    if (tok !== ordToken) return;
+    body.innerHTML = '';
+    const W = Math.min(body.clientWidth - 4, 760), dpr = Math.min(2, window.devicePixelRatio || 1);
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p); const v0 = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: W / v0.width * dpr });
+      const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; c.style.width = W + 'px'; c.className = 'ordpage';
+      body.append(c);
+      await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+      if (tok !== ordToken) return;
+    }
+    pdf.destroy();
+  } catch (e) { body.innerHTML = '<p class="hint">לא הצלחתי להציג את ההזמנה הזו.</p>'; }
+}
+const closeOrder = () => { $('ordDlg').hidden = true; ordToken++; const el = [...document.querySelectorAll('.olink')].find(x => x.textContent === ordOpen); el && el.focus(); };
+$('ordX').onclick = closeOrder;
+$('ordDlg').addEventListener('click', e => { if (e.target === $('ordDlg')) closeOrder(); });
+$('ordPrev').onclick = () => { const l = orderList(), i = l.indexOf(ordOpen); if (i > 0) openOrder(l[i - 1]); };
+$('ordNext').onclick = () => { const l = orderList(), i = l.indexOf(ordOpen); if (i >= 0 && i < l.length - 1) openOrder(l[i + 1]); };
+document.addEventListener('keydown', e => { if ($('ordDlg').hidden) return; if (e.key === 'Escape') closeOrder(); if (e.key === 'ArrowLeft') $('ordNext').click(); if (e.key === 'ArrowRight') $('ordPrev').click(); });
+$('libQ').addEventListener('input', renderLib);
+$('clearAll').onclick = () => {
+  const b = $('clearAll');
+  if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'לנקות הכול?'; setTimeout(() => { delete b.dataset.sure; b.textContent = 'ניקוי הזמנות'; }, 3000); return; }
+  delete b.dataset.sure; b.textContent = 'ניקוי הזמנות';
+  rows = []; parseNotes = []; orderFiles.clear(); selRow = null; curSheet = 0; setStatus('כל ההזמנות נוקו'); update();
+};
+$('clearEx').onclick = () => { rows = rows.filter(r => !r.example); parseNotes = []; update(); };
+$('addRow').onclick = () => { rows.push({ id: nextId++, order: '', name: '', w: 0, l: 0, qty: 1, fileKey: null }); update(); const el = $('n' + (nextId - 1)); el && el.focus(); };
+const SET_IDS = ['sMaxW', 'sMaxL', 'sPmW', 'sPmMx', 'sGap', 'sMx', 'sMy', 'sFull', 'sLabel', 'sDotsPrint', 'sFullW', 'sDotD', 'sDotE', 'sDot5', 'sDotG', 'sDotS', 'sLayR', 'sLayC'];
+try { const sv = JSON.parse(localStorage.getItem('rugnest-settings-v2') || '{}'); for (const k of SET_IDS) if (k in sv && $(k)) { if ($(k).type === 'checkbox') $(k).checked = !!sv[k]; else $(k).value = sv[k]; } } catch (e) {}
+SET_IDS.forEach(k => $(k) && $(k).addEventListener('change', () => { try { const o = {}; SET_IDS.forEach(i => { if ($(i)) o[i] = $(i).type === 'checkbox' ? $(i).checked : $(i).value; }); localStorage.setItem('rugnest-settings-v2', JSON.stringify(o)); } catch (e) {} }));
+['sMaxW', 'sMaxL', 'sPmW', 'sPmMx', 'sGap', 'sMx', 'sMy', 'sFull', 'sDotsPrint', 'sLabel', 'sFullW', 'sDotD', 'sDotE', 'sDot5', 'sDotG', 'sDotS'].forEach(id => $(id).addEventListener('change', update));
+
+/* ---------- downloads ---------- */
+const setStatus = t => { $('status').textContent = t; };
+let dl = null; try { window.claude?.use?.('downloads')?.then(d => { dl = d; }).catch(() => {}); } catch (e) {}
+const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`; };
+async function save(bytes, name) {
+  if (!dl) { setStatus('ההורדה לא זמינה בתצוגה הזאת. פתחי את הכלי ב-claude.ai בדפדפן.'); return; }
+  try { await dl.save({ filename: name, data: bytes instanceof Blob ? bytes : new Blob([bytes], { type: 'application/pdf' }) }); setStatus(`נשמר: ${name}`); }
+  catch (e) { setStatus(e && e.code === 'declined' ? 'ההורדה בוטלה' : `ההורדה נכשלה (${e && (e.code || e.message)})`); }
+}
+// in the order itself: highlight the row of a full-width rug and write a short red note under its description
+let fullNoteImg = null;
+async function markFullRows(file, pages, fulls) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (!new TextDecoder('latin1').decode(buf.slice(0, 1024)).includes('%PDF')) return;
+  const pdf = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise;
+  for (let p = 1; p <= pdf.numPages && p <= pages.length; p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    const m = new Map();
+    for (const it of tc.items.filter(i => i.str && i.str.trim())) { const k = Math.round(it.transform[5] / 4); if (!m.has(k)) m.set(k, []); m.get(k).push({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0 }); }
+    for (const items of m.values()) {
+      const t = logicalLine(items); if (/הדוגמה|משלוח/.test(t)) continue;
+      const r = rowFromLogical(t); if (!r) continue;
+      if (!fulls.some(f => sameSize(f, r) && (norm(f.name) === norm(r.name) || norm(stripType(f.name)) === norm(stripType(r.name))))) continue;
+      const desc = items.find(i => /פי\s*וי\s*סי/.test(i.str)) || items.filter(i => HEB.test(i.str)).sort((a, b) => b.x - a.x)[0];
+      if (!desc) continue;
+      const pg = pages[p - 1], y = desc.y, right = desc.x + desc.w, left = Math.min(...items.map(i => i.x));
+      if (!fullNoteImg) {
+        const c = document.createElement('canvas'), px = 7.5 / 72 * 600; const x = c.getContext('2d'); x.font = `800 ${px}px "Noto Sans Hebrew", Arial, sans-serif`;
+        const txt = '⚠ שטיח רוחב מלא! ללא נקודות'; x.direction = 'rtl'; c.width = Math.ceil(x.measureText(txt).width) + 6; c.height = Math.ceil(px * 1.3);
+        const y2 = c.getContext('2d'); y2.font = `800 ${px}px "Noto Sans Hebrew", Arial, sans-serif`; y2.fillStyle = '#c02828'; y2.direction = 'rtl'; y2.textAlign = 'right'; y2.textBaseline = 'middle'; y2.fillText(txt, c.width - 3, c.height / 2);
+        fullNoteImg = { png: new Uint8Array(await (await new Promise(r2 => c.toBlob(r2, 'image/png'))).arrayBuffer()), w: c.width * 72 / 600, h: c.height * 72 / 600 };
+      }
+      const img = await pg.doc.embedPng(fullNoteImg.png);
+      pg.drawImage(img, { x: right - fullNoteImg.w, y: y - 3 - fullNoteImg.h, width: fullNoteImg.w, height: fullNoteImg.h });
+    }
+  }
+  pdf.destroy();
+}
+async function redText(txt, pt) {
+  try { await document.fonts.load('800 40px "Noto Sans Hebrew"'); } catch (e) {}
+  const px = pt / 72 * 600, c = document.createElement('canvas'), x = c.getContext('2d');
+  x.font = `800 ${px}px "Noto Sans Hebrew", Arial, sans-serif`; x.direction = 'rtl'; c.width = Math.ceil(x.measureText(txt).width) + 8; c.height = Math.ceil(px * 1.35);
+  const y = c.getContext('2d'); y.font = `800 ${px}px "Noto Sans Hebrew", Arial, sans-serif`; y.fillStyle = '#c02828'; y.direction = 'rtl'; y.textAlign = 'right'; y.textBaseline = 'middle'; y.fillText(txt, c.width - 4, c.height / 2);
+  return { png: new Uint8Array(await (await new Promise(r => c.toBlob(r, 'image/png'))).arrayBuffer()), w: c.width * 72 / 600, h: c.height * 72 / 600 };
+}
+async function fullBanner(detail) {
+  try { await document.fonts.load('800 40px "Noto Sans Hebrew"'); } catch (e) {}
+  const W = 2200, H = 150, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  x.fillStyle = '#c02828'; x.beginPath(); x.roundRect(0, 0, W, H, 22); x.fill();
+  x.fillStyle = '#fff'; x.direction = 'rtl'; x.textAlign = 'right'; x.textBaseline = 'middle';
+  x.font = '800 64px "Noto Sans Hebrew", Arial, sans-serif'; x.fillText('⚠ שטיח רוחב מלא! ללא נקודות', W - 40, H / 2);
+  x.font = '600 38px "Noto Sans Hebrew", Arial, sans-serif'; x.textAlign = 'left'; x.fillText(detail, 40, H / 2, W * 0.42);
+  const blob = await new Promise(r => c.toBlob(r, 'image/png')); const buf = new Uint8Array(await blob.arrayBuffer());
+  buf.w = W; buf.h = H; return buf;
+}
+function textImgFactory() {
+  const cache = new Map();
+  return async (txt, pt, color, weight = 800) => {
+    const key = [txt, pt, color, weight].join('|'); if (cache.has(key)) return cache.get(key);
+    try { await document.fonts.load(`${weight} 40px "Noto Sans Hebrew"`); } catch (e) {}
+    const px = pt / 72 * 600, font = `${weight} ${px}px "Noto Sans Hebrew", Arial, sans-serif`;
+    const c = document.createElement('canvas'), m = c.getContext('2d'); m.font = font; m.direction = 'rtl';
+    c.width = Math.ceil(m.measureText(txt).width) + 8; c.height = Math.ceil(px * 1.35);
+    const y = c.getContext('2d'); y.font = font; y.fillStyle = color; y.direction = 'rtl'; y.textAlign = 'right'; y.textBaseline = 'middle'; y.fillText(txt, c.width - 4, c.height / 2);
+    const r = { png: new Uint8Array(await (await new Promise(res => c.toBlob(res, 'image/png'))).arrayBuffer()), w: c.width * 72 / 600, h: c.height * 72 / 600 };
+    cache.set(key, r); return r;
+  };
+}
+// where each item row sits in the order PDF: [{page, y, right, rowId}]
+async function orderRowsPos(file, no) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (!new TextDecoder('latin1').decode(buf.slice(0, 1024)).includes('%PDF')) return [];
+  const pdf = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise, out = [];
+  const mine = rows.filter(r => r.order === no), used = new Set();
+  let head = null;
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    if (p === 1) try {
+      const all = tc.items.filter(i => i.str && i.str.trim()).map(i => ({ str: i.str.trim(), x: i.transform[4], y: i.transform[5], w: i.width || 0, h: Math.abs(i.transform[3]) || i.height || 10 }));
+      const so = all.filter(i => /^SO\d{5,}$/.test(i.str) || (i.str === 'SO' && all.some(j => /^\d{5,}$/.test(j.str) && Math.abs(j.y - i.y) < 3 && j.x > i.x && j.x - (i.x + i.w) < 10))).sort((a, b) => b.y - a.y)[0];
+      const st = all.filter(i => /^(סטטוס|סוטטס)$/.test(i.str)).sort((a, b) => b.y - a.y)[0];
+      if (so && st) {
+        const stR = st.x + st.w, col = all.filter(i => i.x + i.w > stR - 8 && i.x + i.w < stR + 8 && i.y <= st.y + 2 && i.y > st.y - 160);
+        const ys = col.map(i => i.y).sort((a, b) => a - b);
+        let bot = st.y; for (let k = ys.length - 1; k >= 0; k--) { if (bot - ys[k] < 40) bot = Math.min(bot, ys[k]); }
+        const colLeft = Math.min(...all.filter(i => i.x + i.w > stR - 8 && i.x + i.w < stR + 8 && i.y <= st.y + 2 && i.y >= bot - 2).map(i => i.x));
+        head = { x: so.x + 12, size: so.h, top: st.y + st.h, bot, maxW: colLeft - so.x - 32 };
+      }
+      // the "סטטוס" field gets replaced with the job name + sheet id
+      const lab = st;
+      if (lab) {
+        const R = lab.x + lab.w, val = all.filter(i => Math.abs(i.x + i.w - R) < 4 && i.y < lab.y - 3 && i.y > lab.y - 24);
+        const vy = val.length ? Math.max(...val.map(i => i.y)) : lab.y - 15, vals = all.filter(i => Math.abs(i.y - vy) < 2 && i.x + i.w <= R + 4 && i.x > R - 160), vh = vals.length ? Math.max(...vals.map(i => i.h)) : lab.h * 1.25;
+        head = { ...(head || {}), field: { R, ly: lab.y, lh: lab.h, vy, vh, x0: Math.min(lab.x, ...vals.map(i => i.x)) } };
+      }
+      // the "תאריך סיום נדרש" field: used for the multi-item shipping note
+      const lab2 = all.find(i => /^תאריך סיום נדרש$/.test(i.str));
+      if (lab2) {
+        const R = lab2.x + lab2.w, val = all.filter(i => Math.abs(i.x + i.w - R) < 4 && i.y < lab2.y - 3 && i.y > lab2.y - 24);
+        const vy = val.length ? Math.max(...val.map(i => i.y)) : lab2.y - 15, vals = all.filter(i => Math.abs(i.y - vy) < 2 && i.x + i.w <= R + 4 && i.x > R - 160), vh = vals.length ? Math.max(...vals.map(i => i.h)) : lab2.h * 1.25;
+        head = { ...(head || {}), field2: { R, ly: lab2.y, lh: lab2.h, vy, vh, x0: Math.min(lab2.x, ...vals.map(i => i.x)), left: so ? so.x + 8 : 50 } };
+      }
+    } catch (e) { head = null; }
+    const m = new Map();
+    for (const it of tc.items.filter(i => i.str && i.str.trim())) { const k = Math.round(it.transform[5] / 4); if (!m.has(k)) m.set(k, []); m.get(k).push({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0, h: Math.abs(it.transform[3]) || it.height || 8 }); }
+    for (const items of [...m.values()].sort((a, b) => b[0].y - a[0].y)) {
+      const t = logicalLine(items); if (/הדוגמה|משלוח/.test(t)) continue;
+      const r = rowFromLogical(t); if (!r) continue;
+      const free = mine.filter(x => !used.has(x.id) && sameSize(x, r));
+      const hit = free.find(x => norm(x.name) === norm(r.name) || norm(stripType(x.name)) === norm(stripType(r.name))) || free[0]; if (!hit) continue;
+      used.add(hit.id);
+      const desc = items.find(i => /פי\s*וי\s*סי/.test(i.str)) || items.filter(i => HEB.test(i.str)).sort((a, b) => b.x - a.x)[0];
+      let qbox = null;
+      const u = items.find(i => /^\s*\d*\s*יח['׳]?\s*\d*\s*$/.test(i.str));
+      if (u) {
+        const n = /\d/.test(u.str) ? null : items.filter(i => /^\s*\d{1,4}\s*$/.test(i.str) && Math.abs(i.x - u.x) < 40).sort((a, b) => Math.abs(a.x - u.x) - Math.abs(b.x - u.x))[0];
+        const parts = n ? [u, n] : [u], q = +((u.str.match(/\d+/) || [])[0] || (n && n.str) || 1);
+        qbox = { x0: Math.min(...parts.map(i => i.x)), x1: Math.max(...parts.map(i => i.x + i.w)), y: u.y, h: Math.max(...parts.map(i => i.h)), q };
+      }
+      if (desc) out.push({ page: p - 1, y: desc.y, right: desc.x + desc.w, rowId: hit.id, qbox });
+    }
+  }
+  pdf.destroy();
+  out.head = head;
+  return out;
+}
+async function buildOrdersPdf(progress) {
+  const out = await PDFDocument.create(); const skipped = [];
+  const T = textImgFactory();
+  progress('בונה דף ריכוז…');
+  for (const blob of await coverPages()) { const img = await out.embedPng(await blob.arrayBuffer()); const pg = out.addPage([595.28, 841.89]); pg.drawImage(img, { x: 0, y: 0, width: 595.28, height: 841.89 }); }
+  // a bundle per sheet: the orders with something on that sheet (an order on two sheets is printed in both)
+  const ordOfRow = id => { const r = rows.find(x => x.id === id); return r && r.order; };
+  const bundles = sheets.map((sh, i) => ({ sh, i, orders: [...new Set((sh.allItems || sh.items).map(it => ordOfRow(it.rowId)).filter(o => o && orderFiles.has(o)))].sort((a, b) => ordNum(a) - ordNum(b)) }));
+  const placed = new Set(bundles.flatMap(b => b.orders));
+  const rest = [...orderFiles.keys()].filter(o => !placed.has(o)).sort((a, b) => ordNum(a) - ordNum(b));
+  if (rest.length) bundles.push({ sh: null, i: -1, orders: rest });
+  const posCache = new Map(), srcCache = new Map();
+  const put = async (pg, t, xRight, yMid) => { const img = await out.embedPng(t.png); pg.drawImage(img, { x: xRight - t.w, y: yMid - t.h / 2, width: t.w, height: t.h }); };
+  for (const b of bundles) {
+    const id = b.sh ? sheetId(b.sh) : 'ללא גיליון';
+    if (needsBundlePage(b)) {
+      progress(`${id}: דף חבילה…`);
+      for (const blob of await coverPages(b)) { const img = await out.embedPng(await blob.arrayBuffer()); const pg = out.addPage([595.28, 841.89]); pg.drawImage(img, { x: 0, y: 0, width: 595.28, height: 841.89 }); }
+    }
+    for (const no of b.orders) {
+      progress(`${id}: הזמנה ${no}…`);
+      try {
+        if (!srcCache.has(no)) srcCache.set(no, await PDFDocument.load(await orderFiles.get(no).arrayBuffer(), { ignoreEncryption: true }));
+        const src = srcCache.get(no);
+        const pages = await out.copyPages(src, src.getPageIndices()); pages.forEach(pg => out.addPage(pg));
+        if (!posCache.has(no)) { try { posCache.set(no, await orderRowsPos(orderFiles.get(no), no)); } catch (e) { posCache.set(no, []); } }
+        const pg0 = pages[0], W = pg0.getWidth(), H = pg0.getHeight();
+        // big sheet id at the top right
+        const hd = posCache.get(no).head;
+        let big = { w: 0 };
+        if (hd && hd.field) {
+          const f = hd.field;
+          pg0.drawRectangle({ x: f.x0 - 2, y: f.vy - f.vh * 0.35, width: f.R - f.x0 + 4, height: f.ly + f.lh * 1.1 - (f.vy - f.vh * 0.35), color: rgb(243 / 255, 246 / 255, 252 / 255) });
+          const v = await T(id, f.vh, '#111827', 700);
+          const vx = f.R - v.w - 0.5, vyc = f.vy + f.vh * 0.36;
+          pg0.drawImage(await out.embedPng(v.png), { x: vx, y: vyc - v.h / 2, width: v.w, height: v.h });
+          pg0.drawRectangle({ x: vx - 3, y: vyc - f.vh * 0.72, width: v.w + 6, height: f.vh * 1.44, borderColor: rgb(17 / 255, 24 / 255, 39 / 255), borderWidth: 1 });
+        } else if (hd && hd.maxW > 60) {
+          const t = await T(id, hd.size, '#111111'); const k = Math.min(1, hd.maxW / t.w), w = t.w * k, h = t.h * k, cy = (hd.top + hd.bot) / 2;
+          pg0.drawImage(await out.embedPng(t.png), { x: hd.x, y: cy - h / 2, width: w, height: h });
+        } else { big = await T(id, 22, '#111111'); await put(pg0, big, W - 40, H - 26); }
+        const mine = rows.filter(r => r.order === no);
+        const js = r => sheetsOfRow(r.id);
+        const elsewhere = mine.filter(r => js(r).some(j => j !== b.i));
+        const fullHere = b.sh && b.sh.group === 'full';
+        const note = [];
+        if (fullHere) note.push('⚠ שטיח רוחב מלא! ללא נקודות');
+        const nRugs = mine.reduce((a, r) => a + (r.qty || 0), 0);
+        if (nRugs > 1) {
+          const msg = `שימו לב! להזמנה זו יש ${nRugs} פריטים למשלוח`;
+          if (hd && hd.field2) {
+            const f = hd.field2;
+            pg0.drawRectangle({ x: f.x0 - 2, y: f.vy - f.vh * 0.35, width: f.R - f.x0 + 4, height: f.ly + f.lh * 1.1 - (f.vy - f.vh * 0.35), color: rgb(243 / 255, 246 / 255, 252 / 255) });
+            const l = await T('הערות:', f.lh, '#6b7280', 400), v = await T(msg, f.vh, '#c62828', 700);
+            const k = Math.min(1, (f.R - f.left) / v.w), vw = v.w * k, vh2 = v.h * k;
+            pg0.drawImage(await out.embedPng(l.png), { x: f.R - l.w - 0.5, y: f.ly + f.lh * 0.36 - l.h / 2, width: l.w, height: l.h });
+            pg0.drawImage(await out.embedPng(v.png), { x: f.R - vw - 0.5, y: f.vy + f.vh * 0.36 - vh2 / 2, width: vw, height: vh2 });
+          } else note.push('⚠ ' + msg);
+        }
+        if (note.length) {
+          const t = await T(note.join('   ·   '), 11, '#c02828');
+          const k = Math.min(1, (W - 100 - big.w) / t.w), w = t.w * k, h = t.h * k;
+          const img = await out.embedPng(t.png); pg0.drawImage(img, { x: W - 40 - (big.w ? big.w + 14 : 0) - w, y: H - 26 - h / 2, width: w, height: h });
+        }
+        // under every item row: which sheet it is on
+        for (const pos of posCache.get(no)) {
+          const qb = pos.qbox, pg = pages[pos.page]; if (!qb || qb.q < 2 || !pg) continue;
+          const t = await T(`${qb.q} יח'`, Math.max(8, qb.h * 1.05), '#ffffff', 800);
+          const w = Math.max(qb.x1 - qb.x0, t.w) + 6, h = t.h + 2, cx = (qb.x0 + qb.x1) / 2, cy = qb.y + qb.h * 0.35;
+          pg.drawRectangle({ x: cx - w / 2, y: cy - h / 2, width: w, height: h, color: rgb(0.78, 0.16, 0.16) });
+          const img = await out.embedPng(t.png); pg.drawImage(img, { x: cx - t.w / 2, y: cy - t.h / 2, width: t.w, height: t.h });
+        }
+        const multi = mine.reduce((a, r) => a + (r.qty || 0), 0) > 1;
+        for (const pos of (multi ? posCache.get(no) : [])) {
+          const r = rows.find(x => x.id === pos.rowId); const pg = pages[pos.page]; if (!r || !pg) continue;
+          const on = js(r); if (!on.length) continue;
+          const here = on.includes(b.i), oth = on.filter(j => j !== b.i).map(j => sheetNo(sheets[j]));
+          const txt = here ? `✓ בגיליון הזה ${sheetNo(sheets[b.i])}${oth.length ? ` · עוד יחידות בגיליון ${oth.join(', ')}` : ''}${isFullSize(r) ? ' · רוחב מלא! ללא נקודות' : ''}`
+                           : `⚠ לא בגיליון הזה · נמצא בגיליון ${oth.join(', ')}`;
+          const t = await T(txt, 7.5, here && !isFullSize(r) ? '#1b7a45' : '#c02828');
+          await put(pg, t, pos.right, pos.y - 3 - t.h / 2);
+        }
+      } catch (e) { skipped.push(no); }
+    }
+  }
+  return { bytes: await out.save(), skipped: [...new Set(skipped)] };
+}
+const GROUPS = [['rug', 'Rugs', 'שטיחים'], ['table', 'Runners', 'ראנרים ופלייסמנטים'], ['full', 'FullWidth', 'רוחב מלא']];
+const fileBase = fn => `${jobName()}${fn === 'Rugs' ? '' : ' ' + fn.toUpperCase()}`;
+function openExport() {
+  $('expJob').textContent = jobName();
+  const cnt = g => sheets.filter(x => x.group === g).length;
+  $('exPrintInfo').textContent = [cnt('rug') && `שטיחים: ${cnt('rug')} גיליונות`, cnt('table') && `ראנרים: ${cnt('table')}`, cnt('pm') && `פלייסמנטים: ${cnt('pm')}`, cnt('full') && `רוחב מלא: ${cnt('full')} דפים`].filter(Boolean).join(' · ') || 'אין גיליונות';
+  $('exCutInfo').textContent = [cnt('rug') && `שטיחים: ${cnt('rug')}`, cnt('table') && `ראנרים: ${cnt('table')}`, cnt('pm') && `פלייסמנטים: ${cnt('pm')}`].filter(Boolean).join(' · ') + ' (בלי רוחב מלא)';
+  $('exOrders').disabled = !rows.length; if (!rows.length) $('exOrders').checked = false;
+  $('exOrdersInfo').textContent = orderFiles.size ? `דף ריכוז ואחריו ${orderFiles.size} הזמנות לפי מספר, PDF אחד` : 'רק דף ריכוז: לא הועלו כאן קובצי הזמנה (השורות הוקלדו או הן דוגמה)';
+  const mc = missingList().length; $('exMiss').checked = mc > 0; $('exMissInfo').textContent = mc ? `${mc} פריטים חסרים: תאריך, הזמנה, שם, מידות, כמות וסיבה` : 'אין חוסרים כרגע';
+  $('expMsg').textContent = ''; $('expGo').disabled = false; $('expDlg').hidden = false; $('expGo').focus();
+}
+$('expBtn').onclick = openExport;
+$('expX').onclick = $('expCancel').onclick = () => { $('expDlg').hidden = true; };
+$('expDlg').addEventListener('click', e => { if (e.target === $('expDlg')) $('expDlg').hidden = true; });
+$('expGo').onclick = async () => {
+  const msg = t => { $('expMsg').textContent = t; setStatus(t); };
+  const files = []; $('expGo').disabled = true;
+  try {
+    if ($('exOrders').checked && rows.length) { const r = await buildOrdersPdf(msg); files.push([`${jobName()}_ORDERS.pdf`, r.bytes]); if (r.skipped.length) msg(`דולגו הזמנות: ${r.skipped.join(', ')}`); }
+    if ($('exMiss').checked) { msg('בונה דוח חוסרים…'); files.push([`${jobName()}_MISSING.pdf`, await missingReportPdf()]); }
+    if ($('exPrint').checked) for (const sh of sheets) { msg(`בונה הדפסה ${sheetId(sh)}…`); files.push([printName(sh), await buildPrint([sh], S(), msg)]); }
+    if ($('exCut').checked) for (const sh of sheets) { if (sh.group === 'full') continue; msg(`בונה קאט ${sheetId(sh)}…`); files.push([cutName(sh), await buildCut([sh])]); }
+    renderAlerts();
+    if (!files.length) { msg('לא נבחר כלום לייצוא.'); return; }
+    if ($('exZip').checked && files.length > 1) {
+      msg('אורז ZIP…'); const zip = new JSZip(); files.forEach(([n, b]) => zip.file(n, b));
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+      msg('מחכה לאישור הורדה…'); await save(blob, `${jobName()}.zip`);
+    } else for (const [n, b] of files) { msg(`מחכה לאישור הורדה: ${n}`); await save(b, n); }
+    $('expDlg').hidden = true;
+  } catch (e) { msg(`שגיאה בייצוא: ${e.message || e}`); }
+  finally { $('expGo').disabled = false; }
+};
+
+/* ---------- example rows (from the orders shared in chat) ---------- */
+rows = [
+  { order: 'SO26006319', name: 'קפה פריז', w: 80, l: 200, qty: 1 },
+  { order: 'SO26006318', name: 'טלאי קילים אדמה', w: 80, l: 140, qty: 1 },
+  { order: 'SO26006309', name: 'סביליה', w: 70, l: 120, qty: 1 },
+  { order: 'SO26006209', name: 'בריזת אוקיינוס', w: 200, l: 300, qty: 1 },
+  { order: 'SO26006209', name: 'Spring Collection RWFP003', w: 200, l: 300, qty: 1 },
+].map(r => ({ kind: 'rug', ...r, id: nextId++, fileKey: null, example: true }));
+update();
+restoreWork();
+/* ---------- save as + job files ---------- */
+async function downloadJobFile(rec, name) {
+  const zip = new JSZip();
+  const { orders, ...data } = rec;
+  data.version = 1; data.name = name;
+  data.orderFiles = (orders || []).map(([no, f], i) => { const fn = `orders/${String(i + 1).padStart(3, '0')}_${String(no).replace(/[^\w.-]/g, '_')}.pdf`; zip.file(fn, f); return [no, fn, f.name || '']; });
+  zip.file('job.json', JSON.stringify(data, null, 1));
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  await save(blob, `${name.replace(/[\\/:*?"<>|]/g, '-')}.rugjob.zip`);
+}
+async function openJobFile(file) {
+  try {
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const data = JSON.parse(await zip.file('job.json').async('string'));
+    const orders = [];
+    for (const [no, fn, orig] of data.orderFiles || []) { const z = zip.file(fn); if (z) orders.push([no, new File([await z.async('blob')], orig || (no + '.pdf'), { type: 'application/pdf' })]); }
+    await doSave();
+    jobId = 'j' + Date.now();
+    loadRec({ ...data, orders, job: data.job || data.name || '' });
+    if (!jobManual && data.name) { jobManual = true; $('jobName').value = data.name; }
+    workReady = true; await doSave(); update();
+    $('jobsDlg').hidden = true; setStatus(`נפתחה העבודה ${jobName()} מהקובץ`);
+  } catch (e) { setStatus(`לא הצלחתי לפתוח את הקובץ (${e.message || e}). צריך קובץ .rugjob.zip שנשמר מהכלי`); }
+}
+$('inJobFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openJobFile(f); };
+$('saveAsBtn').onclick = () => {
+  if (!realRows().length) { setStatus('אין עדיין מה לשמור. העלי הזמנות.'); return; }
+  $('saName').value = jobName(); $('saveAsDlg').hidden = false; $('saName').select();
+};
+$('saX').onclick = $('saCancel').onclick = () => { $('saveAsDlg').hidden = true; };
+$('saveAsDlg').addEventListener('click', e => { if (e.target === $('saveAsDlg')) $('saveAsDlg').hidden = true; });
+$('saName').addEventListener('keydown', e => { if (e.key === 'Enter') $('saGo').click(); });
+$('saGo').onclick = async () => {
+  const name = $('saName').value.trim(); if (!name) { $('saName').focus(); return; }
+  await doSave();                       // keep the current job as it is
+  jobId = 'j' + Date.now();             // and continue in a new one with the new name
+  jobManual = true; $('jobName').value = name;
+  await doSave(); update();
+  $('saveAsDlg').hidden = true;
+  if ($('saFile').checked) { setStatus('אורז את העבודה לקובץ…'); const rec = await idb('readonly', st => st.get('job:' + jobId)); await downloadJobFile(rec, name); }
+  setStatus(`העבודה נשמרה בשם ${name}`);
+};
+$('jobsBtn').onclick = async () => { await doSave(); await renderJobs(); $('jobsDlg').hidden = false; };
+$('jobsX').onclick = $('jobsClose').onclick = () => { $('jobsDlg').hidden = true; };
+$('jobsDlg').addEventListener('click', e => { if (e.target === $('jobsDlg')) $('jobsDlg').hidden = true; });
+$('jobsNew').onclick = async () => { $('jobsDlg').hidden = true; await newJob(); };
+$('newJobBtn').onclick = newJob;
+$('saveJobBtn').onclick = async () => { if (!realRows().length) { setStatus('אין עדיין מה לשמור. העלי הזמנות.'); return; } await doSave(); setStatus(`השינויים נשמרו בעבודה ${jobName()}`); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('jobsDlg').hidden) $('jobsDlg').hidden = true; if (e.key === 'Escape' && !$('saveAsDlg').hidden) $('saveAsDlg').hidden = true; });
+document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); (e.shiftKey ? $('saveAsBtn') : $('saveJobBtn')).click(); } });
+
+/* ---------- desktop app (Mac): real folders + updates ---------- */
+if (window.rugdesk) (async () => {
+  const DESK = window.rugdesk;
+  document.documentElement.classList.add('desk');
+  let cfg = await DESK.getCfg();
+  // files go straight into folders, no download prompts
+  let lastSaved = null;
+  save = async (bytes, name) => {
+    try {
+      const data = new Uint8Array(bytes instanceof Blob ? await bytes.arrayBuffer() : bytes);
+      lastSaved = await DESK.saveFile(jobName(), name, data, /\.rugjob\.zip$/i.test(name) ? 'job' : 'out');
+      setStatus(`נשמר: ${name}`);
+    } catch (e) { setStatus(`השמירה נכשלה (${e.message || e})`); }
+  };
+  const zl = $('exZip').closest('label'); $('exZip').checked = false; if (zl) zl.hidden = true;
+  const where = document.createElement('div'); where.className = 'hint'; where.style.margin = '8px 0';
+  $('expMsg').before(where);
+  const showWhere = () => { where.innerHTML = ''; const t = document.createElement('span'); t.textContent = `נשמר לתיקייה: ${cfg.outDir}/${jobName()}  `; const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm ghost'; b.textContent = 'שינוי'; b.onclick = async () => { const d = await DESK.pickFolder({ title: 'תיקייה לקובצי ההדפסה והחיתוך', start: cfg.outDir }); if (d) { cfg = await DESK.setCfg({ outDir: d }); showWhere(); } }; where.append(t, b); };
+  const origOpen = $('expBtn').onclick; $('expBtn').onclick = () => { origOpen(); showWhere(); };
+  const origGo = $('expGo').onclick;
+  $('expGo').onclick = async () => { lastSaved = null; await origGo(); if (lastSaved) { DESK.reveal(lastSaved); setStatus(`הקבצים נשמרו בתיקייה ${jobName()}`); } };
+  // the rug folder: read straight from disk (network folder too), every time the app opens
+  $('fixDir').hidden = false; $('fixOpen').hidden = true; $('fixForget').hidden = true; $('fixReload').hidden = false; $('fixSet').textContent = 'החלפת תיקייה';
+  const showDir = () => { $('fixName').textContent = cfg.rugDir || '—'; };
+  const deskCache = new Map();
+  loadFixed = async () => {
+    if (scanning || !cfg.rugDir) return; scanning = true;
+    $('fixMsg').textContent = 'קורא את התיקייה…'; busyUI($('dropRugs'), true, 'קורא את התיקייה…', 0);
+    try {
+      const r = await DESK.listPdfs(cfg.rugDir);
+      if (!r.ok) { $('fixMsg').textContent = `התיקייה ${cfg.rugDir} לא נמצאה. אם זו תיקיית רשת: לחברי את הכונן ואז ״רענון תיקייה״, או בחרי תיקייה אחרת.`; return; }
+      const before = rugFiles.size;
+      const files = r.files.map(f => { const k = f.path + '|' + f.size; let o = deskCache.get(k); if (!o) { o = { name: f.name, _rel: f.rel, size: f.size, lazy: true, arrayBuffer: async () => { const u = await DESK.readFile(f.path); return u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength); } }; deskCache.set(k, o); } return o; });
+      rugFiles.clear(); trimCheck.clear(); addRugs(files);
+      lastScan = Date.now();
+      const diff = rugFiles.size - before;
+      $('fixMsg').textContent = `נטען ${new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })} · ${rugFiles.size} שטיחים${before && diff > 0 ? ` · ${diff} חדשים` : ''}. נטען לבד בכל פתיחה, ושוב כשחוזרים לחלון ויש חוסרים.`;
+    } catch (e) { $('fixMsg').textContent = `לא הצלחתי לקרוא את התיקייה (${e.message || e}).`; }
+    finally { scanning = false; busyUI($('dropRugs'), false); }
+  };
+  fixHandle = { desk: true };
+  $('fixSet').onclick = async () => { const d = await DESK.pickFolder({ title: 'תיקיית השטיחים', start: cfg.rugDir }); if (d) { cfg = await DESK.setCfg({ rugDir: d }); showDir(); deskCache.clear(); await loadFixed(); } };
+  $('fixReload').onclick = () => loadFixed();
+  showDir(); loadFixed();
+  // job file double-clicked in Finder
+  DESK.onOpenJob(async p => { try { const r = await DESK.readJob(p); await openJobFile(new File([r.data], r.name)); } catch (e) { setStatus('לא הצלחתי לפתוח את קובץ העבודה'); } });
+  // updates
+  const bar = document.querySelector('.bottombar');
+  const up = document.createElement('span'); up.className = 'updbox';
+  const ver = document.createElement('span'); ver.className = 'mono'; ver.textContent = `גרסה ${cfg.version}`;
+  const ub = document.createElement('button'); ub.type = 'button'; ub.className = 'btn sm ghost'; ub.textContent = 'בדוק עדכון';
+  up.append(ver, ub); bar.append(up);
+  let latest = null;
+  const check = async quiet => {
+    ub.disabled = true; if (!quiet) ub.textContent = 'בודק…';
+    const r = await DESK.checkUpdate(); ub.disabled = false;
+    if (!r.ok) { ub.textContent = 'בדוק עדכון'; if (!quiet) setStatus('אין חיבור לבדיקת עדכון'); return; }
+    latest = r;
+    if (r.available) { ub.textContent = `יש גרסה חדשה (${r.latest}) – לעדכן`; ub.className = 'btn sm primary'; ub.title = r.notes || ''; }
+    else { ub.textContent = 'בדוק עדכון'; ub.className = 'btn sm ghost'; if (!quiet) setStatus(`הגרסה עדכנית (${r.current})`); }
+  };
+  ub.onclick = async () => {
+    if (!(latest && latest.available)) return check(false);
+    try { await doSave(); } catch (e) {}
+    ub.disabled = true; ub.textContent = 'מעדכן…';
+    const r = await DESK.applyUpdate();
+    if (!r.ok) { ub.disabled = false; ub.textContent = 'העדכון נכשל – לנסות שוב'; setStatus(r.error || ''); }
+  };
+  check(true);
+})();
+</script>
