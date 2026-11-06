@@ -539,7 +539,13 @@ function rowFromLogical(t) {
   // "<product> פי וי סי - NAME - WxH (מידות: …)"
   const m = t.match(/פי\s*וי\s*סי\s*[-–]\s*(.+?)\s+[-–]\s*[()\s]*(\d{2,3}(?:\.\d)?)\s*[x×X*]\s*(\d{2,3}(?:\.\d)?)/)
          || t.match(/פי\s*וי\s*סי\s*[-–]\s*(.+?)\s+[-–]\s*[^\d]*?(?:\d\s*·\s*)?(\d{2,3}(?:\.\d)?)\s*[x×X*]\s*(\d{2,3}(?:\.\d)?)/);
-  if (!m) return null;
+  if (!m) {
+    // round placemat: "פלייסמט פי וי סי - NAME - עגול קוטר 40 · יחידה"
+    const rm = t.match(/פי\s*וי\s*סי\s*[-–]\s*(.+?)\s+[-–]\s*עגול\s*קוטר\s*(\d{2,3}(?:\.\d)?)/) || t.match(/פי\s*וי\s*סי\s*[-–]\s*(.+?)\s+[-–][^\d]*?(\d{2,3}(?:\.\d)?)\s*קוטר\s*עגול/);
+    if (!rm) return null;
+    const nm = fixName(rm[1]); if (!nm || !/[֐-׿A-Za-z]/.test(nm)) return null;
+    return { name: `${nm} עגול`, w: +rm[2], l: +rm[2], kind: kindOf(t), round: true };
+  }
   const name = fixName(m[1]); if (!name || !/[֐-׿A-Za-z]/.test(name)) return null;
   const w = +m[2], l = +m[3];
   return { name, w: Math.min(w, l), l: Math.max(w, l), kind: kindOf(t) };
@@ -781,6 +787,8 @@ function circleOps(cx, cy, r) {
   const k = 0.5523 * r, f = v => v.toFixed(3);
   return `${f(cx + r)} ${f(cy)} m ${f(cx + r)} ${f(cy + k)} ${f(cx + k)} ${f(cy + r)} ${f(cx)} ${f(cy + r)} c ${f(cx - k)} ${f(cy + r)} ${f(cx - r)} ${f(cy + k)} ${f(cx - r)} ${f(cy)} c ${f(cx - r)} ${f(cy - k)} ${f(cx - k)} ${f(cy - r)} ${f(cx)} ${f(cy - r)} c ${f(cx + k)} ${f(cy - r)} ${f(cx + r)} ${f(cy - k)} ${f(cx + r)} ${f(cy)} c f`;
 }
+// round placemat: the order says "עגול קוטר", or the file name says עגול / round
+const isRoundItem = i => { const r = rows.find(x => x.id === i.rowId); const f = r && r.fileKey && rugFiles.get(r.fileKey); return !!((r && r.round) || (f && /עגול|round|circle/i.test(f.name + ' ' + (f.file && f.file.name || '')))); };
 async function buildCut(sheetList) {
   // two layers: registration dots and cut lines, each on its own layer (names from the settings)
   const st = S();
@@ -797,7 +805,10 @@ async function buildCut(sheetList) {
     const ops = ['/OC /Reg BDC', 'q /CSR cs 1 scn'];
     for (const [x, y] of sh.dots) ops.push(circleOps(x * PT, (sh.H - y) * PT, st.dotD / 2 * PT));
     ops.push('Q', 'EMC', '/OC /Cut BDC', 'q /CSC CS 1 SCN 1 w 0 J 0 j');
-    for (const i of sh.items) ops.push(`${f4(i.X)} ${f4(sh.H - i.Y - i.pl)} ${f4(i.pw)} ${f4(i.pl)} re S`);
+    for (const i of sh.items) {
+      if (isRoundItem(i)) { const c = circleOps((i.X + i.pw / 2) * PT, (sh.H - i.Y - i.pl / 2) * PT, Math.min(i.pw, i.pl) / 2 * PT); ops.push(c.replace(/\s[fF]\*?\s*$/, '') + ' h S'); }
+      else ops.push(`${f4(i.X)} ${f4(sh.H - i.Y - i.pl)} ${f4(i.pw)} ${f4(i.pl)} re S`);
+    }
     ops.push('Q', 'EMC');
     page.node.set(PDFName.of('Resources'), ctx.obj({ ColorSpace: { CSC: csCut, CSR: csReg }, Properties: { Reg: ocgReg, Cut: ocgCut } }));
     page.node.set(PDFName.of('Contents'), ctx.register(ctx.stream(ops.join('\n'))));
@@ -815,7 +826,14 @@ function cleanRugDoc(doc) {
     const arr = refs instanceof PDFLib.PDFArray ? refs.asArray() : [refs];
     let text = '';
     for (const r of arr) { const st = ctx.lookup(r); text += new TextDecoder('latin1').decode(PDFLib.decodePDFRawStream(st).decode()) + '\n'; }
-    const cleaned = text.replace(/\bBT\b[\s\S]*?\bET\b/g, blk => /(Tj|TJ|'|")\s*$/m.test(blk) || /\)\s*Tj|\]\s*TJ/.test(blk) ? blk : '');
+    let cleaned = text.replace(/\bBT\b[\s\S]*?\bET\b/g, blk => /(Tj|TJ|'|")\s*$/m.test(blk) || /\)\s*Tj|\]\s*TJ/.test(blk) ? blk : '');
+    // a cut path inside the rug file (layer CUT / Thru-cut) must not print
+    try {
+      const res = node.Resources(), props = res && res.lookup(PDFName.of('Properties'));
+      const cutTags = new Set();
+      if (props) for (const [k, v] of props.entries()) { const o = ctx.lookup(v); const nm = o && o.get && o.get(PDFName.of('Name')); const t = nm ? (nm.decodeText ? nm.decodeText() : String(nm)) : ''; if (/cut|contour|thru|kiss/i.test(t + ' ' + k.toString())) cutTags.add(k.toString()); }
+      if (cutTags.size) cleaned = cleaned.replace(/(\/OC\s+(\/[^\s]+)\s+BDC)([\s\S]*?)\bEMC\b/g, (all, head, tag) => cutTags.has(tag) ? '' : all);
+    } catch (e) {}
     if (cleaned !== text) {
       const bytes = Uint8Array.from(cleaned, ch => ch.charCodeAt(0) & 255);
       node.set(PDFName.of('Contents'), ctx.register(ctx.flateStream(bytes)));
