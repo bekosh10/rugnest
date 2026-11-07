@@ -2247,8 +2247,10 @@ rows = [
   { order: 'SO26006209', name: 'בריזת אוקיינוס', w: 200, l: 300, qty: 1 },
   { order: 'SO26006209', name: 'Spring Collection RWFP003', w: 200, l: 300, qty: 1 },
 ].map(r => ({ kind: 'rug', ...r, id: nextId++, fileKey: null, example: true }));
-update();
-restoreWork();
+// desktop app: opens empty (jobs stay in "העבודות שלי"); only right after an update the open job comes back
+const restoreAfterUpdate = (() => { try { const v = sessionStorage.getItem('rn-restore'); sessionStorage.removeItem('rn-restore'); return !!v; } catch (e) { return false; } })();
+if (window.rugdesk && !restoreAfterUpdate) { rows = []; workReady = true; update(); setStatus('עבודה חדשה. עבודות קודמות נמצאות ב״העבודות שלי״'); }
+else { update(); restoreWork(); }
 /* ---------- save as + job files ---------- */
 async function downloadJobFile(rec, name) {
   const zip = new JSZip();
@@ -2369,6 +2371,7 @@ if (window.rugdesk) (async () => {
   ub.onclick = async () => {
     if (!(latest && latest.available)) return check(false);
     try { await doSave(); } catch (e) {}
+    try { if (rows.length) sessionStorage.setItem('rn-restore', '1'); } catch (e) {}
     ub.disabled = true; ub.textContent = 'מעדכן…';
     const r = await DESK.applyUpdate();
     if (!r.ok) { ub.disabled = false; ub.textContent = 'העדכון נכשל – לנסות שוב'; setStatus(r.error || ''); }
