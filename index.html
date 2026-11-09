@@ -1753,8 +1753,12 @@ async function missingReportPdf() {
   }
   return doc.save();
 }
-const printName = sh => `${jobName()}_${sheetNo(sh)}${cpx(sh)}_print${sh.group === 'full' ? '_fullwidth' : ''}.pdf`;
-const cutName = sh => `${jobName()}_${sheetNo(sh)}${cpx(sh)}_cut.pdf`;
+// runners & placemats are printed on the new linoleum material
+const LINO = 'New Linoleum', LINO_WARN = 'שימו לב !!! New Linoleum';
+const isLino = sh => !!sh && sh.group === 'table';
+const jobPart = sh => `${jobName()}${isLino(sh) ? '-NEW LINOLEUM' : ''}`;
+const printName = sh => `${jobPart(sh)}_${sheetNo(sh)}${cpx(sh)}_print${sh.group === 'full' ? '_fullwidth' : ''}.pdf`;
+const cutName = sh => `${jobPart(sh)}_${sheetNo(sh)}${cpx(sh)}_cut.pdf`;
 // a bundle needs its own cover unless it is one order, one sheet, printed once
 const needsBundlePage = b => b.sh && (b.orders.length > 1 || (b.sh.copies || 1) > 1);
 // customer, contact and phone from the top of an order PDF (so the summary page is enough without the orders)
@@ -1830,6 +1834,7 @@ async function coverPages(bundle) {
       const GR = '#6b7280', DK = '#111827', OB = '#2563eb';
       txt('קמפוס לדפוס דיגיטלי', P(R), P(69), P(17), { w: 700, c: OB });
       txt('דף חבילה לגיליון · לדפוס ולחיתוך', P(R), P(85), P(8), { c: GR });
+      if (isLino(B)) txt(LINO_WARN, W / 2, P(34), P(20), { w: 800, c: '#c62828', a: 'center' });
       txt(sheetId(B), P(L), P(69), P(19), { w: 800, c: DK, a: 'left', ltr: true });
       txt(`הופק: ${new Date().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}${pagesN > 1 ? `   ·   עמוד ${pg + 1}/${pagesN}` : ''}`, P(L), P(88), P(8), { c: GR, a: 'left' });
       x.fillStyle = OB; x.fillRect(P(L), P(103), P(R - L), P(2.6));
@@ -2161,6 +2166,7 @@ async function buildOrdersPdf(progress) {
         const mine = rows.filter(r => r.order === no);
         const js = r => sheetsOfRow(r.id);
         const elsewhere = mine.filter(r => js(r).some(j => j !== b.i));
+        if (isLino(b.sh)) { const t = await T(LINO_WARN, 20, '#c02828', 800); const k = Math.min(1, (W - 80) / t.w); pg0.drawImage(await out.embedPng(t.png), { x: (W - t.w * k) / 2, y: H - 22 - t.h * k / 2, width: t.w * k, height: t.h * k }); }
         const fullHere = b.sh && b.sh.group === 'full';
         const note = [];
         if (fullHere) note.push('⚠ שטיח רוחב מלא! ללא נקודות');
