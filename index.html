@@ -2145,7 +2145,7 @@ async function orderRowsPos(file, no) {
         const parts = n ? [u, n] : [u], q = +((u.str.match(/\d+/) || [])[0] || (n && n.str) || 1);
         qbox = { x0: Math.min(...parts.map(i => i.x)), x1: Math.max(...parts.map(i => i.x + i.w)), y: u.y, h: Math.max(...parts.map(i => i.h)), q };
       }
-      if (desc) out.push({ page: p - 1, y: desc.y, right: desc.x + desc.w, rowId: hit.id, qbox });
+      if (desc) out.push({ page: p - 1, y: desc.y, right: desc.x + desc.w, h: desc.h || 9, rowId: hit.id, qbox });
     }
   }
   pdf.destroy();
@@ -2233,6 +2233,8 @@ async function buildOrdersPdf(progress) {
           const txt = here ? `✓ בגיליון הזה ${sheetNo(sheets[b.i])}${oth.length ? ` · עוד יחידות בגיליון ${oth.join(', ')}` : ''}${isFullSize(r) ? ' · רוחב מלא! ללא נקודות' : ''}`
                            : `⚠ לא בגיליון הזה · נמצא בגיליון ${oth.join(', ')}`;
           const t = await T(txt, 7.5, here && !isFullSize(r) ? '#1b7a45' : '#c02828');
+          // a row that is not on this sheet: fade it (30% visible)
+          if (!here) { const top = pos.y + pos.h * 1.25, bot = pos.y - 3 - t.h - 2; pg.drawRectangle({ x: 40, y: bot, width: pg.getWidth() - 80, height: top - bot, color: rgb(1, 1, 1), opacity: 0.7 }); }
           await put(pg, t, pos.right, pos.y - 3 - t.h / 2);
         }
       } catch (e) { skipped.push(no); }
