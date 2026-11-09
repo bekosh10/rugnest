@@ -1816,7 +1816,7 @@ async function coverPages(bundle) {
   const perFirst = B ? 9 : 11, perNext = 15;
   const info = new Map();
   for (const no of new Set(items.map(r => r.order).filter(Boolean))) info.set(no, await orderHeadInfo(no));
-  const pagesN = items.length <= perFirst ? 1 : 1 + Math.ceil((items.length - perFirst) / perNext);
+  const pagesN = B ? 1 : items.length <= perFirst ? 1 : 1 + Math.ceil((items.length - perFirst) / perNext);
   const out = []; let i = 0;
   const g = k => sheets.filter(s => s.group === k).reduce((a, s) => a + (s.copies || 1), 0);
   const totalLen = sheets.reduce((a, s) => a + s.H * (s.copies || 1), 0) / 100;
@@ -1881,6 +1881,35 @@ async function coverPages(bundle) {
       y += bh + 50;
 
     }
+    if (B) {
+      // bundle page: one row per order (no pictures / rug names — an order can have several rugs)
+      const cols = [['#', 60], ['הזמנה', 170], ['לקוח', 340], ['טלפון', 230], ['פריטים בגיליון', 190], ['הערות', 0]];
+      const tw = W - 2 * M; cols[cols.length - 1][1] = tw - cols.slice(0, -1).reduce((a, c2) => a + c2[1], 0);
+      x.fillStyle = BLUE; x.fillRect(M, y, tw, 62);
+      let cx = W - M; for (const [h, w] of cols) { txt(h, cx - 16, y + 42, 25, { w: 700, c: '#fff' }); cx -= w; }
+      y += 62;
+      bundle.orders.forEach((no, oi) => {
+        const rh = 92, mine = rows.filter(r => r.order === no), h = info.get(no) || {};
+        const nHere = mine.reduce((a, r) => a + (here.get(r.id) || 0), 0), tot = mine.reduce((a, r) => a + (r.qty || 0), 0);
+        const oth = [...new Set(mine.flatMap(r => sheetsOfRow(r.id)).filter(j => j !== bIdx))].sort((a, b) => a - b).map(j => sheetNo(sheets[j]));
+        const full = B.group === 'full';
+        if (full) { x.fillStyle = '#ffe9a8'; x.fillRect(M, y, tw, rh); } else if (oi % 2) { x.fillStyle = '#f5f8fd'; x.fillRect(M, y, tw, rh); }
+        x.fillStyle = LINE; x.fillRect(M, y + rh - 1, tw, 1);
+        const notes = [full && 'שטיח רוחב מלא! ללא נקודות', oth.length && `⚠ עוד בגיליון ${oth.join(',')} · בהזמנה ${tot}`].filter(Boolean);
+        const nm = h.cust || h.contact || '', extra = h.contact && h.cust && h.contact !== h.cust ? h.contact : '';
+        const vals = [String(oi + 1), short4(no), nm, h.phone || '', String(nHere), ''];
+        cx = W - M;
+        vals.forEach((v, j) => {
+          const w = cols[j][1]; x.save(); x.beginPath(); x.rect(cx - w, y, w, rh); x.clip();
+          if (j === 2) { txt(v, cx - 16, y + (extra ? 40 : 56), 26, { w: 600 }); if (extra) txt(extra, cx - 16, y + 74, 20, { c: MUT }); }
+          else if (j === 4 && nHere >= 2) { x.font = `700 26px ${FN}`; const t = x.measureText(v).width; x.fillStyle = '#c62828'; x.beginPath(); x.roundRect(cx - 16 - t - 12, y + rh / 2 - 21, t + 24, 42, 6); x.fill(); txt(v, cx - 16, y + rh / 2 + 9, 26, { w: 700, c: '#fff', mono: true }); }
+          else if (j === 5) { notes.forEach((t, li) => { x.font = `800 21px ${F}`; const tw = x.measureText(t).width; const sz = tw > w - 24 ? Math.max(13, 21 * (w - 24) / tw) : 21; txt(t, cx - 16, y + rh / 2 + 9 - (notes.length - 1) * 15 + li * 30, sz, { w: 800, c: '#c02828' }); }); }
+          else txt(v, cx - 16, y + rh / 2 + 9, 26, { mono: j !== 2, ltr: j === 3, w: j === 1 ? 700 : 400 });
+          x.restore(); cx -= w;
+        });
+        y += rh;
+      });
+    } else {
     // table
     const cols = [['#', 50], ['הזמנה', 120], ['תמונה', 140], ['פריט', B ? 290 : 330], ['סוג', 115], ['מידות', 135], ['כמות', 115], ['גיליון', 105], ['לקוח', 0]];
     const tw = W - 2 * M; cols[cols.length - 1][1] = tw - cols.slice(0, -1).reduce((a, c2) => a + c2[1], 0);
@@ -1936,6 +1965,7 @@ async function coverPages(bundle) {
         x.restore(); cx -= w;
       });
       y += rh;
+    }
     }
     if (pg === pagesN - 1 && !B) {
       y += 40;
