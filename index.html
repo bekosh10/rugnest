@@ -777,7 +777,8 @@ function pack(items, s) {
 /* ---------- registration dots (cm, top-left origin) — copied from the Griffin sample ---------- */
 function marks(sh) {
   const st = S(), c = st.dotEdge, g = st.dotGap, { W, H } = sh;
-  const dots = [[c, c], [W - c, c], [c, H - c], [W - c, H - c], [W - c - st.dot5, H - c]];
+  // rug sheets: only the two dots at the bottom right (+ length dots); other sheets: 4 corners + the 5th
+  const dots = sh.group === 'rug' ? [[W - c, H - c], [W - c - st.dot5, H - c]] : [[c, c], [W - c, c], [c, H - c], [W - c, H - c], [W - c - st.dot5, H - c]];
   const boxes = sh.items.map(i => [i.X, i.Y, i.X + i.pw, i.Y + i.pl]);
   const free = (px, py) => boxes.every(([x0, y0, x1, y1]) => !(x0 - .4 < px && px < x1 + .4 && y0 - .4 < py && py < y1 + .4));
   const along = (a, b, fixed, vert) => { const n = Math.max(1, Math.floor((b - a) / st.dotStep)), r = []; for (let k = 1; k <= n; k++) { const t = a + (b - a) * k / (n + 1); r.push(vert ? [fixed, t] : [t, fixed]); } return r; };
@@ -936,7 +937,7 @@ function compute() {
     const sg = g === 'table' ? { ...s, maxW: s.pmW, mx: s.pmMx } : s;   // runners + placemats run together on the 320 roll
     const sig = JSON.stringify([sg, groups[g].map(i => [i.rowId, i.w, i.l, i.fileKey, i.name, i.order])]);
     if (!packCache.has(sig)) { if (packCache.size > 20) packCache.clear(); packCache.set(sig, pack(groups[g], sg)); }
-    sheets.push(...packCache.get(sig).map(sh => ({ ...sh, group: g })));
+    sheets.push(...packCache.get(sig).map(sh => { const o = { ...sh, group: g }; o.dots = marks(o); return o; }));
   }
   fullRoll.sort((a, b) => ordNum(a.order) - ordNum(b.order));
   for (const it of fullRoll) {   // full roll width: one page each, media width x ordered length, art fills the page (cover), nothing else
