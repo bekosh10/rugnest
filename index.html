@@ -1758,7 +1758,7 @@ async function missingReportPdf() {
   return doc.save();
 }
 // runners & placemats are printed on the new linoleum material
-const LINO = 'New Linoleum', LINO_WARN = 'שימו לב !!! New Linoleum', LINO_SUB = 'חומר חדש! פלייסמנטים';
+const LINO = 'New Linoleum', LINO_WARN = 'שימו לב !!! New Linoleum', LINO_SUB = 'חומר חדש שטיח דק!!!!!';
 const isLino = sh => !!sh && sh.group === 'table';
 const jobPart = sh => `${jobName()}${isLino(sh) ? '-NEW LINOLEUM' : ''}`;
 const printName = sh => `${jobPart(sh)}_${sheetNo(sh)}${cpx(sh)}_print${sh.group === 'full' ? '_fullwidth' : ''}.pdf`;
