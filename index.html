@@ -1758,7 +1758,7 @@ async function missingReportPdf() {
   return doc.save();
 }
 // runners & placemats are printed on the new linoleum material
-const LINO = 'New Linoleum', LINO_WARN = 'שימו לב !!! New Linoleum';
+const LINO = 'New Linoleum', LINO_WARN = 'שימו לב !!! New Linoleum', LINO_SUB = 'חומר חדש! פלייסמנטים';
 const isLino = sh => !!sh && sh.group === 'table';
 const jobPart = sh => `${jobName()}${isLino(sh) ? '-NEW LINOLEUM' : ''}`;
 const printName = sh => `${jobPart(sh)}_${sheetNo(sh)}${cpx(sh)}_print${sh.group === 'full' ? '_fullwidth' : ''}.pdf`;
@@ -1839,7 +1839,7 @@ async function coverPages(bundle) {
       const GR = '#6b7280', DK = '#111827', OB = '#2563eb';
       txt('קמפוס לדפוס דיגיטלי', P(R), P(69), P(17), { w: 700, c: OB });
       txt('דף חבילה לגיליון · לדפוס ולחיתוך', P(R), P(85), P(8), { c: GR });
-      if (isLino(B)) txt(LINO_WARN, W / 2, P(34), P(20), { w: 800, c: '#c62828', a: 'center' });
+      if (isLino(B)) { txt(LINO_WARN, W / 2, P(36), P(28), { w: 800, c: '#c62828', a: 'center' }); txt(LINO_SUB, W / 2, P(72), P(16), { w: 800, c: '#c62828', a: 'center' }); }
       txt(sheetId(B), P(L), P(69), P(19), { w: 800, c: DK, a: 'left', ltr: true });
       txt(`הופק: ${new Date().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}${pagesN > 1 ? `   ·   עמוד ${pg + 1}/${pagesN}` : ''}`, P(L), P(88), P(8), { c: GR, a: 'left' });
       x.fillStyle = OB; x.fillRect(P(L), P(103), P(R - L), P(2.6));
@@ -2185,7 +2185,13 @@ async function buildOrdersPdf(progress) {
         const mine = rows.filter(r => r.order === no);
         const js = r => sheetsOfRow(r.id);
         const elsewhere = mine.filter(r => js(r).some(j => j !== b.i));
-        if (isLino(b.sh)) { const t = await T(LINO_WARN, 20, '#c02828', 800); const k = Math.min(1, (W - 80) / t.w); pg0.drawImage(await out.embedPng(t.png), { x: (W - t.w * k) / 2, y: H - 22 - t.h * k / 2, width: t.w * k, height: t.h * k }); }
+        if (isLino(b.sh)) {
+          const t = await T(LINO_WARN, 30, '#c02828', 800); const k = Math.min(1, (W - 60) / t.w);
+          pg0.drawImage(await out.embedPng(t.png), { x: (W - t.w * k) / 2, y: H - 24 - t.h * k / 2, width: t.w * k, height: t.h * k });
+          const t2 = await T(LINO_SUB, 15, '#c02828', 800);   // in the empty middle of the order header (between the order number and the title)
+          const k2 = Math.min(1, 165 / t2.w), cxm = W / 2 - 22;
+          pg0.drawImage(await out.embedPng(t2.png), { x: cxm - t2.w * k2 / 2, y: H - 66 - t2.h * k2 / 2, width: t2.w * k2, height: t2.h * k2 });
+        }
         const fullHere = b.sh && b.sh.group === 'full';
         const note = [];
         if (fullHere) note.push('⚠ שטיח רוחב מלא! ללא נקודות');
