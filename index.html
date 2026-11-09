@@ -1786,7 +1786,7 @@ async function orderHeadInfo(no) {
           const near = line.filter(i => Math.abs(i.x + i.w - R) < 4).length ? line : [];
           return near.length ? logicalLine(near).replace(/\s+/g, ' ').trim() : '';
         };
-        res = { cust: val(/^לקוח$/), contact: val(/^איש קשר$/), phone: val(/^טלפון איש קשר$/) };
+        res = { cust: val(/^לקוח$/), contact: val(/^איש קשר$/), phone: val(/^טלפון איש קשר$/).replace(/^([\d\s-]+?)\s*\+$/, '+$1').replace(/\s+/g, '') };
       }
     }
   } catch (e) { res = null; }
@@ -1820,7 +1820,8 @@ async function coverPages(bundle) {
   const perFirst = B ? 9 : 18, perNext = 23;
   const info = new Map();
   for (const no of new Set(items.map(r => r.order).filter(Boolean))) info.set(no, await orderHeadInfo(no));
-  const pagesN = B ? 1 : items.length <= perFirst ? 1 : 1 + Math.ceil((items.length - perFirst) / perNext);
+  const ordList = [...new Set(items.map(r => r.order || ''))];
+  const pagesN = B ? 1 : ordList.length <= perFirst ? 1 : 1 + Math.ceil((ordList.length - perFirst) / perNext);
   const out = []; let i = 0;
   const g = k => sheets.filter(s => s.group === k).reduce((a, s) => a + (s.copies || 1), 0);
   const totalLen = sheets.reduce((a, s) => a + s.H * (s.copies || 1), 0) / 100;
@@ -1914,43 +1915,40 @@ async function coverPages(bundle) {
         y += rh;
       });
     } else {
-    // table: one row per item, no pictures / rug names (order, type, size, qty, sheet, customer, notes)
-    const cols = [['#', 50], ['הזמנה', 140], ['סוג', 150], ['מידות', 160], ['כמות', 140], ['גיליון', 130], ['לקוח', 380], ['הערות', 0]];
+    // table: one row per order — customer, total items, sheets, notes
+    const cols = [['#', 50], ['הזמנה', 150], ['לקוח', 430], ['פריטים', 150], ['גיליונות', 260], ['הערות', 0]];
     const tw = W - 2 * M; cols[cols.length - 1][1] = tw - cols.slice(0, -1).reduce((a, c2) => a + c2[1], 0);
     x.fillStyle = BLUE; x.fillRect(M, y, tw, 62);
     let cx = W - M; for (const [h, w] of cols) { txt(h, cx - 16, y + 42, 25, { w: 700, c: '#fff' }); cx -= w; }
     y += 62;
     const per = pg === 0 ? perFirst : perNext;
-    for (let k = 0; k < per && i < items.length; k++, i++) {
-      const r = items[i], rh = 84;
-      const isFullRow = isFullSize(r), first = k === 0 || !items[i - 1] || items[i - 1].order !== r.order;
-      if (isFullRow) { x.fillStyle = '#ffe9a8'; x.fillRect(M, y, tw, rh); x.fillStyle = '#c02828'; x.fillRect(W - M - 10, y, 10, rh); }
+    for (let k = 0; k < per && i < ordList.length; k++, i++) {
+      const no = ordList[i], mine = items.filter(r => (r.order || '') === no), h = info.get(no) || {}, rh = 84;
+      const tot = mine.reduce((a, r) => a + (r.qty || 0), 0);
+      const shs = [...new Set(mine.flatMap(r => sheetsOfRow(r.id)))].sort((a, b) => a - b).map(j => String(j + 1).padStart(3, '0'));
+      const nFull = mine.filter(r => isFullSize(r)).reduce((a, r) => a + (r.qty || 0), 0);
+      const nBad = mine.filter(r => !isFullSize(r) && rowState(r)[0] === 'bad').reduce((a, r) => a + (r.qty || 0), 0);
+      const notes = [nFull && (nFull > 1 ? `${nFull} שטיחים ברוחב מלא! ללא נקודות` : 'שטיח רוחב מלא! ללא נקודות'), nBad && `⚠ חסר קובץ (${nBad})`].filter(Boolean);
+      if (nFull) { x.fillStyle = '#ffe9a8'; x.fillRect(M, y, tw, rh); x.fillStyle = '#c02828'; x.fillRect(W - M - 10, y, 10, rh); }
       else if (k % 2) { x.fillStyle = '#f5f8fd'; x.fillRect(M, y, tw, rh); }
-      x.fillStyle = first && k ? '#b8c2cc' : LINE; x.fillRect(M, y, tw, first && k ? 2 : 0);
       x.fillStyle = LINE; x.fillRect(M, y + rh - 1, tw, 1);
-      const sh = sheetsOfRow(r.id).map(j => String(j + 1).padStart(3, '0')).join(',');
-      const q = qtyOf(r);
-      const bad = !isFullRow && rowState(r)[0] === 'bad' ? (r.match && r.match.kind === 'size' ? '⚠ אין קובץ בגודל הזה' : '⚠ חסר קובץ') : '';
-      const notes = [isFullRow && 'שטיח רוחב מלא! ללא נקודות', bad].filter(Boolean);
-      const vals = [String(i + 1), first ? (short4(r.order) || '—') : '', KINDS[kindKey(r.kind)], `${r.w}×${r.l}`, r.units ? `${q} · סט` : String(q), sh || '—', '', ''];
+      const vals = [String(i + 1), short4(no) || '—', '', String(tot), shs.join(', ') || '—', ''];
       cx = W - M;
       vals.forEach((v, j) => {
         const w = cols[j][1]; x.save(); x.beginPath(); x.rect(cx - w, y, w, rh); x.clip();
-        if (j === 6) {
-          const h = first && info.get(r.order);
-          if (h) {
-            const fit = (t, size, wt) => { x.save(); x.font = `${wt} ${size}px ${F}`; let u = t; while (x.measureText(u).width > w - 24 && u.length > 4) u = u.slice(0, -2); x.restore(); return u === t ? t : u.trim() + '…'; };
-            const nm = h.cust || h.contact || '', ph = h.phone || '';
-            const ls = [[nm, 23, 600, INK], [ph, 21, 400, INK]].filter(a => a[0]);
-            const y0 = y + rh / 2 + 8 - (ls.length - 1) * 15;
-            ls.forEach(([t, sz, wt, c], li) => txt(fit(t, sz, wt), cx - 16, y0 + li * 30, sz, { w: wt, c, mono: t === ph, ltr: t === ph }));
-          }
-        } else if (j === 7) {
+        if (j === 2) {
+          const fit = (t, size, wt) => { x.save(); x.font = `${wt} ${size}px ${F}`; let u = t; while (x.measureText(u).width > w - 24 && u.length > 4) u = u.slice(0, -2); x.restore(); return u === t ? t : u.trim() + '…'; };
+          const nm = h.cust || h.contact || '', ph = h.phone || '';
+          const ls = [[nm, 24, 600], [ph, 21, 400]].filter(a => a[0]);
+          const y0 = y + rh / 2 + 8 - (ls.length - 1) * 15;
+          ls.forEach(([t, sz, wt], li) => txt(fit(t, sz, wt), cx - 16, y0 + li * 30, sz, { w: wt, mono: t === ph, ltr: t === ph }));
+        } else if (j === 5) {
           notes.forEach((t, li) => { x.font = `800 22px ${F}`; const tw2 = x.measureText(t).width; const sz = tw2 > w - 24 ? Math.max(13, 22 * (w - 24) / tw2) : 22; txt(t, cx - 16, y + rh / 2 + 9 - (notes.length - 1) * 15 + li * 30, sz, { w: 800, c: '#c02828' }); });
         } else {
-          const redQ = j === 4 && (q || 0) >= 2;
+          const redQ = j === 3 && tot >= 2;
           if (redQ) { x.font = `700 25px ${FN}`; const tw2 = x.measureText(v).width; x.fillStyle = '#c62828'; x.beginPath(); x.roundRect(cx - 16 - tw2 - 12, y + rh / 2 - 20, tw2 + 24, 40, 6); x.fill(); }
-          txt(v, cx - 16, y + rh / 2 + 9, j === 5 && v.length > 4 ? 19 : 25, { mono: j !== 2, ltr: j === 5, w: j === 1 || redQ ? 700 : 400, c: redQ ? '#ffffff' : INK });
+          let sz = 25; if (j === 4) { x.font = `400 25px ${FN}`; const tw2 = x.measureText(v).width; if (tw2 > w - 24) sz = Math.max(14, 25 * (w - 24) / tw2); }
+          txt(v, cx - 16, y + rh / 2 + 9, sz, { mono: true, ltr: j === 4, w: j === 1 || redQ ? 700 : 400, c: redQ ? '#ffffff' : INK });
         }
         x.restore(); cx -= w;
       });
