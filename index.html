@@ -668,13 +668,20 @@ function suggestFile(row) {
   }
   return best;
 }
+// the site sometimes repeats the collection name: "טוסקנה - טוסקנה מסגרת אדומה" -> "טוסקנה מסגרת אדומה"
+function dedupeName(name) {
+  const w = String(name || '').replace(/\s*[-–]\s*/g, ' ').trim().split(/\s+/);
+  for (let k = 3; k >= 1; k--) if (w.length >= 2 * k && w.slice(0, k).join(' ') === w.slice(k, 2 * k).join(' ')) return w.slice(k).join(' ');
+  return name;
+}
 function autoMatch(row) {
-  const n0 = norm(row.name), n1 = norm(stripType(row.name));
+  const n0 = norm(row.name), n1 = norm(stripType(row.name)), n2 = norm(dedupeName(row.name)), n3 = norm(stripType(dedupeName(row.name)));
   const n = n0;
   if (!n) return { key: null, kind: 'none' };
   let exact = null, nameOnly = [];
+  const want = [n0, n1, n2, n3];
   for (const [k, f] of rugFiles) {
-    if (f.norm === n0 || f.norm === n1 || (f.aliases && (f.aliases.has(n0) || f.aliases.has(n1)))) { if (sameSize(f, row)) { exact = k; break; } nameOnly.push(f); }
+    if (want.includes(f.norm) || (f.aliases && want.some(x => f.aliases.has(x)))) { if (sameSize(f, row)) { exact = k; break; } nameOnly.push(f); }
   }
   if (exact) return { key: exact, kind: 'exact' };
   // product code in the name (AO-3, MORT-3, RWFP003): a file or folder named exactly with that code
