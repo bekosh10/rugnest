@@ -922,7 +922,7 @@ async function buildPrint(sheetList, s, progress) {
       else { const s1 = w / tw, s2 = h / th; page.drawPage(emb, { x: x - bb * s1, y: y - bb * s2, width: (tw + 2 * bb) * s1, height: (th + 2 * bb) * s2 }); }
     }
     if (s.label) {   // to the left of the 5th (orientation) dot, on the same line, bottom edge
-      const t = sheetLabel(sh).replace(/[^\x20-\x7e]/g, ''), L = await lblImg(t), tw = L.w;
+      const t = sheetLabel(sh).replace(/[^\x20-\x7e]/g, ''), L = await lblImg(t, 18), tw = L.w;
       const xEnd = (sh.W - s.dotEdge - s.dot5 - s.dotD / 2 - 4) * PT, yMid = s.dotEdge * PT;
       page.drawImage(L.img, { x: Math.max(0.5 * PT, xEnd - tw), y: yMid - L.h / 2, width: L.w, height: L.h });
     }
@@ -1084,6 +1084,7 @@ function renderRows() {
               <span class="qtyctl"><button type="button" data-q="-1" aria-label="פחות">−</button><input type="number" id="q${r.id}" min="1" aria-label="כמות"><button type="button" data-q="1" aria-label="יותר">+</button></span>${kk !== 'rug' ? `<span class="ktag k-${kk}">${KINDS[kk]}</span>` : ''}</span></div>
           <button class="xdel" type="button" aria-label="מחיקת שורה">${ICON_X}</button></div>`;
       d.querySelector('#n' + r.id).value = r.name;
+      { const fl = r.fileKey ? 'קובץ: ' + fileLabel(r.fileKey) : (isFullSize(r) ? '' : 'אין קובץ'); if (fl) { d.querySelector('.thumb').title = fl; d.querySelector('#n' + r.id).title = fl; } }
       d.querySelector('#w' + r.id).value = r.w || ''; d.querySelector('#l' + r.id).value = r.l || ''; d.querySelector('#q' + r.id).value = r.qty;
       d.addEventListener('click', e => { if (e.target.closest('input,select,.xdel,.kbtn,[data-q]')) return; selectRow(r.id); });
       d.querySelector('.swapbtn').onclick = e => { e.stopPropagation(); [r.w, r.l] = [r.l, r.w]; setStatus(`${r.name}: עכשיו ${r.w}×${r.l}`); update(); };
@@ -1260,6 +1261,8 @@ function renderAlerts() {
   }
 }
 
+// the rug file behind an item (folder/file name), shown when hovering
+const fileLabel = key => { const f = key && rugFiles.get(key); return f ? (f.path || (f.file && f.file.name) || f.name) : 'אין קובץ'; };
 function sheetSvg(sh, big) {
   const fs = Math.max(3, Math.min(8, sh.W / 20));
   let s = `<rect class="sheet" x="0" y="0" width="${sh.W}" height="${sh.H}"/>`;
@@ -1273,7 +1276,7 @@ function sheetSvg(sh, big) {
     }
     if (!i.cover) s += `<rect class="cutl" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}"/>`;
     if (big && i.rowId === selRow) s += `<rect class="selr" x="${i.X + .6}" y="${i.Y + .6}" width="${i.pw - 1.2}" height="${i.pl - 1.2}"/>`;
-    if (big) s += `<rect class="hitr" data-row="${i.rowId}" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}"/>`;
+    if (big) s += `<rect class="hitr" data-row="${i.rowId}" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}"><title>${esc(fileLabel(i.fileKey))}</title></rect>`;
     if (big) {
       const cx = i.X + i.pw / 2, cy = i.Y + i.pl / 2, nm = short(i.name, i.pw / fs * 1.8), on = i.order || '';
       const bw = Math.min(i.pw - 2, Math.max(nm.length * fs * .55, on.length * fs * .52) + 5);
@@ -1284,7 +1287,7 @@ function sheetSvg(sh, big) {
     }
   }
   if (big) for (const [x, y] of sh.dots) s += `<circle class="mk" cx="${x}" cy="${y}" r="${S().dotD / 2}"/>`;
-  if (big && sh.group !== 'full' && S().label && typeof sheetLabel === 'function') { const st = S(); s += `<text class="slbl" x="${sh.W - st.dotEdge - st.dot5 - st.dotD / 2 - 4}" y="${sh.H - st.dotEdge + 0.3}" text-anchor="end" font-size="0.9">${esc(sheetLabel(sh))}</text>`; }
+  if (big && sh.group !== 'full' && S().label && typeof sheetLabel === 'function') { const st = S(); s += `<text class="slbl" x="${sh.W - st.dotEdge - st.dot5 - st.dotD / 2 - 4}" y="${sh.H - st.dotEdge + 0.3}" text-anchor="end" font-size="1.8">${esc(sheetLabel(sh))}</text>`; }
   return s;
 }
 
