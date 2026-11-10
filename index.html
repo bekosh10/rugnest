@@ -933,6 +933,7 @@ async function buildPrint(sheetList, s, progress) {
 
 /* ---------- compute + render ---------- */
 const packCache = new Map();
+let frozenPack = new Map(), lastPack = [], lastPackJob = null;   // layout saved with a job
 function compute() {
   const s = S();
   const groups = { rug: [], table: [], pm: [] }; fullRoll = []; tooBig = [];
@@ -949,12 +950,22 @@ function compute() {
       groups[matGroup(it.kind)].push(it);
     }
   }
-  sheets = [];
+  sheets = []; lastPack = []; lastPackJob = jobId;
   for (const g of ['rug', 'table', 'pm']) if (groups[g].length) {
     const sg = g === 'table' ? { ...s, maxW: s.pmW, mx: s.pmMx } : s;   // runners + placemats run together on the 320 roll
     const sig = JSON.stringify([sg, groups[g].map(i => [i.rowId, i.w, i.l, i.fileKey, i.name, i.order])]);
-    if (!packCache.has(sig)) { if (packCache.size > 20) packCache.clear(); packCache.set(sig, pack(groups[g], sg)); }
-    sheets.push(...packCache.get(sig).map(sh => { const o = { ...sh, group: g }; o.dots = marks(o); return o; }));
+    // a saved job keeps its layout: same items + same settings -> the exact sheets that were exported
+    const loose = JSON.stringify([g, sg, groups[g].map(i => [i.rowId, i.w, i.l, i.order])]);
+    let res;
+    if (frozenPack.has(loose)) {
+      const byRow = new Map(groups[g].map(i => [i.rowId, i]));
+      res = frozenPack.get(loose).map(sh => ({ ...sh, items: sh.items.map(it => { const cur = byRow.get(it.rowId); return cur ? { ...it, fileKey: cur.fileKey, name: cur.name } : it; }) }));
+    } else {
+      if (!packCache.has(sig)) { if (packCache.size > 20) packCache.clear(); packCache.set(sig, pack(groups[g], sg)); }
+      res = packCache.get(sig);
+    }
+    lastPack.push([loose, res.map(sh => ({ W: sh.W, H: sh.H, items: sh.items }))]);
+    sheets.push(...res.map(sh => { const o = { ...sh, group: g }; o.dots = marks(o); return o; }));
   }
   fullRoll.sort((a, b) => ordNum(a.order) - ordNum(b.order));
   for (const it of fullRoll) {   // full roll width: one page each, media width x ordered length, art fills the page (cover), nothing else
@@ -1339,7 +1350,7 @@ async function doSave() {
   const keep = realRows().map(({ match, ...r }) => r);
   if (!keep.length && !jobId) return;
   if (!jobId) jobId = 'j' + Date.now();
-  const rec = { rows: keep, parseNotes, nextId, job: jobManual ? $('jobName').value : '', at: Date.now(), orders: [...orderFiles.entries()] };
+  const rec = { rows: keep, parseNotes, nextId, job: jobManual ? $('jobName').value : '', at: Date.now(), orders: [...orderFiles.entries()], pack: lastPackJob === jobId ? lastPack : [...frozenPack.entries()] };
   const meta = { id: jobId, name: jobName(), at: rec.at, orders: new Set(keep.map(r => r.order).filter(Boolean)).size, items: keep.reduce((a, r) => a + (r.qty || 0), 0) };
   try {
     const list = (await idb('readonly', st => st.get('jobs'))) || [];
@@ -1353,6 +1364,7 @@ function loadRec(rec) {
   nextId = Math.max(rec.nextId || 1, 1, ...rows.map(r => r.id + 1));
   orderFiles.clear(); (rec.orders || []).forEach(([k, f]) => orderFiles.set(k, f));
   jobManual = !!rec.job; $('jobName').value = rec.job || '';
+  frozenPack = new Map(rec.pack || []); lastPack = []; lastPackJob = null;
   selRow = null; curSheet = 0;
 }
 async function restoreWork() {
@@ -1367,7 +1379,7 @@ async function restoreWork() {
 }
 async function newJob() {
   await doSave();
-  rows = []; parseNotes = []; orderFiles.clear(); jobManual = false; $('jobName').value = ''; jobId = null; selRow = null; curSheet = 0;
+  rows = []; parseNotes = []; orderFiles.clear(); jobManual = false; $('jobName').value = ''; jobId = null; selRow = null; curSheet = 0; frozenPack = new Map();
   try { await idb('readwrite', st => st.put(null, 'current')); } catch (e) {}
   $('savedLbl').textContent = ''; update(); showTab('orders');
   setStatus('עבודה חדשה. העבודה הקודמת שמורה ב״העבודות שלי״');
