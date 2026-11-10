@@ -933,7 +933,7 @@ async function buildPrint(sheetList, s, progress) {
 
 /* ---------- compute + render ---------- */
 const packCache = new Map();
-let frozenPack = new Map(), lastPack = [], lastPackJob = null;   // layout saved with a job
+let frozenPack = new Map(), lastPack = [], lastPackJob = null, loadedSet = null;   // layout saved with a job
 function compute() {
   const s = S();
   const groups = { rug: [], table: [], pm: [] }; fullRoll = []; tooBig = [];
@@ -1350,7 +1350,7 @@ async function doSave() {
   const keep = realRows().map(({ match, ...r }) => r);
   if (!keep.length && !jobId) return;
   if (!jobId) jobId = 'j' + Date.now();
-  const rec = { rows: keep, parseNotes, nextId, job: jobManual ? $('jobName').value : '', at: Date.now(), orders: [...orderFiles.entries()], pack: lastPackJob === jobId ? lastPack : [...frozenPack.entries()] };
+  const rec = { rows: keep, parseNotes, nextId, job: jobManual ? $('jobName').value : '', at: Date.now(), orders: [...orderFiles.entries()], pack: lastPackJob === jobId ? lastPack : [...frozenPack.entries()], settings: typeof getSet === 'function' ? (loadedSet && lastPackJob !== jobId ? loadedSet : getSet()) : null };
   const meta = { id: jobId, name: jobName(), at: rec.at, orders: new Set(keep.map(r => r.order).filter(Boolean)).size, items: keep.reduce((a, r) => a + (r.qty || 0), 0) };
   try {
     const list = (await idb('readonly', st => st.get('jobs'))) || [];
@@ -1365,6 +1365,7 @@ function loadRec(rec) {
   orderFiles.clear(); (rec.orders || []).forEach(([k, f]) => orderFiles.set(k, f));
   jobManual = !!rec.job; $('jobName').value = rec.job || '';
   frozenPack = new Map(rec.pack || []); lastPack = []; lastPackJob = null;
+  loadedSet = rec.settings || null; if (rec.settings) putSet(rec.settings);
   selRow = null; curSheet = 0;
 }
 async function restoreWork() {
@@ -2043,7 +2044,10 @@ $('clearEx').onclick = () => { rows = rows.filter(r => !r.example); parseNotes =
 $('addRow').onclick = () => { rows.push({ id: nextId++, order: '', name: '', w: 0, l: 0, qty: 1, fileKey: null }); update(); const el = $('n' + (nextId - 1)); el && el.focus(); };
 const SET_IDS = ['sMaxW', 'sMaxL', 'sPmW', 'sPmMx', 'sGap', 'sMx', 'sMy', 'sFull', 'sLabel', 'sDotsPrint', 'sFullW', 'sDotD', 'sDotE', 'sDot5', 'sDotG', 'sDotS', 'sLayR', 'sLayC'];
 try { const sv = JSON.parse(localStorage.getItem('rugnest-settings-v2') || '{}'); for (const k of SET_IDS) if (k in sv && $(k)) { if ($(k).type === 'checkbox') $(k).checked = !!sv[k]; else $(k).value = sv[k]; } } catch (e) {}
-SET_IDS.forEach(k => $(k) && $(k).addEventListener('change', () => { try { const o = {}; SET_IDS.forEach(i => { if ($(i)) o[i] = $(i).type === 'checkbox' ? $(i).checked : $(i).value; }); localStorage.setItem('rugnest-settings-v2', JSON.stringify(o)); } catch (e) {} }));
+const getSet = () => { const o = {}; SET_IDS.forEach(i => { if ($(i)) o[i] = $(i).type === 'checkbox' ? $(i).checked : $(i).value; }); return o; };
+// a job carries its own settings (gaps, margins, dots…): opening it puts them back
+const putSet = o => { if (!o) return; for (const k of SET_IDS) if (k in o && $(k)) { if ($(k).type === 'checkbox') $(k).checked = !!o[k]; else $(k).value = o[k]; } try { localStorage.setItem('rugnest-settings-v2', JSON.stringify(getSet())); } catch (e) {} };
+SET_IDS.forEach(k => $(k) && $(k).addEventListener('change', () => { try { localStorage.setItem('rugnest-settings-v2', JSON.stringify(getSet())); } catch (e) {} }));
 ['sMaxW', 'sMaxL', 'sPmW', 'sPmMx', 'sGap', 'sMx', 'sMy', 'sFull', 'sDotsPrint', 'sLabel', 'sFullW', 'sDotD', 'sDotE', 'sDot5', 'sDotG', 'sDotS'].forEach(id => $(id).addEventListener('change', update));
 
 /* ---------- downloads ---------- */
