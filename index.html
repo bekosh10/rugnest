@@ -981,6 +981,7 @@ function compute() {
     const m = { ...sh, copies: 1, allItems: [...sh.items] }; bySig.set(k, m); merged.push(m);
   }
   sheets = merged;
+  sheets.forEach((sh, i) => { sh.no = i + 1; });   // the number travels with the sheet (export keeps working even if the screen refreshes meanwhile)
 }
 const cpx = sh => (sh.copies > 1 ? `_x${sh.copies}` : '');
 
@@ -1743,7 +1744,7 @@ function autoJobName() {
 let jobManual = false;
 const jobName = () => (($('jobName') && $('jobName').value.trim()) || autoJobName()).replace(/[\\/:*?"<>|]/g, '-');
 function refreshJobName() { if (!jobManual && $('jobName')) $('jobName').value = autoJobName(); }
-const sheetNo = sh => String(sheets.indexOf(sh) + 1).padStart(3, '0');
+const sheetNo = sh => { const i = sheets.indexOf(sh); return String(i >= 0 ? i + 1 : (sh && sh.no) || 0).padStart(3, '0'); };
 const sheetId = sh => `${jobName()}-${sheetNo(sh)}`;
 const sheetLabel = sh => sheetId(sh) + (sh.copies > 1 ? ` x${sh.copies}` : '');
 
@@ -2398,13 +2399,13 @@ if (window.rugdesk) (async () => {
   const showWhere = () => { where.innerHTML = ''; const t = document.createElement('span'); t.textContent = `נשמר לתיקייה: ${cfg.outDir}/${jobName()}  `; const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm ghost'; b.textContent = 'שינוי'; b.onclick = async () => { const d = await DESK.pickFolder({ title: 'תיקייה לקובצי ההדפסה והחיתוך', start: cfg.outDir }); if (d) { cfg = await DESK.setCfg({ outDir: d }); showWhere(); } }; where.append(t, b); };
   const origOpen = $('expBtn').onclick; $('expBtn').onclick = () => { origOpen(); showWhere(); };
   const origGo = $('expGo').onclick;
-  $('expGo').onclick = async () => { lastSaved = null; await origGo(); if (lastSaved) { DESK.reveal(lastSaved); setStatus(`הקבצים נשמרו בתיקייה ${jobName()}`); } };
+  $('expGo').onclick = async () => { lastSaved = null; window.__exporting = true; try { await origGo(); } finally { window.__exporting = false; } if (lastSaved) { DESK.reveal(lastSaved); setStatus(`הקבצים נשמרו בתיקייה ${jobName()}`); } };
   // the rug folder: read straight from disk (network folder too), every time the app opens
   $('fixDir').hidden = false; $('fixOpen').hidden = true; $('fixForget').hidden = true; $('fixReload').hidden = false; $('fixSet').textContent = 'החלפת תיקייה';
   const showDir = () => { $('fixName').textContent = cfg.rugDir || '—'; };
   const deskCache = new Map();
   loadFixed = async () => {
-    if (scanning || !cfg.rugDir) return; scanning = true;
+    if (scanning || !cfg.rugDir || window.__exporting) return; scanning = true;
     $('fixMsg').textContent = 'קורא את התיקייה…'; busyUI($('dropRugs'), true, 'קורא את התיקייה…', 0);
     try {
       const r = await DESK.listPdfs(cfg.rugDir);
