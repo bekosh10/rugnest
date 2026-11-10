@@ -750,20 +750,37 @@ function pack(items, s) {
   let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const orders = sorts.map(so => [...items].sort(so));
   for (let t = 0; t < 40; t++) { const o = [...items].sort(sorts[t % sorts.length]); for (let i = o.length - 1; i > 0; i--) if (rnd() < 0.35) { const j = Math.max(0, i - 1 - Math.floor(rnd() * 3)); [o[i], o[j]] = [o[j], o[i]]; } orders.push(o); }
-  let best = null;
-  for (const heur of ['bl', 'bssf', 'baf', 'cp']) for (const order0 of orders) {
-    const order = order0; const bins = [];
+  // keeping an order together comes before saving material (allowed: one extra sheet at most)
+  const okey = it => it.order || ('r' + it.rowId);
+  const area = it => it.w * it.l;
+  const groups = [...items.reduce((m, it) => m.set(okey(it), [...(m.get(okey(it)) || []), it]), new Map()).values()].map(g => g.sort((a, b) => area(b) - area(a)));
+  const gArea = g => g.reduce((a, it) => a + area(it), 0), gMax = g => Math.max(...g.map(it => Math.max(it.w, it.l)));
+  const grouped = [[...groups].sort((a, b) => gArea(b) - gArea(a)), [...groups].sort((a, b) => gMax(b) - gMax(a)), [...groups].sort((a, b) => b.length - a.length || gArea(b) - gArea(a))].map(gs => gs.flat());
+  for (let t = 0; t < 21; t++) { const gs = [...groups].sort((a, b) => gArea(b) - gArea(a)); for (let i = gs.length - 1; i > 0; i--) if (rnd() < 0.4) { const j = Math.floor(rnd() * (i + 1)); [gs[i], gs[j]] = [gs[j], gs[i]]; } grouped.push(gs.flat()); }
+  const multiOrder = groups.some(g => g.length > 1);
+  const runs = orders.map(o => [o, false]).concat(multiOrder ? grouped.flatMap(o => [[o, false], [o, true]]) : []);
+  const bestBy = new Map();   // sheet count -> best layout [splits, length]
+  for (const heur of ['bl', 'bssf', 'baf', 'cp']) for (const [order, aff] of runs) {
+    const bins = [];
     for (const it of order) {
       const w = it.w + s.gap, h = it.l + s.gap;
       let pick = null, pb = null;
-      for (const b of bins) { const p = b.find(w, h, heur); if (p) { pick = p; pb = b; break; } }
+      // affinity: first try the sheets that already hold this order
+      const pref = aff ? bins.filter(b => b.keys && b.keys.has(okey(it))).concat(bins.filter(b => !(b.keys && b.keys.has(okey(it))))) : bins;
+      for (const b of pref) { const p = b.find(w, h, heur); if (p) { pick = p; pb = b; break; } }
       if (!pick) { pb = new Bin(W, H); bins.push(pb); pick = pb.find(w, h, heur); }
-      pb.place(pick); pick.item = it;
+      pb.place(pick); pick.item = it; (pb.keys || (pb.keys = new Set())).add(okey(it));
     }
     const len = bins.reduce((a, b) => a + Math.max(...b.used.map(u => u.y + u.h)), 0);
-    const score = [bins.length, len];
-    if (!best || score[0] < best.score[0] || (score[0] === best.score[0] && score[1] < best.score[1] - 1e-6)) best = { score, bins };
+    const per = new Map(); bins.forEach((b, bi) => b.used.forEach(u => { const k = okey(u.item); if (!per.has(k)) per.set(k, new Set()); per.get(k).add(bi); }));
+    const splits = [...per.values()].reduce((a, v) => a + v.size - 1, 0);
+    const cur = bestBy.get(bins.length);
+    if (!cur || splits < cur.splits || (splits === cur.splits && len < cur.len - 1e-6)) bestBy.set(bins.length, { splits, len, bins });
   }
+  const minB = Math.min(...bestBy.keys());
+  const cands = [...bestBy.entries()].filter(([n]) => n <= minB + 1).map(([n, v]) => ({ n, ...v }));
+  cands.sort((a, b) => a.splits - b.splits || a.n - b.n || a.len - b.len);
+  const best = cands[0] || null;
   return (best ? best.bins : []).map(b => {
     const its = b.used.map(u => ({ ...u.item, x: u.x, y: u.y, pw: u.w - s.gap, pl: u.h - s.gap, rot: u.rot }));
     const Wc = Math.max(...its.map(i => i.x + i.pw)), Lc = Math.max(...its.map(i => i.y + i.pl));
