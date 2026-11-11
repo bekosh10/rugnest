@@ -1805,7 +1805,7 @@ const jobPart = sh => `${jobName()}${isLino(sh) ? '-NEW LINOLEUM' : ''}`;
 const printName = sh => `${jobPart(sh)}_${sheetNo(sh)}${cpx(sh)}_print${sh.group === 'full' ? '_fullwidth' : ''}.pdf`;
 const cutName = sh => `${jobPart(sh)}_${sheetNo(sh)}${cpx(sh)}_cut.pdf`;
 // a bundle needs its own cover unless it is one order, one sheet, printed once
-const needsBundlePage = b => b.sh && (b.orders.length > 1 || (b.sh.copies || 1) > 1);
+const needsBundlePage = b => false;   // no bundle pages: only the ORDERS summary page at the start
 // customer, contact and phone from the top of an order PDF (so the summary page is enough without the orders)
 const headCache = new Map();
 async function orderHeadInfo(no) {
