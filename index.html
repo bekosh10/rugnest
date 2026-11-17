@@ -367,6 +367,7 @@ svg .hitr.droptgt{fill:rgba(37,99,235,.25);stroke:#2563eb;stroke-width:4;vector-
       <label for="sPmW">רוחב דף לראנרים ופלייסמנטים (ס״מ)</label><input type="number" id="sPmW" step="0.5" value="320">
       <label for="sPmMx">שוליים בצדדים לראנרים ופלייסמנטים (ס״מ)</label><input type="number" id="sPmMx" step="0.5" value="5">
       <label for="sGap">רווח בין שטיחים (ס״מ)</label><input type="number" id="sGap" step="0.1" value="0.7">
+      <label for="sPmGap">רווח בין ראנרים ופלייסמנטים (ס״מ)</label><input type="number" id="sPmGap" step="0.1" value="1.5">
       <label for="sMx">שוליים בצדדים (ס״מ)</label><input type="number" id="sMx" step="0.05" value="4.75">
       <label for="sMy">שוליים למעלה ולמטה (ס״מ)</label><input type="number" id="sMy" step="0.05" value="2">
       <label for="sFull">גודל שיוצא כמו שהוא</label><input type="text" id="sFull" value="200x300" class="mono" style="direction:ltr;text-align:center">
@@ -494,7 +495,7 @@ const S = () => ({
   maxW: +$('sMaxW').value || 199, maxL: +$('sMaxL').value || 295,
   gap: Math.max(0, +$('sGap').value || 0), mx: +$('sMx').value || 4.75, my: +$('sMy').value || 2,
   full: ($('sFull').value.match(/(\d+(?:\.\d+)?)\s*[x×X*]\s*(\d+(?:\.\d+)?)/) || []).slice(1).map(Number),
-  dotsPrint: $('sDotsPrint').checked, pmW: +$('sPmW').value || 320, pmMx: +$('sPmMx').value || 5, label: $('sLabel').checked, fullW: +$('sFullW').value || 201,
+  dotsPrint: $('sDotsPrint').checked, pmW: +$('sPmW').value || 320, pmMx: +$('sPmMx').value || 5, pmGap: Math.max(0, $('sPmGap').value === '' ? 1.5 : +$('sPmGap').value), label: $('sLabel').checked, fullW: +$('sFullW').value || 201,
   dotD: Math.max(0.1, +$('sDotD').value || 0.6), dotEdge: +$('sDotE').value || 0.8, dot5: +$('sDot5').value || 5.08, dotGap: Math.max(0, +$('sDotG').value || 0), dotStep: Math.max(10, +$('sDotS').value || 50), layerReg: ($('sLayR').value || 'REGISTER').trim(), layerCut: ($('sLayC').value || 'THRUCUT').trim()
 });
 
@@ -959,7 +960,7 @@ function compute() {
   }
   sheets = []; lastPack = []; lastPackJob = jobId;
   for (const g of ['rug', 'table', 'pm']) if (groups[g].length) {
-    const sg = g === 'table' ? { ...s, maxW: s.pmW, mx: s.pmMx } : s;   // runners + placemats run together on the 320 roll
+    const sg = g === 'table' ? { ...s, maxW: s.pmW, mx: s.pmMx, gap: s.pmGap } : s;   // runners + placemats run together on the 320 roll
     const sig = JSON.stringify([sg, groups[g].map(i => [i.rowId, i.w, i.l, i.fileKey, i.name, i.order])]);
     // a saved job keeps its layout: same items + same settings -> the exact sheets that were exported
     const loose = JSON.stringify([g, sg, groups[g].map(i => [i.rowId, i.w, i.l, i.order])]);
@@ -2050,13 +2051,14 @@ $('clearAll').onclick = () => {
 };
 $('clearEx').onclick = () => { rows = rows.filter(r => !r.example); parseNotes = []; update(); };
 $('addRow').onclick = () => { rows.push({ id: nextId++, order: '', name: '', w: 0, l: 0, qty: 1, fileKey: null }); update(); const el = $('n' + (nextId - 1)); el && el.focus(); };
-const SET_IDS = ['sMaxW', 'sMaxL', 'sPmW', 'sPmMx', 'sGap', 'sMx', 'sMy', 'sFull', 'sLabel', 'sDotsPrint', 'sFullW', 'sDotD', 'sDotE', 'sDot5', 'sDotG', 'sDotS', 'sLayR', 'sLayC'];
+const SET_IDS = ['sMaxW', 'sMaxL', 'sPmW', 'sPmMx', 'sPmGap', 'sGap', 'sMx', 'sMy', 'sFull', 'sLabel', 'sDotsPrint', 'sFullW', 'sDotD', 'sDotE', 'sDot5', 'sDotG', 'sDotS', 'sLayR', 'sLayC'];
 try { const sv = JSON.parse(localStorage.getItem('rugnest-settings-v2') || '{}'); for (const k of SET_IDS) if (k in sv && $(k)) { if ($(k).type === 'checkbox') $(k).checked = !!sv[k]; else $(k).value = sv[k]; } } catch (e) {}
 const getSet = () => { const o = {}; SET_IDS.forEach(i => { if ($(i)) o[i] = $(i).type === 'checkbox' ? $(i).checked : $(i).value; }); return o; };
 // a job carries its own settings (gaps, margins, dots…): opening it puts them back
-const putSet = o => { if (!o) return; for (const k of SET_IDS) if (k in o && $(k)) { if ($(k).type === 'checkbox') $(k).checked = !!o[k]; else $(k).value = o[k]; } try { localStorage.setItem('rugnest-settings-v2', JSON.stringify(getSet())); } catch (e) {} };
+const putSet = o => { if (!o) return; if (!('sPmGap' in o)) o = { ...o, sPmGap: 'sGap' in o ? o.sGap : $('sGap').value };   // jobs saved before this setting existed used the same gap
+  for (const k of SET_IDS) if (k in o && $(k)) { if ($(k).type === 'checkbox') $(k).checked = !!o[k]; else $(k).value = o[k]; } try { localStorage.setItem('rugnest-settings-v2', JSON.stringify(getSet())); } catch (e) {} };
 SET_IDS.forEach(k => $(k) && $(k).addEventListener('change', () => { try { localStorage.setItem('rugnest-settings-v2', JSON.stringify(getSet())); } catch (e) {} }));
-['sMaxW', 'sMaxL', 'sPmW', 'sPmMx', 'sGap', 'sMx', 'sMy', 'sFull', 'sDotsPrint', 'sLabel', 'sFullW', 'sDotD', 'sDotE', 'sDot5', 'sDotG', 'sDotS'].forEach(id => $(id).addEventListener('change', update));
+['sMaxW', 'sMaxL', 'sPmW', 'sPmMx', 'sPmGap', 'sGap', 'sMx', 'sMy', 'sFull', 'sDotsPrint', 'sLabel', 'sFullW', 'sDotD', 'sDotE', 'sDot5', 'sDotG', 'sDotS'].forEach(id => $(id).addEventListener('change', update));
 
 /* ---------- downloads ---------- */
 const setStatus = t => { $('status').textContent = t; };
