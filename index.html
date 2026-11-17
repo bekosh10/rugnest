@@ -2185,6 +2185,39 @@ async function orderRowsPos(file, no) {
   out.head = head;
   return out;
 }
+// where the pictures sit on each page of an order PDF: [{page, x, y, w, h}] (PDF points)
+async function orderImageBoxes(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (!new TextDecoder('latin1').decode(buf.slice(0, 1024)).includes('%PDF')) return [];
+  const pdf = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise, out = [], O = pdfjsLib.OPS;
+  const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p), ol = await page.getOperatorList();
+    // the caption above a picture ("🖼 הדוגמה: …") goes too
+    const tc = await page.getTextContent(), its = tc.items.filter(i => i.str && i.str.trim());
+    for (const cap of its.filter(i => /הדוגמה/.test(i.str))) {
+      const line = its.filter(i => Math.abs(i.transform[5] - cap.transform[5]) < 3), hh = Math.max(...line.map(i => Math.abs(i.transform[3]) || 9));
+      const x0 = Math.min(...line.map(i => i.transform[4])), x1 = Math.max(...line.map(i => i.transform[4] + (i.width || 0)));
+      out.push({ page: p - 1, x: x0 - 14, y: cap.transform[5] - hh * 0.35, w: x1 - x0 + 16, h: hh * 1.4 });
+    }
+    let ctm = [1, 0, 0, 1, 0, 0]; const st = [];
+    for (let i = 0; i < ol.fnArray.length; i++) {
+      const fn = ol.fnArray[i], a = ol.argsArray[i];
+      if (fn === O.save) st.push(ctm);
+      else if (fn === O.restore) ctm = st.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.transform) ctm = mul(ctm, a);
+      else if (fn === O.paintFormXObjectBegin) { st.push(ctm); if (a && a[0]) ctm = mul(ctm, a[0]); }
+      else if (fn === O.paintFormXObjectEnd) ctm = st.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.paintImageXObject || fn === O.paintInlineImageXObject || fn === O.paintImageMaskXObject || fn === O.paintJpegXObject) {
+        const pts = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([u, v]) => [ctm[0] * u + ctm[2] * v + ctm[4], ctm[1] * u + ctm[3] * v + ctm[5]]);
+        const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]), x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0, h = Math.max(...ys) - y0;
+        if (w > 4 && h > 4) out.push({ page: p - 1, x: x0, y: y0, w, h });
+      }
+    }
+  }
+  pdf.destroy();
+  return out;
+}
 async function buildOrdersPdf(progress) {
   const out = await PDFDocument.create(); const skipped = [];
   const T = textImgFactory();
@@ -2196,7 +2229,7 @@ async function buildOrdersPdf(progress) {
   const placed = new Set(bundles.flatMap(b => b.orders));
   const rest = [...orderFiles.keys()].filter(o => !placed.has(o)).sort((a, b) => ordNum(a) - ordNum(b));
   if (rest.length) bundles.push({ sh: null, i: -1, orders: rest });
-  const posCache = new Map(), srcCache = new Map();
+  const posCache = new Map(), srcCache = new Map(), imgCache = new Map();
   const put = async (pg, t, xRight, yMid) => { const img = await out.embedPng(t.png); pg.drawImage(img, { x: xRight - t.w, y: yMid - t.h / 2, width: t.w, height: t.h }); };
   for (const b of bundles) {
     const id = b.sh ? sheetId(b.sh) : 'ללא גיליון';
@@ -2230,6 +2263,11 @@ async function buildOrdersPdf(progress) {
         const js = r => sheetsOfRow(r.id);
         const elsewhere = mine.filter(r => js(r).some(j => j !== b.i));
         if (isLino(b.sh)) {
+          // new linoleum: no rug pictures on the order (they show the old material)
+          try {
+            if (!imgCache.has(no)) imgCache.set(no, await orderImageBoxes(orderFiles.get(no)));
+            for (const bx of imgCache.get(no)) { const pg = pages[bx.page]; if (pg) pg.drawRectangle({ x: bx.x - 2, y: bx.y - 2, width: bx.w + 4, height: bx.h + 4, color: rgb(1, 1, 1) }); }
+          } catch (e) {}
           const t = await T(LINO_WARN, 30, '#c02828', 800); const k = Math.min(1, (W - 60) / t.w);
           pg0.drawImage(await out.embedPng(t.png), { x: (W - t.w * k) / 2, y: H - 24 - t.h * k / 2, width: t.w * k, height: t.h * k });
           const t2 = await T(LINO_SUB, 15, '#c02828', 800);   // in the empty middle of the order header (between the order number and the title)
