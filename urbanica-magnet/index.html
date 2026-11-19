@@ -40,6 +40,12 @@
   th { font-size:12px; color:var(--muted); font-weight:600; background:#fafbfc; position:sticky; top:0; }
   td.ltr, .ltr { direction:ltr; text-align:left; }
   .qty input { width:64px; padding:4px 6px; font-size:15px; text-align:center; border:1px solid var(--line); border-radius:6px; }
+  .q4 { display:flex; gap:22px; flex-wrap:wrap; }
+  .q4 label { display:flex; flex-direction:column; align-items:center; gap:5px; font-weight:600; }
+  .q4 input { width:110px; font-size:22px; font-weight:700; text-align:center; padding:6px; border:2px solid var(--blue); border-radius:8px; }
+  .q4 input.missing { border-color:var(--red); background:var(--redbg); }
+  .qty input.ovr { border-color:#e8a200; background:#fff6d6; font-weight:700; }
+  .qty input::placeholder { color:#aab3bd; }
   .qty input.missing { border-color:var(--red); background:var(--redbg); }
   .qty .none { color:#c3cad2; text-align:center; display:inline-block; width:64px; }
   tr.all td { background:var(--blue2); font-weight:600; }
@@ -120,7 +126,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 3;
+const APP_VERSION = 4;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -226,7 +232,8 @@ function compute(files, S, ovs, qty, order, sizes = {}, dismissed = new Set()) {
   const colOrder = [...new Set(S.divisions.map(d => d.en))].concat(LARGE);
   const gOrder = S.genders.map(g => g.en);
   for (const r of recs) {
-    const q = r.col ? ((qty[r.groupKey] || {})[r.col] ?? '') : '';
+    const ov = r.col ? (qty[r.groupKey] || {})[r.col] : '';
+    const q = r.col ? (ov !== undefined && ov !== '' ? ov : ((qty['*'] || {})[r.col] ?? '')) : '';
     r.qty = q;
     if (r.col && (q === '' || !(+q > 0))) r.issues.push('qty');
     r.newName = buildName(r, order, S, q);
@@ -333,7 +340,7 @@ const D = window.desk;
 let S = JSON.parse(JSON.stringify(DEFAULTS));
 let files = [], srcPaths = [], ovs = {}, qty = {}, allQty = {}, C = null, cfg = {};
 let askedFor = new Set();
-let sideTab = 'div';
+let sideTab = 'div', showExc = false;
 let sizes = {}, dismissed = new Set(), sizeRun = 0, sizeProg = null, sizeNoApi = false;
 
 async function saveSettings() { if (D) await D.setCfg({ settings: S }); else localStorage.setItem('shemot-settings', JSON.stringify(S)); }
@@ -368,6 +375,7 @@ $('#order').addEventListener('input', () => render(true));
 /* ---------- main render ---------- */
 function render(soft) {
   $('#clientLbl').textContent = S.client;
+  qty['*'] = allQty;
   C = compute(files, S, ovs, qty, $('#order').value, sizes, dismissed);
   $('#order').classList.toggle('missing', files.length > 0 && !$('#order').value.trim());
   $('#dropCard').style.display = files.length ? 'none' : '';
@@ -376,26 +384,34 @@ function render(soft) {
   const colHe = c => c === LARGE ? '\u2066' + S.largeSize.replace('x', '×') + '\u2069' : ((S.divisions.find(d => d.en === c) || {}).he || c);
   const cols = C.colOrder.filter(c => C.groupList.some(g => g.cols[c]));
   let h = `<div class="layout"><div class="mainCol"><div class="card"><div class="loaded" id="topInfo"></div></div>`;
-  h += `<div class="card"><h2>כמויות <span class="muted">— כמות לכל מבצע ולכל חלוקה. בשורה הכחולה אפשר למלא עמודה שלמה בבת אחת, ואז לתקן רק את החריגים.</span></h2>
+  const nOv = Object.keys(qty).filter(k => k !== '*').reduce((a, k) => a + Object.values(qty[k]).filter(v => v !== '' && v != null).length, 0);
+  h += `<div class="card"><h2>כמויות <span class="muted">— ארבעה מספרים לכל העבודה</span></h2>
+    <div class="q4">${cols.map(c => `<label><span>${esc(colHe(c))}</span><input type="number" min="1" data-all="${esc(c)}" value="${esc(allQty[c] ?? '')}"></label>`).join('')}</div>
+    <div style="margin-top:12px"><button class="small" id="bExc">${showExc ? '▴' : '▾'} חריגים – כמות שונה למבצע מסוים ${nOv ? `<span class="badge" style="background:#fff0c2">${nOv}</span>` : ''}</button></div>
+    ${showExc ? `<p class="muted" style="margin:10px 0 6px">משאירים ריק = הכמות הכללית שלמעלה. ממלאים רק איפה שהכמות שונה.</p>
     <table id="qtyTable"><thead><tr><th>מגדר</th><th>מבצע</th><th>תת-מבצע</th>${cols.map(c => `<th class="qty">${esc(colHe(c))}</th>`).join('')}</tr></thead><tbody>
-    <tr class="all"><td colspan="3">לכולם</td>${cols.map(c => `<td class="qty"><input type="number" min="1" data-all="${esc(c)}" value="${esc(allQty[c] ?? '')}"></td>`).join('')}</tr>
     ${C.groupList.map(g => `<tr><td>${esc(g.genderHe || '?')}</td><td>${esc(g.promoHe)}${g.promoEn ? ` <span class="muted ltr">${esc(g.promoEn)}</span>` : ''}</td><td><bdi>${esc(g.subHe)}</bdi></td>
-      ${cols.map(c => `<td class="qty">${g.cols[c] ? `<input type="number" min="1" data-g="${esc(g.key)}" data-c="${esc(c)}" value="${esc((qty[g.key] || {})[c] ?? '')}">` : '<span class="none">–</span>'}</td>`).join('')}</tr>`).join('')}
-    </tbody></table></div>`;
+      ${cols.map(c => `<td class="qty">${g.cols[c] ? `<input type="number" min="1" data-g="${esc(g.key)}" data-c="${esc(c)}" value="${esc((qty[g.key] || {})[c] ?? '')}" placeholder="${esc(allQty[c] ?? '')}">` : '<span class="none">–</span>'}</td>`).join('')}</tr>`).join('')}
+    </tbody></table>` : ''}</div>`;
   h += `<div class="card"><h2>קבצים <span class="muted" id="fileCount"></span></h2><div id="problems"></div><table><thead><tr><th>שם חדש</th><th>קובץ מקורי</th><th style="width:230px">הערות</th></tr></thead><tbody id="fileRows"></tbody></table></div></div><aside class="card" id="side"></aside></div>`;
   $('#work').innerHTML = h;
+  $('#bExc').onclick = () => { showExc = !showExc; render(); };
   $('#work').querySelectorAll('input[data-g]').forEach(inp => inp.addEventListener('input', () => {
-    const g = inp.dataset.g, c = inp.dataset.c; (qty[g] = qty[g] || {})[c] = inp.value.trim(); markQty(); render(true);
+    const g = inp.dataset.g, c = inp.dataset.c, v = inp.value.trim();
+    qty[g] = qty[g] || {}; if (v) qty[g][c] = v; else delete qty[g][c];
+    render(true); markQty();
   }));
-  $('#work').querySelectorAll('input[data-all]').forEach(inp => inp.addEventListener('change', () => {
-    const c = inp.dataset.all, v = inp.value.trim(); allQty[c] = v;
-    for (const g of C.groupList) if (g.cols[c]) (qty[g.key] = qty[g.key] || {})[c] = v;
-    $('#work').querySelectorAll(`input[data-c="${CSS.escape(c)}"]`).forEach(x => { x.value = v; });
-    markQty(); render(true);
+  $('#work').querySelectorAll('input[data-all]').forEach(inp => inp.addEventListener('input', () => {
+    const c = inp.dataset.all; allQty[c] = inp.value.trim();
+    $('#work').querySelectorAll(`input[data-c="${CSS.escape(c)}"]`).forEach(x => { x.placeholder = allQty[c]; });
+    render(true); markQty();
   }));
-  markQty(); renderTop(); renderFiles(); renderSide();
+  renderTop(); renderFiles(); renderSide(); markQty();
 }
-function markQty() { $('#work').querySelectorAll('input[data-g]').forEach(x => x.classList.toggle('missing', !(+x.value > 0))); }
+function markQty() {
+  $('#work').querySelectorAll('input[data-all]').forEach(x => { const c = x.dataset.all; x.classList.toggle('missing', C.recs.some(r => r.col === c && r.issues.includes('qty'))); });
+  $('#work').querySelectorAll('input[data-g]').forEach(x => { x.classList.toggle('ovr', x.value.trim() !== ''); x.classList.toggle('missing', x.value.trim() === '' && !(+x.placeholder > 0)); });
+}
 function renderTop() {
   const errs = C.recs.filter(r => r.issues.length).length;
   $('#topInfo').innerHTML = `<b>${C.recs.length} קבצים</b>
