@@ -1,4 +1,4 @@
-// שינוי שמות – desktop shell.
+// Urbanica Magnet – desktop shell.
 // All the renaming logic lives in index.html (updated from GitHub); this shell gives it
 // folders, file copying and saving. The original files are never changed – only copied.
 const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, Menu } = require('electron');
@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
 
-const RAW = 'https://raw.githubusercontent.com/bekosh10/rugnest/main/shemot';
+const RAW = 'https://raw.githubusercontent.com/bekosh10/rugnest/main/urbanica-magnet';
 const BUNDLED = path.join(__dirname, 'app');
 const USERDATA = () => app.getPath('userData');
 const UPDATED = () => path.join(USERDATA(), 'page');
@@ -40,11 +40,11 @@ function setupProtocol() {
 let win = null;
 function createWindow() {
   win = new BrowserWindow({
-    width: 1400, height: 900, minWidth: 950, minHeight: 600, title: 'שינוי שמות',
+    width: 1400, height: 900, minWidth: 950, minHeight: 600, title: 'Urbanica Magnet',
     backgroundColor: '#f4f6f8',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, spellcheck: false },
   });
-  win.loadURL('app://shemot/index.html');
+  win.loadURL('app://urbanica-magnet/index.html');
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   // dropping a folder outside the drop zone must not navigate away
   win.webContents.on('will-navigate', e => e.preventDefault());

@@ -1,7 +1,7 @@
 {
-  "name": "shinui-shemot",
-  "productName": "Shinui Shemot",
-  "description": "שינוי שמות קבצים",
+  "name": "urbanica-magnet",
+  "productName": "Urbanica Magnet",
+  "description": "Urbanica Magnet – שינוי שמות קבצי מגנטים",
   "author": "Campus",
   "license": "UNLICENSED",
   "main": "main.js",
@@ -9,8 +9,8 @@
     "start": "electron ."
   },
   "build": {
-    "appId": "il.campus.shinuishemot",
-    "productName": "Shinui Shemot",
+    "appId": "il.campus.urbanicamagnet",
+    "productName": "Urbanica Magnet",
     "files": [
       "main.js",
       "preload.js",
@@ -33,7 +33,7 @@
         "LSMinimumSystemVersion": "11.0"
       }
     },
-    "artifactName": "shinui-shemot-mac-${arch}.${ext}",
+    "artifactName": "urbanica-magnet-mac-${arch}.${ext}",
     "directories": {
       "output": "dist"
     },

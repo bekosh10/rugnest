@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<title>שינוי שמות</title>
+<title>Urbanica Magnet</title>
 <!-- SHEMOT_APP -->
 <script src="lib/exceljs.min.js"></script>
 <style>
@@ -75,7 +75,7 @@
 </head>
 <body>
 <header>
-  <h1>שינוי שמות</h1>
+  <h1>Urbanica Magnet</h1>
   <div class="order"><label for="order">מס׳ הזמנה</label><input id="order" placeholder="26001234" autocomplete="off"></div>
   <span class="client" id="clientLbl"></span>
   <div class="spacer"></div>
@@ -248,7 +248,7 @@ function compute(files, S, ovs, qty, order) {
 /* ---------- excel ---------- */
 async function buildExcel(C, S, order) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'שינוי שמות';
+  wb.creator = 'Urbanica Magnet';
   const colHe = c => c === LARGE ? 'מגנט גדול ' + S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
   const FILLS = ['FFE8F0FE', 'FFE6F4EA', 'FFFEF7E0', 'FFFCE8E6', 'FFF3E8FD', 'FFE0F7FA'];
   const hdr = ws => { const row = ws.getRow(1); row.font = { bold: true, color: { argb: 'FFFFFFFF' } }; row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F6FEB' } }; row.alignment = { vertical: 'middle' }; row.height = 22; };
@@ -447,7 +447,7 @@ function openSettings() {
     for (const k of ['promos', 'subs', 'divisions', 'genders']) T[k] = T[k].map(x => ({ he: x.he.trim(), en: x.en.trim() })).filter(x => x.he && x.en);
     S = T; await saveSettings(); closeModal(); render();
   };
-  m.querySelector('#sExp').onclick = async () => { const p = await D.saveDialog({ name: 'הגדרות שינוי שמות.json', data: new TextEncoder().encode(JSON.stringify(S, null, 2)), ext: 'json', title: 'שמירת הגדרות' }); if (p) toast('נשמר'); };
+  m.querySelector('#sExp').onclick = async () => { const p = await D.saveDialog({ name: 'הגדרות Urbanica Magnet.json', data: new TextEncoder().encode(JSON.stringify(S, null, 2)), ext: 'json', title: 'שמירת הגדרות' }); if (p) toast('נשמר'); };
   m.querySelector('#sImp').onclick = async () => {
     const t = await D.openText({ title: 'טעינת הגדרות', ext: 'json' }); if (!t) return;
     try { const j = JSON.parse(t); if (!j.promos || !j.genders) throw 0; S = { ...DEFAULTS, ...j }; await saveSettings(); closeModal(); render(); toast('ההגדרות נטענו'); } catch (e) { toast('הקובץ לא תקין'); }
