@@ -67,6 +67,19 @@
   .maptbl td { border:none; padding:3px 4px; }
   .x { border:none; background:none; color:var(--muted); font-size:16px; padding:2px 8px; }
   .x:hover { color:var(--red); background:none; }
+  .layout { display:flex; gap:14px; align-items:flex-start; }
+  .mainCol { flex:1; min-width:0; }
+  aside#side { width:300px; flex:none; position:sticky; top:76px; padding:0; overflow:hidden; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); }
+  .tabs button { flex:1; border:none; border-radius:0; padding:10px; background:#fafbfc; color:var(--muted); font-weight:600; }
+  .tabs button.on { background:#fff; color:var(--blue); box-shadow:inset 0 -2px 0 var(--blue); }
+  .sum { padding:10px 14px 14px; }
+  .sum table td, .sum table th { padding:5px 4px; font-size:13px; }
+  .sum td.n, .sum th.n { text-align:center; width:56px; }
+  .sum tr.tot td { font-weight:700; border-top:2px solid var(--line); border-bottom:none; }
+  .sum tr.sub td { color:var(--muted); font-size:12px; }
+  .sum tr.sub td:first-child { padding-inline-start:16px; }
+  .sum .big { font-size:16px; font-weight:700; }
   .toast { position:fixed; bottom:50px; left:20px; background:#1d2733; color:#fff; padding:12px 16px; border-radius:10px; z-index:30; max-width:520px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
   .toast button { margin-inline-start:10px; }
   .problems { background:var(--redbg); color:var(--red); border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px; }
@@ -105,7 +118,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 1;
+const APP_VERSION = 2;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -301,6 +314,7 @@ const D = window.desk;
 let S = JSON.parse(JSON.stringify(DEFAULTS));
 let files = [], srcPaths = [], ovs = {}, qty = {}, allQty = {}, C = null, cfg = {};
 let askedFor = new Set();
+let sideTab = 'div';
 
 async function saveSettings() { if (D) await D.setCfg({ settings: S }); else localStorage.setItem('shemot-settings', JSON.stringify(S)); }
 async function init() {
@@ -337,17 +351,17 @@ function render(soft) {
   $('#order').classList.toggle('missing', files.length > 0 && !$('#order').value.trim());
   $('#dropCard').style.display = files.length ? 'none' : '';
   if (!files.length) { $('#work').innerHTML = ''; return; }
-  if (soft) { renderFiles(); renderTop(); return; }
+  if (soft) { renderFiles(); renderTop(); renderSide(); return; }
   const colHe = c => c === LARGE ? S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
   const cols = C.colOrder.filter(c => C.groupList.some(g => g.cols[c]));
-  let h = `<div class="card"><div class="loaded" id="topInfo"></div></div>`;
+  let h = `<div class="layout"><div class="mainCol"><div class="card"><div class="loaded" id="topInfo"></div></div>`;
   h += `<div class="card"><h2>כמויות <span class="muted">— כמות לכל מבצע ולכל חלוקה. בשורה הכחולה אפשר למלא עמודה שלמה בבת אחת, ואז לתקן רק את החריגים.</span></h2>
     <table id="qtyTable"><thead><tr><th>מגדר</th><th>מבצע</th><th>תת-מבצע</th>${cols.map(c => `<th class="qty">${esc(colHe(c))}</th>`).join('')}</tr></thead><tbody>
     <tr class="all"><td colspan="3">לכולם</td>${cols.map(c => `<td class="qty"><input type="number" min="1" data-all="${esc(c)}" value="${esc(allQty[c] ?? '')}"></td>`).join('')}</tr>
     ${C.groupList.map(g => `<tr><td>${esc(g.genderHe || '?')}</td><td>${esc(g.promoHe)}${g.promoEn ? ` <span class="muted ltr">${esc(g.promoEn)}</span>` : ''}</td><td><bdi>${esc(g.subHe)}</bdi></td>
       ${cols.map(c => `<td class="qty">${g.cols[c] ? `<input type="number" min="1" data-g="${esc(g.key)}" data-c="${esc(c)}" value="${esc((qty[g.key] || {})[c] ?? '')}">` : '<span class="none">–</span>'}</td>`).join('')}</tr>`).join('')}
     </tbody></table></div>`;
-  h += `<div class="card"><h2>קבצים <span class="muted" id="fileCount"></span></h2><div id="problems"></div><table><thead><tr><th>שם חדש</th><th>קובץ מקורי</th><th style="width:230px">הערות</th></tr></thead><tbody id="fileRows"></tbody></table></div>`;
+  h += `<div class="card"><h2>קבצים <span class="muted" id="fileCount"></span></h2><div id="problems"></div><table><thead><tr><th>שם חדש</th><th>קובץ מקורי</th><th style="width:230px">הערות</th></tr></thead><tbody id="fileRows"></tbody></table></div></div><aside class="card" id="side"></aside></div>`;
   $('#work').innerHTML = h;
   $('#work').querySelectorAll('input[data-g]').forEach(inp => inp.addEventListener('input', () => {
     const g = inp.dataset.g, c = inp.dataset.c; (qty[g] = qty[g] || {})[c] = inp.value.trim(); markQty(); render(true);
@@ -358,7 +372,7 @@ function render(soft) {
     $('#work').querySelectorAll(`input[data-c="${CSS.escape(c)}"]`).forEach(x => { x.value = v; });
     markQty(); render(true);
   }));
-  markQty(); renderTop(); renderFiles();
+  markQty(); renderTop(); renderFiles(); renderSide();
 }
 function markQty() { $('#work').querySelectorAll('input[data-g]').forEach(x => x.classList.toggle('missing', !(+x.value > 0))); }
 function renderTop() {
@@ -391,6 +405,37 @@ function renderFiles() {
   }).join('');
   $('#fileRows').querySelectorAll('select[data-ov]').forEach(s => s.onchange = () => { const o = ovs[s.dataset.f] = ovs[s.dataset.f] || {}; o[s.dataset.ov] = s.value; render(); });
   $('#fileRows').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete ovs[b.dataset.reset]; render(); });
+}
+
+/* ---------- side panel: totals ---------- */
+function renderSide() {
+  const el = $('#side'); if (!el) return;
+  const colHe = c => c === LARGE ? 'מגנט גדול ' + S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
+  const units = rs => { const ok = rs.filter(r => +r.qty > 0); return { u: ok.reduce((a, r) => a + +r.qty, 0), missing: ok.length < rs.length }; };
+  const uTxt = x => x.u ? x.u.toLocaleString('he-IL') + (x.missing ? '<span class="issue">*</span>' : '') : (x.missing ? '<span class="issue">חסר</span>' : '–');
+  const withCol = C.recs.filter(r => r.col);
+  let body = '';
+  if (sideTab === 'div') {
+    body = `<table><thead><tr><th>חלוקה</th><th class="n">קבצים</th><th class="n">יח׳</th></tr></thead><tbody>` +
+      C.colOrder.map(c => { const rs = withCol.filter(r => r.col === c); if (!rs.length) return ''; return `<tr><td>${esc(colHe(c))}</td><td class="n big">${rs.length}</td><td class="n">${uTxt(units(rs))}</td></tr>`; }).join('') +
+      `<tr class="tot"><td>סה״כ</td><td class="n big">${C.recs.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
+  } else {
+    const promos = [...new Set(C.groupList.map(g => g.promoHe))];
+    body = `<table><thead><tr><th>מבצע</th><th class="n">קבצים</th><th class="n">יח׳</th></tr></thead><tbody>`;
+    for (const p of promos) {
+      const rs = C.recs.filter(r => r.promoHe === p);
+      body += `<tr><td><b>${esc(p || '?')}</b></td><td class="n big">${rs.length}</td><td class="n">${uTxt(units(rs.filter(r => r.col)))}</td></tr>`;
+      const subs = [...new Set(C.groupList.filter(g => g.promoHe === p).map(g => g.genderHe + (g.subHe ? ' ' + g.subHe : '')))];
+      if (subs.length > 1 || subs[0] !== undefined) for (const sb of subs) {
+        const rr = rs.filter(r => (r.genderHe + (r.subHe ? ' ' + r.subHe : '')) === sb);
+        body += `<tr class="sub"><td><bdi>${esc(sb || '?')}</bdi></td><td class="n">${rr.length}</td><td class="n">${uTxt(units(rr.filter(r => r.col)))}</td></tr>`;
+      }
+    }
+    body += `<tr class="tot"><td>סה״כ</td><td class="n big">${C.recs.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
+  }
+  el.innerHTML = `<div class="tabs"><button data-t="div" class="${sideTab === 'div' ? 'on' : ''}">לפי חלוקה</button><button data-t="promo" class="${sideTab === 'promo' ? 'on' : ''}">לפי מבצע</button></div>
+    <div class="sum">${body}<div class="muted" style="margin-top:8px">יח׳ = סכום הכמויות. <span class="issue">*</span> = עוד חסרות כמויות.</div></div>`;
+  el.querySelectorAll('[data-t]').forEach(b => b.onmousedown = () => { sideTab = b.dataset.t; renderSide(); });
 }
 
 /* ---------- new names → ask for English ---------- */
