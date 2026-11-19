@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('desk', {
   exportFiles: job => ipcRenderer.invoke('export', job),
   saveDialog: opts => ipcRenderer.invoke('save-dialog', opts),
   openText: opts => ipcRenderer.invoke('open-text', opts),
+  readRange: opts => ipcRenderer.invoke('read-range', opts),
   reveal: p => ipcRenderer.invoke('reveal', p),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   applyUpdate: () => ipcRenderer.invoke('update:apply'),

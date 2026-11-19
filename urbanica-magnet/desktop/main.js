@@ -107,6 +107,17 @@ ipcMain.handle('open-text', async (e, { title, ext }) => {
   if (r.canceled || !r.filePaths[0]) return null;
   return fsp.readFile(r.filePaths[0], 'utf8');
 });
+// read part of a file (start<0 = from the end; no length = to the end) – used to check PDF page size
+ipcMain.handle('read-range', async (e, { path: p, start = 0, length }) => {
+  const fh = await fsp.open(p, 'r');
+  try {
+    const st = await fh.stat();
+    const s = start < 0 ? Math.max(0, st.size + start) : Math.min(start, st.size);
+    const len = Math.max(0, Math.min(length == null ? st.size : length, st.size - s));
+    const buf = Buffer.alloc(len); await fh.read(buf, 0, len, s);
+    return { size: st.size, data: new Uint8Array(buf.buffer, buf.byteOffset, len) };
+  } finally { await fh.close(); }
+});
 ipcMain.handle('reveal', (e, p) => { if (p && fs.existsSync(p)) { if (fs.statSync(p).isDirectory()) shell.openPath(p); else shell.showItemInFolder(p); return true; } return false; });
 
 /* ---------- updates ---------- */

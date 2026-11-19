@@ -5,6 +5,7 @@
 <title>Urbanica Magnet</title>
 <!-- SHEMOT_APP -->
 <script src="lib/exceljs.min.js"></script>
+<script src="lib/pdf-lib.min.js"></script>
 <style>
   :root { --bg:#f4f6f8; --card:#fff; --line:#e2e6ea; --text:#1d2733; --muted:#6b7785; --blue:#1f6feb; --blue2:#e8f0fe; --red:#d93025; --redbg:#fdecea; --yel:#fff6d6; --green:#1e8e3e; }
   * { box-sizing:border-box; }
@@ -79,6 +80,7 @@
   .sum tr.tot td { font-weight:700; border-top:2px solid var(--line); border-bottom:none; }
   .sum tr.sub td { color:var(--muted); font-size:12px; }
   .sum tr.sub td:first-child { padding-inline-start:16px; }
+  .sum td.n button { white-space:nowrap; }
   .sum .big { font-size:16px; font-weight:700; }
   .toast { position:fixed; bottom:50px; left:20px; background:#1d2733; color:#fff; padding:12px 16px; border-radius:10px; z-index:30; max-width:520px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
   .toast button { margin-inline-start:10px; }
@@ -118,10 +120,11 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 2;
+const APP_VERSION = 3;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
+  sizeTol: 0.2,
   genders:   [{ he: 'נשים', en: 'women' }, { he: 'גברים', en: 'men' }, { he: 'ילדים', en: 'kid' }],
   divisions: [{ he: 'ארצי', en: 'artzi' }, { he: 'אילת', en: 'eilat' }, { he: 'סטיישן', en: 'station' }],
   promos:    [{ he: "ג'ינסים", en: 'jeans' }, { he: 'פוטרים', en: 'footer' }, { he: "פיג'מות", en: 'pijama' }, { he: 'אקטיב', en: 'active' }],
@@ -218,7 +221,7 @@ const ISSUE_TEXT = {
 };
 
 /* everything the screen / excel / export need */
-function compute(files, S, ovs, qty, order) {
+function compute(files, S, ovs, qty, order, sizes = {}, dismissed = new Set()) {
   const recs = files.map(f => parseFile(f, S, ovs[f.rel] || {}));
   const colOrder = [...new Set(S.divisions.map(d => d.en))].concat(LARGE);
   const gOrder = S.genders.map(g => g.en);
@@ -227,6 +230,15 @@ function compute(files, S, ovs, qty, order) {
     r.qty = q;
     if (r.col && (q === '' || !(+q > 0))) r.issues.push('qty');
     r.newName = buildName(r, order, S, q);
+    // real page size (cm) against the size in the name
+    const rs = sizes[r.rel]; r.sizeSt = ''; r.real = '';
+    if (rs && rs.st === 'got' && r.size) {
+      const exp = r.size.split('x').map(Number).sort((a, b) => a - b);
+      const got = [rs.w, rs.h].map(x => x * 2.54 / 72).sort((a, b) => a - b);
+      const tol = (+S.sizeTol >= 0 ? +S.sizeTol : 0.2) + 1e-6;
+      r.real = got.map(x => String(Math.round(x * 10) / 10)).join('×');
+      r.sizeSt = Math.abs(got[0] - exp[0]) <= tol && Math.abs(got[1] - exp[1]) <= tol ? 'ok' : 'bad';
+    } else if (rs) r.sizeSt = rs.st === 'got' ? '' : rs.st;
   }
   const seen = {};
   for (const r of recs) (seen[r.newName.toLowerCase()] = seen[r.newName.toLowerCase()] || []).push(r);
@@ -255,7 +267,14 @@ function compute(files, S, ovs, qty, order) {
   // names that still need an English mapping
   const unmappedPromos = [...new Set(recs.filter(r => r.issues.includes('promo-unmapped')).map(r => r.promoHe))];
   const unmappedSubs = [...new Set(recs.flatMap(r => r.subUnmapped))];
-  return { recs, sorted, groupList, colOrder, problems, unmappedPromos, unmappedSubs };
+  // files that should exist but don't: every promo gets every division + the large magnet
+  const missing = [];
+  for (const g of groupList) {
+    if (!g.genderEn || !g.promoEn || !Object.keys(g.cols).length) continue;
+    for (const c of colOrder) if (!g.cols[c]) { const k = g.key + '#' + c; missing.push({ key: k, g, col: c, dismissed: dismissed.has(k) }); }
+  }
+  const sizeBad = sorted.filter(r => r.sizeSt === 'bad');
+  return { recs, sorted, groupList, colOrder, problems, unmappedPromos, unmappedSubs, missing, sizeBad };
 }
 
 /* ---------- excel ---------- */
@@ -315,6 +334,7 @@ let S = JSON.parse(JSON.stringify(DEFAULTS));
 let files = [], srcPaths = [], ovs = {}, qty = {}, allQty = {}, C = null, cfg = {};
 let askedFor = new Set();
 let sideTab = 'div';
+let sizes = {}, dismissed = new Set(), sizeRun = 0, sizeProg = null, sizeNoApi = false;
 
 async function saveSettings() { if (D) await D.setCfg({ settings: S }); else localStorage.setItem('shemot-settings', JSON.stringify(S)); }
 async function init() {
@@ -330,9 +350,10 @@ async function load(paths) {
   if (!D || !paths.length) return;
   const got = await D.scan(paths);
   if (!got.length) { toast('לא נמצאו קבצים בתיקייה'); return; }
-  files = got; srcPaths = paths; ovs = {}; qty = {}; allQty = {}; askedFor = new Set();
+  files = got; srcPaths = paths; ovs = {}; qty = {}; allQty = {}; askedFor = new Set(); sizes = {}; dismissed = new Set();
   render();
   askMappings();
+  checkSizes();
 }
 document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('over'); });
 document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('over'); });
@@ -347,12 +368,12 @@ $('#order').addEventListener('input', () => render(true));
 /* ---------- main render ---------- */
 function render(soft) {
   $('#clientLbl').textContent = S.client;
-  C = compute(files, S, ovs, qty, $('#order').value);
+  C = compute(files, S, ovs, qty, $('#order').value, sizes, dismissed);
   $('#order').classList.toggle('missing', files.length > 0 && !$('#order').value.trim());
   $('#dropCard').style.display = files.length ? 'none' : '';
   if (!files.length) { $('#work').innerHTML = ''; return; }
   if (soft) { renderFiles(); renderTop(); renderSide(); return; }
-  const colHe = c => c === LARGE ? S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
+  const colHe = c => c === LARGE ? '\u2066' + S.largeSize.replace('x', '×') + '\u2069' : ((S.divisions.find(d => d.en === c) || {}).he || c);
   const cols = C.colOrder.filter(c => C.groupList.some(g => g.cols[c]));
   let h = `<div class="layout"><div class="mainCol"><div class="card"><div class="loaded" id="topInfo"></div></div>`;
   h += `<div class="card"><h2>כמויות <span class="muted">— כמות לכל מבצע ולכל חלוקה. בשורה הכחולה אפשר למלא עמודה שלמה בבת אחת, ואז לתקן רק את החריגים.</span></h2>
@@ -382,7 +403,7 @@ function renderTop() {
     <span class="path">${esc(srcPaths.join(' , '))}</span><span class="spacer" style="flex:1"></span>
     ${C.unmappedPromos.length + C.unmappedSubs.length ? '<button class="small" id="bMapNow">מיפוי שמות חדשים</button>' : ''}
     <button class="small" id="bClear">ניקוי / תיקייה אחרת</button>`;
-  $('#bClear').onclick = () => { files = []; srcPaths = []; render(); };
+  $('#bClear').onclick = () => { files = []; srcPaths = []; sizeRun++; sizeProg = null; render(); };
   if ($('#bMapNow')) $('#bMapNow').onclick = () => { askedFor = new Set(); askMappings(); };
 }
 function renderFiles() {
@@ -400,8 +421,11 @@ function renderFiles() {
       else if (i === 'size') notes.push(`גודל: <select data-ov="size" data-f="${esc(r.rel)}"><option value="">בחירה…</option><option value="reg">רגיל 59×159</option><option value="large">גדול ${esc(S.largeSize)}</option></select>`);
       else notes.push(`<span class="issue">${esc(ISSUE_TEXT[i])}</span>`);
     }
+    if (r.sizeSt === 'bad') notes.push(`<span class="issue">גודל בפועל \u2066${esc(r.real)}\u2069 ס״מ</span>`);
+    else if (r.sizeSt === 'wait') notes.push('<span class="muted">בודק גודל…</span>');
+    else if (r.sizeSt === 'unk') notes.push('<span class="muted">לא הצלחתי למדוד גודל</span>');
     if (ov.gender || ov.div || ov.size) notes.push(`<button class="small x" title="ביטול בחירה ידנית" data-reset="${esc(r.rel)}">↺</button>`);
-    return `<tr class="${r.issues.some(i => i !== 'qty') ? 'err' : r.issues.length ? 'warn' : ''}"><td class="newname">${esc(r.newName)}</td><td class="orig">${r.rel.split('/').map(x => `<bdi>${esc(x)}</bdi>`).join(' / ')}</td><td>${notes.join(' ')}</td></tr>`;
+    return `<tr class="${r.issues.some(i => i !== 'qty') ? 'err' : (r.issues.length || r.sizeSt === 'bad') ? 'warn' : ''}"><td class="newname">${esc(r.newName)}</td><td class="orig">${r.rel.split('/').map(x => `<bdi>${esc(x)}</bdi>`).join(' / ')}</td><td>${notes.join(' ')}</td></tr>`;
   }).join('');
   $('#fileRows').querySelectorAll('select[data-ov]').forEach(s => s.onchange = () => { const o = ovs[s.dataset.f] = ovs[s.dataset.f] || {}; o[s.dataset.ov] = s.value; render(); });
   $('#fileRows').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete ovs[b.dataset.reset]; render(); });
@@ -410,12 +434,29 @@ function renderFiles() {
 /* ---------- side panel: totals ---------- */
 function renderSide() {
   const el = $('#side'); if (!el) return;
-  const colHe = c => c === LARGE ? 'מגנט גדול ' + S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
+  const colHe = c => c === LARGE ? 'מגנט גדול \u2066' + S.largeSize.replace('x', '×') + '\u2069' : ((S.divisions.find(d => d.en === c) || {}).he || c);
   const units = rs => { const ok = rs.filter(r => +r.qty > 0); return { u: ok.reduce((a, r) => a + +r.qty, 0), missing: ok.length < rs.length }; };
   const uTxt = x => x.u ? x.u.toLocaleString('he-IL') + (x.missing ? '<span class="issue">*</span>' : '') : (x.missing ? '<span class="issue">חסר</span>' : '–');
   const withCol = C.recs.filter(r => r.col);
   let body = '';
-  if (sideTab === 'div') {
+  const openMiss = C.missing.filter(m => !m.dismissed).length + C.sizeBad.length;
+  if (sideTab === 'miss') {
+    const lbl = m => `${m.g.genderHe} · ${m.g.promoHe}${m.g.subHe ? ' · ' + m.g.subHe : ''}`;
+    const open = C.missing.filter(m => !m.dismissed), done = C.missing.filter(m => m.dismissed);
+    body = `<h4 style="margin:4px 0 6px">קבצים חסרים</h4>`;
+    body += open.length ? `<table><tbody>${open.map(m => `<tr><td><bdi>${esc(lbl(m))}</bdi><br><span class="issue">חסר: ${esc(colHe(m.col))}</span></td><td class="n"><button class="small" data-dis="${esc(m.key)}" title="זה בכוונה – לא חסר">לא חסר</button></td></tr>`).join('')}</tbody></table>`
+      : '<div class="muted">✓ לכל מבצע יש ארצי, אילת, סטיישן ומגנט גדול</div>';
+    if (done.length) body += `<div class="muted" style="margin-top:8px">סומנו "לא חסר":</div><table><tbody>${done.map(m => `<tr class="sub"><td><bdi>${esc(lbl(m))}</bdi> – ${esc(colHe(m.col))}</td><td class="n"><button class="small x" data-undis="${esc(m.key)}" title="להחזיר לרשימה">↺</button></td></tr>`).join('')}</tbody></table>`;
+    body += `<h4 style="margin:14px 0 6px">גודל לא תואם</h4>`;
+    if (sizeNoApi) body += '<div class="muted">כדי למדוד גדלים צריך להתקין את הקובץ החדש של האפליקציה.</div>';
+    else {
+      if (sizeProg && sizeProg.done < sizeProg.total) body += `<div class="muted">בודק גדלים ${sizeProg.done}/${sizeProg.total}…</div>`;
+      body += C.sizeBad.length ? `<table><tbody>${C.sizeBad.map(r => `<tr><td><bdi>${esc(r.genderHe)} · ${esc(r.promoHe)}${r.subHe ? ' · ' + esc(r.subHe) : ''}</bdi> · ${esc(r.large ? colHe(LARGE) : r.divHe)}<br><span class="issue">בפועל \u2066${esc(r.real)}\u2069 – בשם \u2066${esc(r.size.replace('x', '×'))}\u2069</span></td></tr>`).join('')}</tbody></table>`
+        : (sizeProg && sizeProg.done >= sizeProg.total ? '<div class="muted">✓ כל הקבצים בגודל הנכון</div>' : '');
+      const unk = C.recs.filter(r => r.sizeSt === 'unk').length;
+      if (unk) body += `<div class="muted" style="margin-top:6px">${unk} קבצים לא נמדדו</div>`;
+    }
+  } else if (sideTab === 'div') {
     body = `<table><thead><tr><th>חלוקה</th><th class="n">קבצים</th><th class="n">יח׳</th></tr></thead><tbody>` +
       C.colOrder.map(c => { const rs = withCol.filter(r => r.col === c); if (!rs.length) return ''; return `<tr><td>${esc(colHe(c))}</td><td class="n big">${rs.length}</td><td class="n">${uTxt(units(rs))}</td></tr>`; }).join('') +
       `<tr class="tot"><td>סה״כ</td><td class="n big">${C.recs.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
@@ -433,9 +474,52 @@ function renderSide() {
     }
     body += `<tr class="tot"><td>סה״כ</td><td class="n big">${C.recs.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
   }
-  el.innerHTML = `<div class="tabs"><button data-t="div" class="${sideTab === 'div' ? 'on' : ''}">לפי חלוקה</button><button data-t="promo" class="${sideTab === 'promo' ? 'on' : ''}">לפי מבצע</button></div>
-    <div class="sum">${body}<div class="muted" style="margin-top:8px">יח׳ = סכום הכמויות. <span class="issue">*</span> = עוד חסרות כמויות.</div></div>`;
+  el.innerHTML = `<div class="tabs"><button data-t="div" class="${sideTab === 'div' ? 'on' : ''}">לפי חלוקה</button><button data-t="promo" class="${sideTab === 'promo' ? 'on' : ''}">לפי מבצע</button><button data-t="miss" class="${sideTab === 'miss' ? 'on' : ''}">חוסרים ${openMiss ? `<span class="badge red">${openMiss}</span>` : (sizeProg && sizeProg.done < sizeProg.total ? '' : '<span class="badge green">✓</span>')}</button></div>
+    <div class="sum">${body}${sideTab !== 'miss' ? '<div class="muted" style="margin-top:8px">יח׳ = סכום הכמויות. <span class="issue">*</span> = עוד חסרות כמויות.</div>' : ''}</div>`;
   el.querySelectorAll('[data-t]').forEach(b => b.onmousedown = () => { sideTab = b.dataset.t; renderSide(); });
+  el.querySelectorAll('[data-dis]').forEach(b => b.onmousedown = () => { dismissed.add(b.dataset.dis); render(true); });
+  el.querySelectorAll('[data-undis]').forEach(b => b.onmousedown = () => { dismissed.delete(b.dataset.undis); render(true); });
+}
+
+/* ---------- real PDF size ---------- */
+function boxFromText(t) {
+  const re = /\/(TrimBox|MediaBox)\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]/g;
+  let m, trim = null, media = null;
+  while ((m = re.exec(t))) {
+    const b = { w: Math.abs(m[4] - m[2]), h: Math.abs(m[5] - m[3]) };
+    if (m[1] === 'TrimBox') { trim = trim || b; } else media = media || b;
+  }
+  return trim || media;
+}
+const latin1 = u8 => new TextDecoder('latin1').decode(u8);
+async function realSize(p) {
+  const CH = 1.5e6;
+  const head = await D.readRange({ path: p, start: 0, length: CH });
+  let txt = latin1(head.data);
+  if (head.size > CH) txt += '\n' + latin1((await D.readRange({ path: p, start: -CH, length: CH })).data);
+  let b = boxFromText(txt);
+  if (b) return b;
+  if (typeof PDFLib === 'undefined') return null;
+  const all = head.size > CH ? (await D.readRange({ path: p, start: 0 })).data : head.data;
+  b = boxFromText(latin1(all)); if (b) return b;
+  const doc = await PDFLib.PDFDocument.load(all, { ignoreEncryption: true, updateMetadata: false });
+  const t = doc.getPage(0).getTrimBox();
+  return { w: t.width, h: t.height };
+}
+async function checkSizes() {
+  if (!D || !D.readRange) { sizeNoApi = true; render(true); return; }
+  const run = ++sizeRun;
+  const pdfs = files.filter(f => /\.pdf$/i.test(f.rel));
+  pdfs.forEach(f => { sizes[f.rel] = { st: 'wait' }; });
+  sizeProg = { done: 0, total: pdfs.length };
+  for (const f of pdfs) {
+    let r = null;
+    try { r = await realSize(f.path); } catch (e) { r = null; }
+    if (run !== sizeRun) return;
+    sizes[f.rel] = r ? { st: 'got', w: r.w, h: r.h } : { st: 'unk' };
+    sizeProg.done++;
+    render(true);
+  }
 }
 
 /* ---------- new names → ask for English ---------- */
@@ -481,6 +565,7 @@ function openSettings() {
   const m = modal(`<h3>הגדרות מיפוי</h3>
     <div class="row"><b style="width:110px">שם הלקוח</b><input type="text" class="en" id="sClient" value="${esc(T.client)}"></div>
     <div class="row"><b style="width:110px">מגנט גדול</b><input type="text" class="en" id="sLarge" value="${esc(T.largeSize)}"> <span class="muted">אין בשם חלוקה, הגודל נכתב בשם</span></div>
+    <div class="row"><b style="width:110px">סטייה בגודל</b><input type="text" class="en" id="sTol" style="width:80px" value="${esc(T.sizeTol ?? 0.2)}"> <span class="muted">ס״מ – כמה הגודל האמיתי של ה-PDF יכול להיות שונה מהגודל שבשם</span></div>
     <div id="secs"></div>
     <h4>גיבוי</h4><div class="row"><button class="small" id="sExp">שמירת ההגדרות לקובץ…</button><button class="small" id="sImp">טעינת הגדרות מקובץ…</button><button class="small" id="sDef">החזרת ברירת מחדל</button></div>
     <div class="foot"><button class="primary" id="sSave">שמירה</button><button id="sCancel">ביטול</button></div>`);
@@ -489,6 +574,7 @@ function openSettings() {
   m.querySelector('#sSave').onclick = async () => {
     T.client = m.querySelector('#sClient').value.trim();
     T.largeSize = sizeKey(m.querySelector('#sLarge').value) || '119x159';
+    { const v = parseFloat(m.querySelector('#sTol').value); T.sizeTol = v >= 0 ? v : 0.2; }
     for (const k of ['promos', 'subs', 'divisions', 'genders']) T[k] = T[k].map(x => ({ he: x.he.trim(), en: x.en.trim() })).filter(x => x.he && x.en);
     S = T; await saveSettings(); closeModal(); render();
   };
@@ -505,6 +591,11 @@ function confirmBox(msg) { return window.confirm(msg); }
 function guard() {
   if (!files.length) { toast('קודם צריך לגרור תיקייה'); return false; }
   if (C.problems.length) { toast('יש דברים לתקן לפני כן – הם מסומנים באדום'); $('#problems').scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
+  const miss = C.missing.filter(m => !m.dismissed).length, bad = C.sizeBad.length;
+  if (miss || bad) {
+    const msg = [miss ? `${miss} קבצים חסרים` : '', bad ? `${bad} קבצים בגודל לא תואם` : ''].filter(Boolean).join(' ו-');
+    if (!confirm(`יש ${msg} (בלשונית "חוסרים").\nלהמשיך בכל זאת?`)) { sideTab = 'miss'; renderSide(); return false; }
+  }
   return true;
 }
 const jobName = () => `${$('#order').value.trim()} ${S.client}`.trim();
