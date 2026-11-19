@@ -1,0 +1,47 @@
+{
+  "name": "shinui-shemot",
+  "productName": "Shinui Shemot",
+  "description": "שינוי שמות קבצים",
+  "author": "Campus",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "build": {
+    "appId": "il.campus.shinuishemot",
+    "productName": "Shinui Shemot",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "icon": "build/icon.png",
+      "extendInfo": {
+        "LSMinimumSystemVersion": "11.0"
+      }
+    },
+    "artifactName": "shinui-shemot-mac-${arch}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "publish": null
+  },
+  "version": "1.0.0",
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  }
+}

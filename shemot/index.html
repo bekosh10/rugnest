@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>שינוי שמות</title>
+<!-- SHEMOT_APP -->
+<script src="lib/exceljs.min.js"></script>
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --line:#e2e6ea; --text:#1d2733; --muted:#6b7785; --blue:#1f6feb; --blue2:#e8f0fe; --red:#d93025; --redbg:#fdecea; --yel:#fff6d6; --green:#1e8e3e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"SF Pro Text","Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:18px; padding:12px 20px; background:var(--card); border-bottom:1px solid var(--line); }
+  header h1 { font-size:18px; margin:0; white-space:nowrap; }
+  .order { display:flex; align-items:center; gap:8px; }
+  .order label { font-weight:600; }
+  .order input { font-size:20px; font-weight:700; width:170px; padding:6px 10px; border:2px solid var(--blue); border-radius:8px; direction:ltr; text-align:center; }
+  .order input.missing { border-color:var(--red); background:var(--redbg); }
+  .client { color:var(--muted); direction:ltr; }
+  .spacer { flex:1; }
+  .btns { display:flex; gap:8px; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  button:hover { background:#f0f3f6; }
+  button.primary { background:var(--blue); color:#fff; border-color:var(--blue); font-weight:600; }
+  button.primary:hover { background:#1a5fd0; }
+  button.small { padding:4px 10px; font-size:13px; }
+  button:disabled { opacity:.45; cursor:default; }
+  main { padding:16px 20px 70px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 10px; display:flex; align-items:center; gap:10px; }
+  .card h2 .muted { font-weight:400; }
+  .muted { color:var(--muted); font-size:13px; }
+  #drop { border:2px dashed #b8c2cc; border-radius:14px; padding:50px 20px; text-align:center; background:#fafbfc; }
+  #drop.over, body.over #drop { border-color:var(--blue); background:var(--blue2); }
+  #drop .big { font-size:20px; font-weight:600; margin-bottom:8px; }
+  .loaded { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .loaded .path { direction:ltr; font-family:Menlo,monospace; font-size:12px; color:var(--muted); }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:right; vertical-align:middle; }
+  th { font-size:12px; color:var(--muted); font-weight:600; background:#fafbfc; position:sticky; top:0; }
+  td.ltr, .ltr { direction:ltr; text-align:left; }
+  .qty input { width:64px; padding:4px 6px; font-size:15px; text-align:center; border:1px solid var(--line); border-radius:6px; }
+  .qty input.missing { border-color:var(--red); background:var(--redbg); }
+  .qty .none { color:#c3cad2; text-align:center; display:inline-block; width:64px; }
+  tr.all td { background:var(--blue2); font-weight:600; }
+  tr.all input { border-color:var(--blue); }
+  #qtyTable td.qty, #qtyTable th.qty { text-align:center; }
+  tr.err td { background:var(--redbg); }
+  tr.warn td { background:var(--yel); }
+  .issue { color:var(--red); font-size:12px; }
+  .newname { font-family:Menlo,monospace; font-size:12.5px; direction:ltr; text-align:left; white-space:nowrap; }
+  .orig { font-size:12px; color:var(--muted); }
+  select { font:inherit; font-size:12px; padding:2px 4px; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px; background:#eef1f4; font-size:12px; }
+  .badge.red { background:var(--redbg); color:var(--red); }
+  .badge.green { background:#e6f4ea; color:var(--green); }
+  footer { position:fixed; bottom:0; left:0; right:0; display:flex; align-items:center; gap:12px; padding:8px 20px; background:var(--card); border-top:1px solid var(--line); font-size:12px; color:var(--muted); }
+  /* modal */
+  .modal-bg { position:fixed; inset:0; background:rgba(20,30,40,.35); display:flex; align-items:flex-start; justify-content:center; padding-top:50px; z-index:20; }
+  .modal { background:#fff; border-radius:14px; width:min(820px,94vw); max-height:84vh; overflow:auto; padding:18px 22px; box-shadow:0 10px 40px rgba(0,0,0,.2); }
+  .modal h3 { margin:0 0 12px; font-size:18px; }
+  .modal h4 { margin:18px 0 6px; font-size:14px; }
+  .modal .row { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .modal input[type=text] { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; }
+  .modal input.en { direction:ltr; width:200px; }
+  .modal input.he { width:200px; }
+  .modal .foot { display:flex; gap:8px; justify-content:flex-start; margin-top:16px; position:sticky; bottom:-18px; background:#fff; padding:10px 0; }
+  .maptbl td { border:none; padding:3px 4px; }
+  .x { border:none; background:none; color:var(--muted); font-size:16px; padding:2px 8px; }
+  .x:hover { color:var(--red); background:none; }
+  .toast { position:fixed; bottom:50px; left:20px; background:#1d2733; color:#fff; padding:12px 16px; border-radius:10px; z-index:30; max-width:520px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
+  .toast button { margin-inline-start:10px; }
+  .problems { background:var(--redbg); color:var(--red); border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px; }
+  .problems ul { margin:4px 0 0; padding-inline-start:18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>שינוי שמות</h1>
+  <div class="order"><label for="order">מס׳ הזמנה</label><input id="order" placeholder="26001234" autocomplete="off"></div>
+  <span class="client" id="clientLbl"></span>
+  <div class="spacer"></div>
+  <div class="btns">
+    <button id="bSettings">הגדרות מיפוי</button>
+    <button id="bExcel">טבלת אקסל</button>
+    <button id="bExport" class="primary">ייצוא</button>
+  </div>
+</header>
+
+<main>
+  <div class="card" id="dropCard">
+    <div id="drop">
+      <div class="big">גררי לכאן תיקייה</div>
+      <div class="muted">אפשר לגרור את התיקייה הראשית (עם גברים / נשים / ילדים) או כל תת-תיקייה. הקבצים המקוריים לא משתנים.</div>
+      <div style="margin-top:14px"><button id="bPick">או בחירת תיקייה…</button></div>
+    </div>
+  </div>
+  <div id="work"></div>
+</main>
+
+<footer>
+  <span id="ver"></span>
+  <button class="small" id="bUpd">בדוק עדכון</button>
+  <span id="updMsg"></span>
+</footer>
+
+<script id="logic">
+/* ================= pure logic (no DOM) ================= */
+const APP_VERSION = 1;
+const DEFAULTS = {
+  client: 'urbanica',
+  largeSize: '119x159',
+  genders:   [{ he: 'נשים', en: 'women' }, { he: 'גברים', en: 'men' }, { he: 'ילדים', en: 'kid' }],
+  divisions: [{ he: 'ארצי', en: 'artzi' }, { he: 'אילת', en: 'eilat' }, { he: 'סטיישן', en: 'station' }],
+  promos:    [{ he: "ג'ינסים", en: 'jeans' }, { he: 'פוטרים', en: 'footer' }, { he: "פיג'מות", en: 'pijama' }, { he: 'אקטיב', en: 'active' }],
+  subs:      [],
+};
+const LARGE = 'L';
+
+const norm = s => String(s || '').normalize('NFC').replace(/[׳’‘`´]/g, "'").replace(/[״“”]/g, '"').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+const hasHeb = s => /[֐-׿]/.test(s || '');
+const findMap = (list, s) => { const n = norm(s); return n ? (list || []).find(m => norm(m.he) === n || (m.en && norm(m.en) === n)) : undefined; };
+const sizeKey = s => norm(s).replace(/[×*]/g, 'x').replace(/\s/g, '');
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// does text contain word w (Hebrew or English) as a separate word? (Hebrew prefixes ל/ה/ב allowed)
+function hasWord(text, w) {
+  const n = norm(w); if (!n) return false;
+  const re = hasHeb(n) ? new RegExp('(^|[^\\u0590-\\u05FF])[לבהו]?' + escRe(n) + '($|[^\\u0590-\\u05FF])')
+                       : new RegExp('(^|[^a-z])' + escRe(n) + '($|[^a-z])');
+  return re.test(text);
+}
+
+/* one file → parsed record. ov = per-file manual choices {gender, div, size} */
+function parseFile(f, S, ov = {}) {
+  const parts = f.rel.split('/');
+  const fname = parts.pop();
+  const segs = parts;
+  const dot = fname.lastIndexOf('.');
+  const base = dot > 0 ? fname.slice(0, dot) : fname;
+  const ext = dot > 0 ? fname.slice(dot).toLowerCase() : '';
+  const nb = norm(base);
+  const r = { id: f.rel, path: f.path, rel: f.rel, fname, ext, issues: [], warns: [] };
+
+  // gender: a folder named like a gender; else a gender word in the file name
+  let gi = segs.findIndex(s => S.genders.some(g => norm(g.he) === norm(s) || norm(g.en) === norm(s)));
+  let g = gi >= 0 ? findMap(S.genders, segs[gi]) : undefined;
+  if (!g) g = S.genders.find(x => hasWord(nb, x.he));
+  if (ov.gender) g = S.genders.find(x => x.en === ov.gender) || g;
+  r.genderEn = g ? g.en : ''; r.genderHe = g ? g.he : '';
+  if (!g) r.issues.push('gender');
+
+  // promo = folder after the gender folder; sub-promo = folders below it
+  const promoSeg = gi >= 0 ? segs[gi + 1] : segs[0];
+  const subSegs = gi >= 0 ? segs.slice(gi + 2) : segs.slice(1);
+  r.promoHe = promoSeg || '';
+  const pm = promoSeg ? findMap(S.promos, promoSeg) : undefined;
+  r.promoEn = pm ? pm.en : '';
+  if (!promoSeg) r.issues.push('promo-missing');
+  else if (!pm) r.issues.push('promo-unmapped');
+
+  r.subHe = subSegs.join(' / ');
+  r.subUnmapped = [];
+  r.subEn = subSegs.map(s => {
+    if (!hasHeb(s)) return s.trim();
+    const m = findMap(S.subs, s);
+    if (!m) { r.subUnmapped.push(s); return ''; }
+    return m.en;
+  }).filter(Boolean).join(' ');
+  if (r.subUnmapped.length) r.issues.push('sub-unmapped');
+
+  // size
+  const m = base.match(/(\d{2,3})\s*[xX×*]\s*(\d{2,3})/);
+  let size = m ? `${m[1]}x${m[2]}` : '';
+  let large = size ? sizeKey(size) === sizeKey(S.largeSize) : null;
+  if (ov.size === 'large') large = true; else if (ov.size === 'reg') large = false;
+  r.size = large === true ? sizeKey(S.largeSize) : (large === false ? (size && !ov.size ? size : '59x159') : '');
+  r.large = large === true;
+  if (large === null) r.issues.push('size');
+
+  // division (not for the large magnet)
+  let d = S.divisions.find(x => hasWord(nb, x.he) || hasWord(nb, x.en));
+  if (ov.div) d = S.divisions.find(x => x.en === ov.div) || d;
+  r.divEn = d ? d.en : ''; r.divHe = d ? d.he : '';
+  if (!r.large && large !== null && !d) r.issues.push('div');
+
+  r.col = r.large ? LARGE : r.divEn;
+  r.groupKey = [r.genderEn || '?', r.promoEn || r.promoHe || '?', r.subEn].join('|');
+  return r;
+}
+
+function buildName(r, order, S, qty) {
+  const p = [String(order || '').trim(), S.client];
+  if (!r.large) p.push(r.divEn);
+  p.push(r.genderEn, r.promoEn);
+  if (r.subEn) p.push(r.subEn);
+  if (r.large) p.push(sizeKey(S.largeSize));
+  if (qty !== '' && qty != null) p.push('x' + qty);
+  return p.filter(Boolean).join(' ').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim() + r.ext;
+}
+
+const ISSUE_TEXT = {
+  'gender': 'לא זוהה מגדר', 'promo-missing': 'הקובץ לא בתוך תיקיית מבצע', 'promo-unmapped': 'מבצע בלי שם באנגלית',
+  'sub-unmapped': 'תת-מבצע בלי שם באנגלית', 'size': 'לא זוהה גודל', 'div': 'לא זוהתה חלוקה (ארצי/אילת/סטיישן)',
+  'qty': 'חסרה כמות', 'dup': 'שם כפול – יש עוד קובץ עם אותו שם',
+};
+
+/* everything the screen / excel / export need */
+function compute(files, S, ovs, qty, order) {
+  const recs = files.map(f => parseFile(f, S, ovs[f.rel] || {}));
+  const colOrder = [...new Set(S.divisions.map(d => d.en))].concat(LARGE);
+  const gOrder = S.genders.map(g => g.en);
+  for (const r of recs) {
+    const q = r.col ? ((qty[r.groupKey] || {})[r.col] ?? '') : '';
+    r.qty = q;
+    if (r.col && (q === '' || !(+q > 0))) r.issues.push('qty');
+    r.newName = buildName(r, order, S, q);
+  }
+  const seen = {};
+  for (const r of recs) (seen[r.newName.toLowerCase()] = seen[r.newName.toLowerCase()] || []).push(r);
+  for (const k in seen) if (seen[k].length > 1 && !seen[k].some(r => r.issues.some(i => i !== 'qty'))) seen[k].forEach(r => r.issues.push('dup'));
+
+  // groups for the quantity table
+  const groups = {};
+  for (const r of recs) {
+    const g = groups[r.groupKey] || (groups[r.groupKey] = { key: r.groupKey, genderEn: r.genderEn, genderHe: r.genderHe, promoHe: r.promoHe, promoEn: r.promoEn, subHe: r.subHe, subEn: r.subEn, cols: {} });
+    if (r.col) g.cols[r.col] = (g.cols[r.col] || 0) + 1;
+  }
+  const cmpNum = (a, b) => String(a).localeCompare(String(b), 'he', { numeric: true });
+  const gi = x => { const i = gOrder.indexOf(x); return i < 0 ? 99 : i; };
+  const groupList = Object.values(groups).sort((a, b) => gi(a.genderEn) - gi(b.genderEn) || cmpNum(a.promoHe, b.promoHe) || cmpNum(a.subHe, b.subHe));
+
+  // excel order: division → promo → gender
+  const ci = c => { const i = colOrder.indexOf(c); return i < 0 ? 98 : i; };
+  const sorted = recs.slice().sort((a, b) => ci(a.col) - ci(b.col) || cmpNum(a.promoHe, b.promoHe) || cmpNum(a.subHe, b.subHe) || gi(a.genderEn) - gi(b.genderEn) || cmpNum(a.rel, b.rel));
+
+  const problems = [];
+  if (!String(order || '').trim()) problems.push('חסר מספר הזמנה');
+  const cnt = {};
+  for (const r of recs) for (const i of r.issues) cnt[i] = (cnt[i] || 0) + 1;
+  for (const i in cnt) problems.push(`${ISSUE_TEXT[i]} (${cnt[i]} קבצים)`);
+
+  // names that still need an English mapping
+  const unmappedPromos = [...new Set(recs.filter(r => r.issues.includes('promo-unmapped')).map(r => r.promoHe))];
+  const unmappedSubs = [...new Set(recs.flatMap(r => r.subUnmapped))];
+  return { recs, sorted, groupList, colOrder, problems, unmappedPromos, unmappedSubs };
+}
+
+/* ---------- excel ---------- */
+async function buildExcel(C, S, order) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'שינוי שמות';
+  const colHe = c => c === LARGE ? 'מגנט גדול ' + S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
+  const FILLS = ['FFE8F0FE', 'FFE6F4EA', 'FFFEF7E0', 'FFFCE8E6', 'FFF3E8FD', 'FFE0F7FA'];
+  const hdr = ws => { const row = ws.getRow(1); row.font = { bold: true, color: { argb: 'FFFFFFFF' } }; row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F6FEB' } }; row.alignment = { vertical: 'middle' }; row.height = 22; };
+
+  const ws = wb.addWorksheet('קבצים', { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
+  ws.columns = [
+    { header: '#', key: 'n', width: 5 }, { header: 'חלוקה', key: 'div', width: 16 }, { header: 'מבצע', key: 'promo', width: 18 },
+    { header: 'תת-מבצע', key: 'sub', width: 12 }, { header: 'מגדר', key: 'gender', width: 9 }, { header: 'גודל', key: 'size', width: 10 },
+    { header: 'כמות', key: 'qty', width: 8 }, { header: 'שם קובץ חדש', key: 'name', width: 62 }, { header: 'קובץ מקורי', key: 'orig', width: 60 },
+  ];
+  hdr(ws);
+  const cols = C.colOrder;
+  C.sorted.forEach((r, i) => {
+    const row = ws.addRow({ n: i + 1, div: r.col ? colHe(r.col) : '?', promo: r.promoHe, sub: r.subHe, gender: r.genderHe, size: r.size.replace('x', '×'), qty: r.qty === '' ? '' : +r.qty, name: r.newName, orig: r.rel });
+    const f = FILLS[Math.max(0, cols.indexOf(r.col)) % FILLS.length];
+    row.eachCell({ includeEmpty: true }, c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: f } }; });
+    row.getCell('name').alignment = { horizontal: 'left' };
+    row.getCell('orig').alignment = { horizontal: 'right' };
+    row.getCell('qty').alignment = { horizontal: 'center' };
+  });
+  const last = ws.rowCount;
+  const tot = ws.addRow({ div: 'סה״כ', qty: { formula: `SUM(G2:G${last})` }, name: `${C.sorted.length} קבצים` });
+  tot.font = { bold: true }; tot.getCell('qty').alignment = { horizontal: 'center' };
+  ws.autoFilter = { from: 'A1', to: `I${last}` };
+
+  // quantities matrix
+  const wq = wb.addWorksheet('כמויות', { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
+  wq.columns = [{ header: 'מגדר', key: 'g', width: 9 }, { header: 'מבצע', key: 'p', width: 18 }, { header: 'תת-מבצע', key: 's', width: 12 }]
+    .concat(cols.map(c => ({ header: colHe(c), key: 'c_' + c, width: 13 })));
+  hdr(wq);
+  for (const g of C.groupList) {
+    const o = { g: g.genderHe, p: g.promoHe, s: g.subHe };
+    for (const c of cols) { const r = C.recs.find(x => x.groupKey === g.key && x.col === c); o['c_' + c] = r ? (r.qty === '' ? '' : +r.qty) : null; }
+    const row = wq.addRow(o);
+    cols.forEach((c, i) => { row.getCell(4 + i).alignment = { horizontal: 'center' }; });
+  }
+  const lq = wq.rowCount, t = { g: 'סה״כ' };
+  cols.forEach((c, i) => { const L = String.fromCharCode(68 + i); t['c_' + c] = { formula: `SUM(${L}2:${L}${lq})` }; });
+  const tr = wq.addRow(t); tr.font = { bold: true };
+  cols.forEach((c, i) => { tr.getCell(4 + i).alignment = { horizontal: 'center' }; });
+  return new Uint8Array(await wb.xlsx.writeBuffer());
+}
+</script>
+
+<script>
+/* ================= screen ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const D = window.desk;
+let S = JSON.parse(JSON.stringify(DEFAULTS));
+let files = [], srcPaths = [], ovs = {}, qty = {}, allQty = {}, C = null, cfg = {};
+let askedFor = new Set();
+
+async function saveSettings() { if (D) await D.setCfg({ settings: S }); else localStorage.setItem('shemot-settings', JSON.stringify(S)); }
+async function init() {
+  if (D) { cfg = await D.getCfg(); if (cfg.settings) S = { ...S, ...cfg.settings }; }
+  else { try { const s = JSON.parse(localStorage.getItem('shemot-settings')); if (s) S = { ...S, ...s }; } catch (e) {} }
+  $('#ver').textContent = 'גרסה ' + (cfg.version || APP_VERSION);
+  render();
+  if (D) checkUpdate(true);
+}
+
+/* ---------- loading folders ---------- */
+async function load(paths) {
+  if (!D || !paths.length) return;
+  const got = await D.scan(paths);
+  if (!got.length) { toast('לא נמצאו קבצים בתיקייה'); return; }
+  files = got; srcPaths = paths; ovs = {}; qty = {}; allQty = {}; askedFor = new Set();
+  render();
+  askMappings();
+}
+document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('over'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('over'); });
+document.addEventListener('drop', e => {
+  e.preventDefault(); document.body.classList.remove('over');
+  const paths = [...e.dataTransfer.files].map(f => D ? D.pathOf(f) : '').filter(Boolean);
+  load(paths);
+});
+$('#bPick').onclick = async () => { const p = await D.pickFolder({ title: 'בחירת תיקייה' }); if (p) load([p]); };
+$('#order').addEventListener('input', () => render(true));
+
+/* ---------- main render ---------- */
+function render(soft) {
+  $('#clientLbl').textContent = S.client;
+  C = compute(files, S, ovs, qty, $('#order').value);
+  $('#order').classList.toggle('missing', files.length > 0 && !$('#order').value.trim());
+  $('#dropCard').style.display = files.length ? 'none' : '';
+  if (!files.length) { $('#work').innerHTML = ''; return; }
+  if (soft) { renderFiles(); renderTop(); return; }
+  const colHe = c => c === LARGE ? S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
+  const cols = C.colOrder.filter(c => C.groupList.some(g => g.cols[c]));
+  let h = `<div class="card"><div class="loaded" id="topInfo"></div></div>`;
+  h += `<div class="card"><h2>כמויות <span class="muted">— כמות לכל מבצע ולכל חלוקה. בשורה הכחולה אפשר למלא עמודה שלמה בבת אחת, ואז לתקן רק את החריגים.</span></h2>
+    <table id="qtyTable"><thead><tr><th>מגדר</th><th>מבצע</th><th>תת-מבצע</th>${cols.map(c => `<th class="qty">${esc(colHe(c))}</th>`).join('')}</tr></thead><tbody>
+    <tr class="all"><td colspan="3">לכולם</td>${cols.map(c => `<td class="qty"><input type="number" min="1" data-all="${esc(c)}" value="${esc(allQty[c] ?? '')}"></td>`).join('')}</tr>
+    ${C.groupList.map(g => `<tr><td>${esc(g.genderHe || '?')}</td><td>${esc(g.promoHe)}${g.promoEn ? ` <span class="muted ltr">${esc(g.promoEn)}</span>` : ''}</td><td><bdi>${esc(g.subHe)}</bdi></td>
+      ${cols.map(c => `<td class="qty">${g.cols[c] ? `<input type="number" min="1" data-g="${esc(g.key)}" data-c="${esc(c)}" value="${esc((qty[g.key] || {})[c] ?? '')}">` : '<span class="none">–</span>'}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div>`;
+  h += `<div class="card"><h2>קבצים <span class="muted" id="fileCount"></span></h2><div id="problems"></div><table><thead><tr><th>שם חדש</th><th>קובץ מקורי</th><th style="width:230px">הערות</th></tr></thead><tbody id="fileRows"></tbody></table></div>`;
+  $('#work').innerHTML = h;
+  $('#work').querySelectorAll('input[data-g]').forEach(inp => inp.addEventListener('input', () => {
+    const g = inp.dataset.g, c = inp.dataset.c; (qty[g] = qty[g] || {})[c] = inp.value.trim(); markQty(); render(true);
+  }));
+  $('#work').querySelectorAll('input[data-all]').forEach(inp => inp.addEventListener('change', () => {
+    const c = inp.dataset.all, v = inp.value.trim(); allQty[c] = v;
+    for (const g of C.groupList) if (g.cols[c]) (qty[g.key] = qty[g.key] || {})[c] = v;
+    $('#work').querySelectorAll(`input[data-c="${CSS.escape(c)}"]`).forEach(x => { x.value = v; });
+    markQty(); render(true);
+  }));
+  markQty(); renderTop(); renderFiles();
+}
+function markQty() { $('#work').querySelectorAll('input[data-g]').forEach(x => x.classList.toggle('missing', !(+x.value > 0))); }
+function renderTop() {
+  const errs = C.recs.filter(r => r.issues.length).length;
+  $('#topInfo').innerHTML = `<b>${C.recs.length} קבצים</b>
+    ${errs ? `<span class="badge red">${errs} דורשים טיפול</span>` : '<span class="badge green">הכול מוכן</span>'}
+    <span class="path">${esc(srcPaths.join(' , '))}</span><span class="spacer" style="flex:1"></span>
+    ${C.unmappedPromos.length + C.unmappedSubs.length ? '<button class="small" id="bMapNow">מיפוי שמות חדשים</button>' : ''}
+    <button class="small" id="bClear">ניקוי / תיקייה אחרת</button>`;
+  $('#bClear').onclick = () => { files = []; srcPaths = []; render(); };
+  if ($('#bMapNow')) $('#bMapNow').onclick = () => { askedFor = new Set(); askMappings(); };
+}
+function renderFiles() {
+  const P = C.problems;
+  $('#problems').innerHTML = P.length ? `<div class="problems">לפני ייצוא צריך לטפל ב:<ul>${P.map(p => `<li>${esc(p)}</li>`).join('')}</ul></div>` : '';
+  $('#fileCount').textContent = `(${C.recs.length}, לפי סדר האקסל: חלוקה ← מבצע ← מגדר)`;
+  const opt = (list, cur) => `<option value="">בחירה…</option>` + list.map(x => `<option value="${esc(x.en)}" ${x.en === cur ? 'selected' : ''}>${esc(x.he)}</option>`).join('');
+  const bad = r => r.issues.some(i => i !== 'qty');
+  $('#fileRows').innerHTML = C.sorted.filter(bad).concat(C.sorted.filter(r => !bad(r))).map(r => {
+    const ov = ovs[r.rel] || {};
+    const notes = [];
+    for (const i of r.issues) {
+      if (i === 'gender') notes.push(`מגדר: <select data-ov="gender" data-f="${esc(r.rel)}">${opt(S.genders, ov.gender)}</select>`);
+      else if (i === 'div') notes.push(`חלוקה: <select data-ov="div" data-f="${esc(r.rel)}">${opt(S.divisions, ov.div)}</select>`);
+      else if (i === 'size') notes.push(`גודל: <select data-ov="size" data-f="${esc(r.rel)}"><option value="">בחירה…</option><option value="reg">רגיל 59×159</option><option value="large">גדול ${esc(S.largeSize)}</option></select>`);
+      else notes.push(`<span class="issue">${esc(ISSUE_TEXT[i])}</span>`);
+    }
+    if (ov.gender || ov.div || ov.size) notes.push(`<button class="small x" title="ביטול בחירה ידנית" data-reset="${esc(r.rel)}">↺</button>`);
+    return `<tr class="${r.issues.some(i => i !== 'qty') ? 'err' : r.issues.length ? 'warn' : ''}"><td class="newname">${esc(r.newName)}</td><td class="orig">${r.rel.split('/').map(x => `<bdi>${esc(x)}</bdi>`).join(' / ')}</td><td>${notes.join(' ')}</td></tr>`;
+  }).join('');
+  $('#fileRows').querySelectorAll('select[data-ov]').forEach(s => s.onchange = () => { const o = ovs[s.dataset.f] = ovs[s.dataset.f] || {}; o[s.dataset.ov] = s.value; render(); });
+  $('#fileRows').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete ovs[b.dataset.reset]; render(); });
+}
+
+/* ---------- new names → ask for English ---------- */
+function askMappings() {
+  const P = C.unmappedPromos.filter(x => !askedFor.has('p:' + x)), SB = C.unmappedSubs.filter(x => !askedFor.has('s:' + x));
+  if (!P.length && !SB.length) return;
+  P.forEach(x => askedFor.add('p:' + x)); SB.forEach(x => askedFor.add('s:' + x));
+  const row = (he, k) => `<div class="row"><input type="text" class="he" value="${esc(he)}" disabled> ← <input type="text" class="en" data-k="${k}" data-he="${esc(he)}" placeholder="שם באנגלית"></div>`;
+  const m = modal(`<h3>${P.length ? 'מבצע חדש' : 'תת-מבצע חדש'} – צריך שם באנגלית</h3>
+    <p class="muted">השם נשמר בהגדרות המיפוי, ובפעם הבאה הוא יזוהה לבד.</p>
+    ${P.length ? `<h4>מבצעים</h4>${P.map(x => row(x, 'p')).join('')}` : ''}
+    ${SB.length ? `<h4>תתי-מבצעים</h4>${SB.map(x => row(x, 's')).join('')}` : ''}
+    <div class="foot"><button class="primary" id="mSave">שמירה</button><button id="mLater">אחר כך</button></div>`);
+  const first = m.querySelector('input.en'); if (first) first.focus();
+  m.querySelector('#mLater').onclick = () => closeModal();
+  m.querySelector('#mSave').onclick = async () => {
+    m.querySelectorAll('input.en').forEach(i => {
+      const en = i.value.trim().toLowerCase(); if (!en) return;
+      (i.dataset.k === 'p' ? S.promos : S.subs).push({ he: i.dataset.he, en });
+    });
+    await saveSettings(); closeModal(); render();
+  };
+  m.addEventListener('keydown', e => { if (e.key === 'Enter') m.querySelector('#mSave').click(); });
+}
+
+/* ---------- settings ---------- */
+$('#bSettings').onclick = openSettings;
+function openSettings() {
+  const T = JSON.parse(JSON.stringify(S));
+  const sec = (key, title, hint) => `<h4>${title} <span class="muted">${hint || ''}</span></h4><table class="maptbl" data-sec="${key}"><tbody>${
+    T[key].map((x, i) => `<tr><td><input type="text" class="he" data-i="${i}" data-f="he" value="${esc(x.he)}" placeholder="עברית"></td><td>←</td><td><input type="text" class="en" data-i="${i}" data-f="en" value="${esc(x.en)}" placeholder="english"></td><td><button class="x" data-del="${i}" title="מחיקה">✕</button></td></tr>`).join('')
+  }</tbody></table><button class="small" data-add="${key}">+ הוספה</button>`;
+  const draw = () => {
+    m.querySelector('#secs').innerHTML =
+      sec('promos', 'מבצעים', '(שם התיקייה ← שם בקובץ)') +
+      sec('subs', 'תתי-מבצעים', '(רק כשיש עברית בשם התיקייה. שמות כמו <bdi>3=100</bdi> נשארים כמו שהם)') +
+      sec('divisions', 'חלוקות', '(המילה בשם הקובץ ← שם בקובץ)') +
+      sec('genders', 'מגדרים', '(שם התיקייה ← שם בקובץ)');
+    m.querySelectorAll('.maptbl input').forEach(inp => inp.oninput = () => { T[inp.closest('table').dataset.sec][+inp.dataset.i][inp.dataset.f] = inp.value; });
+    m.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { T[b.closest('table').dataset.sec].splice(+b.dataset.del, 1); draw(); });
+    m.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { T[b.dataset.add].push({ he: '', en: '' }); draw(); const ins = b.previousElementSibling.querySelectorAll('input.he'); ins[ins.length - 1].focus(); });
+  };
+  const m = modal(`<h3>הגדרות מיפוי</h3>
+    <div class="row"><b style="width:110px">שם הלקוח</b><input type="text" class="en" id="sClient" value="${esc(T.client)}"></div>
+    <div class="row"><b style="width:110px">מגנט גדול</b><input type="text" class="en" id="sLarge" value="${esc(T.largeSize)}"> <span class="muted">אין בשם חלוקה, הגודל נכתב בשם</span></div>
+    <div id="secs"></div>
+    <h4>גיבוי</h4><div class="row"><button class="small" id="sExp">שמירת ההגדרות לקובץ…</button><button class="small" id="sImp">טעינת הגדרות מקובץ…</button><button class="small" id="sDef">החזרת ברירת מחדל</button></div>
+    <div class="foot"><button class="primary" id="sSave">שמירה</button><button id="sCancel">ביטול</button></div>`);
+  draw();
+  m.querySelector('#sCancel').onclick = closeModal;
+  m.querySelector('#sSave').onclick = async () => {
+    T.client = m.querySelector('#sClient').value.trim();
+    T.largeSize = sizeKey(m.querySelector('#sLarge').value) || '119x159';
+    for (const k of ['promos', 'subs', 'divisions', 'genders']) T[k] = T[k].map(x => ({ he: x.he.trim(), en: x.en.trim() })).filter(x => x.he && x.en);
+    S = T; await saveSettings(); closeModal(); render();
+  };
+  m.querySelector('#sExp').onclick = async () => { const p = await D.saveDialog({ name: 'הגדרות שינוי שמות.json', data: new TextEncoder().encode(JSON.stringify(S, null, 2)), ext: 'json', title: 'שמירת הגדרות' }); if (p) toast('נשמר'); };
+  m.querySelector('#sImp').onclick = async () => {
+    const t = await D.openText({ title: 'טעינת הגדרות', ext: 'json' }); if (!t) return;
+    try { const j = JSON.parse(t); if (!j.promos || !j.genders) throw 0; S = { ...DEFAULTS, ...j }; await saveSettings(); closeModal(); render(); toast('ההגדרות נטענו'); } catch (e) { toast('הקובץ לא תקין'); }
+  };
+  m.querySelector('#sDef').onclick = () => { if (confirmBox('להחזיר את ברירת המחדל? כל המיפויים שהוספת יימחקו.')) { const keep = T; Object.assign(keep, JSON.parse(JSON.stringify(DEFAULTS))); draw(); m.querySelector('#sClient').value = keep.client; m.querySelector('#sLarge').value = keep.largeSize; } };
+}
+function confirmBox(msg) { return window.confirm(msg); }
+
+/* ---------- excel / export ---------- */
+function guard() {
+  if (!files.length) { toast('קודם צריך לגרור תיקייה'); return false; }
+  if (C.problems.length) { toast('יש דברים לתקן לפני כן – הם מסומנים באדום'); $('#problems').scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
+  return true;
+}
+const jobName = () => `${$('#order').value.trim()} ${S.client}`.trim();
+$('#bExcel').onclick = async () => {
+  render(true); if (!guard()) return;
+  const data = await buildExcel(C, S, $('#order').value.trim());
+  const p = await D.saveDialog({ name: jobName() + '.xlsx', data, ext: 'xlsx', extName: 'Excel', title: 'שמירת טבלת אקסל', start: cfg.lastOut });
+  if (p) toast('האקסל נשמר', p);
+};
+$('#bExport').onclick = async () => {
+  render(true); if (!guard()) return;
+  const start = cfg.lastOut || (srcPaths[0] ? srcPaths[0].replace(/\/[^/]+\/?$/, '') : undefined);
+  const parent = await D.pickFolder({ title: `איפה ליצור את התיקייה "${jobName()}"?`, start });
+  if (!parent) return;
+  cfg.lastOut = parent; D.setCfg({ lastOut: parent });
+  const xlsx = await buildExcel(C, S, $('#order').value.trim());
+  const res = await D.exportFiles({ parent, folderName: jobName(), items: C.sorted.map(r => ({ src: r.path, name: r.newName })), xlsx });
+  if (res.ok) toast(`${res.count} קבצים הועתקו לתיקייה חדשה, והאקסל נשמר לידה`, res.dir);
+  else toast('שגיאה בייצוא: ' + res.error);
+};
+
+/* ---------- updates ---------- */
+async function checkUpdate(silent) {
+  const r = await D.checkUpdate();
+  const b = $('#bUpd');
+  if (r.ok && r.available) {
+    b.textContent = 'יש גרסה חדשה – לעדכן'; b.classList.add('primary');
+    $('#updMsg').textContent = r.notes ? 'מה חדש: ' + r.notes : '';
+    b.onclick = async () => { b.disabled = true; b.textContent = 'מעדכן…'; const a = await D.applyUpdate(); if (!a.ok) { b.disabled = false; b.textContent = 'נסי שוב'; $('#updMsg').textContent = a.error; } };
+  } else {
+    b.textContent = 'בדוק עדכון'; b.classList.remove('primary'); b.onclick = () => checkUpdate(false);
+    if (!silent) $('#updMsg').textContent = r.ok ? 'זו הגרסה האחרונה' : 'אין חיבור לבדיקת עדכון';
+  }
+}
+$('#bUpd').onclick = () => checkUpdate(false);
+
+/* ---------- little helpers ---------- */
+let modalEl = null;
+function modal(html) { closeModal(); modalEl = document.createElement('div'); modalEl.className = 'modal-bg'; modalEl.innerHTML = `<div class="modal">${html}</div>`; document.body.appendChild(modalEl); return modalEl.querySelector('.modal'); }
+function closeModal() { if (modalEl) modalEl.remove(); modalEl = null; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+let toastT = null;
+function toast(msg, path) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = esc(msg) + (path ? ' <button class="small">פתיחה</button>' : '');
+  if (path) t.querySelector('button').onclick = () => D.reveal(path);
+  document.body.appendChild(t); clearTimeout(toastT); toastT = setTimeout(() => t.remove(), path ? 12000 : 4500);
+}
+init();
+</script>
+</body>
+</html>
