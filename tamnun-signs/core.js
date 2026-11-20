@@ -921,7 +921,7 @@ async function buildLayoutPdfs(groups, o, label, PDFLib) {
     const rects = s.cells.map(z => `${z.x.toFixed(3)} ${z.y.toFixed(3)} ${z.w.toFixed(3)} ${z.h.toFixed(3)} re S`).join('\n');
     cuL(c, `${marks}q /OC /Pr2 BDC /CScut CS 1 SCN 1 w 0 J 0 j\n${rects}\nEMC Q\n`);
     // proof: graphics + cut lines on top – for checking only, not for the machine
-    pfL(f, `${marks}q /OC /Pr2 BDC 1 0 0 0 K 2 w 0 J 0 j\n${rects}\nEMC Q\n`);
+    pfL(f, `${marks}q /OC /Pr2 BDC /CScut CS 1 SCN 2 w 0 J 0 j\n${rects}\nEMC Q\n`);
   }
   return { print: await pr.save(), cut: await cu.save(), proof: await pf.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies })) };
 }
