@@ -41,7 +41,7 @@
   th, td { padding:5px 8px; border-bottom:1px solid var(--line); text-align:right; vertical-align:middle; }
   th { font-size:12px; color:var(--muted); font-weight:600; background:#fafbfc; }
   td.n, th.n { text-align:center; }
-  td.fname { font-size:13px; }
+  td.fname, th.fname { font-size:13px; text-align:left; }
   tr.miss td { background:var(--redbg); }
   tr.fix td { background:var(--yel); }
   tr.zero td { color:#aab3bd; }
@@ -367,7 +367,7 @@ function render() {
     out.push(`<div class="card"><h2 class="tabhead">${esc(tab.name)} <span class="badge">${esc(tab.machine)}</span>${tab.duplex ? '<span class="badge">דו צדדי</span>' : ''} ${sumBadge}
       <span class="muted" title="העמודות שנספרו לכמות">כמות = ${tab.qtyHeaders.map(esc).join(' + ') || '—'}</span>
       <span class="muted r">${art ? esc(art.name) + ' · ' + art.pages.length + ' עמ\'' : '<span class="badge red">אין קובץ בגודל ' + (tab.size ? tab.size.join('×') : '?') + '</span>'}</span></h2>
-      <table><tr><th></th><th>#</th><th>צבע</th><th>שילוט</th><th class="n">כמות</th><th>עמוד</th><th></th><th>שם קובץ</th></tr>`);
+      <table><tr><th></th><th>#</th><th>צבע</th><th>שילוט</th><th class="n">כמות</th><th>עמוד</th><th></th><th class="fname">שם קובץ</th></tr>`);
     const extraRow = e => {
       const p = art.pages[e.page];
       out.push(`<tr class="off"><td></td><td class="muted">${esc(e.label)}</td><td class="st">${swatch(e.color)}${esc(C.COLOR_HE[e.color])}</td><td class="st">${esc(e.text) || '(ללא טקסט)'}</td><td class="n"></td>
