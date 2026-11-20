@@ -118,6 +118,9 @@
   <h1>תמנון – שילוט</h1>
   <span class="so" id="soLbl"></span>
   <div class="spacer"></div>
+  <button id="bOpen">פתיחת עבודה</button>
+  <button id="bSave" disabled>שמירת עבודה</button>
+  <input type="file" id="fOpen" accept=".tamnun" style="display:none">
   <button id="bClear">ניקוי</button>
   <button id="bExport" class="primary" disabled>ייצוא</button>
 </header>
@@ -188,17 +191,17 @@ async function isSO(buf) {
   } catch (e) { return false; }
 }
 
-async function addFiles(list) {   // list of {name, buf}
+async function addFiles(list, fromJob) {   // list of {name, buf}
   await busy('קורא קבצים…', async () => {
     for (const f of list) {
       const n = f.name.toLowerCase();
       try {
         if (/\.xlsx$/.test(n)) {
-          S.table = await C.readTableXlsx(f.buf, ExcelJS); S.tableName = f.name;
+          S.table = await C.readTableXlsx(f.buf, ExcelJS); S.tableName = f.name; S.tableBuf = new Uint8Array(f.buf).slice();
           if (!S.table.length) toast('לא מצאתי לשוניות עם טבלת שילוט באקסל ' + esc(f.name));
         } else if (/\.pdf$/.test(n)) {
           const kind = await pdfKind(f.buf);
-          if (kind === 'so') { S.so = await C.readSO(f.buf, pdfjs); S.soName = f.name; }
+          if (kind === 'so') { S.soBuf = new Uint8Array(f.buf).slice(); S.so = await C.readSO(S.soBuf.slice(), pdfjs); S.soName = f.name; }
           else if (kind === 'tablepdf') { S.tablePdf = f.name; }
           else {
             S.arts = S.arts.filter(a => a.name !== f.name);
@@ -216,6 +219,8 @@ document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.bod
 document.addEventListener('drop', async e => {
   e.preventDefault(); document.body.classList.remove('over');
   const files = [...e.dataTransfer.files];
+  const job = files.find(f => /\.tamnun$/i.test(f.name));
+  if (job) { openJob(await job.arrayBuffer()); return; }
   const out = [];
   if (desk) {
     const paths = files.map(f => desk.pathOf(f)).filter(Boolean);
@@ -226,7 +231,43 @@ document.addEventListener('drop', async e => {
   }
   addFiles(out);
 });
-$('#bClear').onclick = () => { S.genThumb = {}; Object.assign(S, { removed: {}, cur: 0, tablePdf: '', table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
+$('#bClear').onclick = () => { S.genThumb = {}; Object.assign(S, { removed: {}, cur: 0, tablePdf: '', tableBuf: null, soBuf: null, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
+
+/* ---------------- save / open a job ---------------- */
+const b64 = u8 => { let s = ''; const CH = 0x8000; for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); };
+const unb64 = str => { const s = atob(str), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+$('#bSave').onclick = async () => {
+  if (!S.tableBuf) return;
+  const job = {
+    app: 'tamnun-signs', v: 1, saved: new Date().toISOString(),
+    table: { name: S.tableName, data: b64(S.tableBuf) },
+    so: S.soBuf ? { name: S.soName, data: b64(S.soBuf) } : null,
+    arts: S.arts.map(a => ({ name: a.name, data: b64(a.bytes) })),
+    override: S.override, removed: S.removed, cur: S.cur,
+  };
+  const blob = new Blob([JSON.stringify(job)], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${(S.so && S.so.soNumber) || 'עבודה'} תמנון.tamnun`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+};
+$('#bOpen').onclick = () => $('#fOpen').click();
+$('#fOpen').onchange = async () => { const f = $('#fOpen').files[0]; $('#fOpen').value = ''; if (f) openJob(await f.arrayBuffer()); };
+async function openJob(buf) {
+  let job;
+  try { job = JSON.parse(new TextDecoder().decode(buf)); } catch (e) { toast('הקובץ לא נפתח – לא קובץ עבודה תקין'); return; }
+  if (job.app !== 'tamnun-signs') { toast('זה לא קובץ עבודה של התוכנה'); return; }
+  S.genThumb = {};
+  Object.assign(S, { removed: {}, cur: 0, tablePdf: '', tableBuf: null, soBuf: null, table: null, tableName: '', tableBuf: null, so: null, soName: '', soBuf: null, arts: [], plan: null, override: {} });
+  const list = [{ name: job.table.name, buf: unb64(job.table.data) }];
+  if (job.so) list.push({ name: job.so.name, buf: unb64(job.so.data) });
+  job.arts.forEach(a => list.push({ name: a.name, buf: unb64(a.data) }));
+  await addFiles(list, true);
+  S.override = job.override || {}; S.removed = job.removed || {}; S.cur = job.cur || 0;
+  recompute();
+  toast('העבודה נפתחה' + (job.saved ? ' (נשמרה ' + new Date(job.saved).toLocaleString('he-IL') + ')' : ''));
+}
 
 /* ---------------- plan ---------------- */
 function recompute() {
@@ -338,6 +379,7 @@ function render() {
   $('#soLbl').textContent = S.so && S.so.soNumber || '';
   const P = S.plan;
   $('#bExport').disabled = !P || !P.items.length;
+  $('#bSave').disabled = !S.tableBuf;
   const out = [];
   if (P) {
     if (S.cur >= S.table.length) S.cur = 0;
