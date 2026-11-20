@@ -88,6 +88,12 @@
   .sum tr.sub td { color:var(--muted); font-size:12px; }
   .sum tr.sub td:first-child { padding-inline-start:16px; }
   .sum td.n button { white-space:nowrap; }
+  .sum tr.divrow td { background:#eef3fd; cursor:pointer; font-weight:700; font-size:14px; border-top:6px solid #fff; }
+  .sum tr.divrow:hover td { background:#e2ebfb; }
+  .sum tr.divrow .arr { display:inline-block; width:14px; color:var(--blue); }
+  .sum tr.prow td { font-weight:600; padding-inline-start:20px; }
+  .sum tr.prow td:first-child { padding-inline-start:20px; }
+  .sum tr.sub td:first-child { padding-inline-start:34px; }
   .sum .big { font-size:16px; font-weight:700; }
   .toast { position:fixed; bottom:50px; left:20px; background:#1d2733; color:#fff; padding:12px 16px; border-radius:10px; z-index:30; max-width:520px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
   .toast button { margin-inline-start:10px; }
@@ -128,7 +134,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -441,6 +447,7 @@ let S = JSON.parse(JSON.stringify(DEFAULTS));
 let files = [], srcPaths = [], ovs = {}, qty = {}, allQty = {}, C = null, cfg = {};
 let askedFor = new Set();
 let sideTab = 'div', showExc = false;
+const openDivs = new Set();
 let sizes = {}, dismissed = new Set(), sizeRun = 0, sizeProg = null, sizeNoApi = false;
 
 async function saveSettings() { if (D) await D.setCfg({ settings: S }); else localStorage.setItem('shemot-settings', JSON.stringify(S)); }
@@ -577,22 +584,28 @@ function renderSide() {
       C.colOrder.map(c => { const rs = withCol.filter(r => r.col === c); if (!rs.length) return ''; return `<tr><td>${esc(colHe(c))}</td><td class="n big">${rs.length}</td><td class="n">${uTxt(units(rs))}</td></tr>`; }).join('') +
       `<tr class="tot"><td>סה״כ</td><td class="n big">${C.recs.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
   } else {
-    const promos = [...new Set(C.groupList.map(g => g.promoHe))];
-    body = `<table><thead><tr><th>מבצע</th><th class="n">קבצים</th><th class="n">יח׳</th></tr></thead><tbody>`;
-    for (const p of promos) {
-      const rs = C.recs.filter(r => r.promoHe === p);
-      body += `<tr><td><b>${esc(p || '?')}</b></td><td class="n big">${rs.length}</td><td class="n">${uTxt(units(rs.filter(r => r.col)))}</td></tr>`;
-      const subs = [...new Set(C.groupList.filter(g => g.promoHe === p).map(g => g.genderHe + (g.subHe ? ' ' + g.subHe : '')))];
-      if (subs.length > 1 || subs[0] !== undefined) for (const sb of subs) {
-        const rr = rs.filter(r => (r.genderHe + (r.subHe ? ' ' + r.subHe : '')) === sb);
-        body += `<tr class="sub"><td><bdi>${esc(sb || '?')}</bdi></td><td class="n">${rr.length}</td><td class="n">${uTxt(units(rr.filter(r => r.col)))}</td></tr>`;
+    // division → its promos (click a division to open / close it)
+    body = `<div style="text-align:left;margin-bottom:4px"><button class="small x" id="openAll" style="font-size:12px">${C.colOrder.every(c => openDivs.has(c)) ? 'סגירת הכול' : 'פתיחת הכול'}</button></div>
+      <table><thead><tr><th>חלוקה / מבצע</th><th class="n">קבצים</th><th class="n">יח׳</th></tr></thead><tbody>`;
+    for (const c of C.colOrder) {
+      const rs = withCol.filter(r => r.col === c); if (!rs.length) continue;
+      const open = openDivs.has(c);
+      body += `<tr class="divrow" data-div="${esc(c)}"><td><span class="arr">${open ? '▾' : '◂'}</span> ${esc(colHe(c))}</td><td class="n big">${rs.length}</td><td class="n"><b>${uTxt(units(rs))}</b></td></tr>`;
+      if (!open) continue;
+      const promos = [...new Set(rs.map(r => r.promoHe))];
+      for (const p of promos) {
+        const rp = rs.filter(r => r.promoHe === p);
+        body += `<tr class="prow"><td>${esc(p || '?')}</td><td class="n">${rp.length}</td><td class="n">${uTxt(units(rp))}</td></tr>`;
+        for (const r of rp) body += `<tr class="sub"><td><bdi>${esc(r.genderHe || '?')}${r.subHe ? ' · ' + esc(r.subHe) : ''}</bdi></td><td class="n"></td><td class="n">${uTxt(units([r]))}</td></tr>`;
       }
     }
-    body += `<tr class="tot"><td>סה״כ</td><td class="n big">${C.recs.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
+    body += `<tr class="tot"><td>סה״כ</td><td class="n big">${withCol.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
   }
   el.innerHTML = `<div class="tabs"><button data-t="div" class="${sideTab === 'div' ? 'on' : ''}">לפי חלוקה</button><button data-t="promo" class="${sideTab === 'promo' ? 'on' : ''}">לפי מבצע</button><button data-t="miss" class="${sideTab === 'miss' ? 'on' : ''}">חוסרים ${openMiss ? `<span class="badge red">${openMiss}</span>` : (sizeProg && sizeProg.done < sizeProg.total ? '' : '<span class="badge green">✓</span>')}</button></div>
     <div class="sum">${body}${sideTab !== 'miss' ? '<div class="muted" style="margin-top:8px">יח׳ = סכום הכמויות. <span class="issue">*</span> = עוד חסרות כמויות.</div>' : ''}</div>`;
   el.querySelectorAll('[data-t]').forEach(b => b.onmousedown = () => { sideTab = b.dataset.t; renderSide(); });
+  el.querySelectorAll('[data-div]').forEach(tr => tr.onmousedown = () => { const c = tr.dataset.div; openDivs.has(c) ? openDivs.delete(c) : openDivs.add(c); renderSide(); });
+  if (el.querySelector('#openAll')) el.querySelector('#openAll').onmousedown = () => { const all = C.colOrder.every(c => openDivs.has(c)); C.colOrder.forEach(c => all ? openDivs.delete(c) : openDivs.add(c)); renderSide(); };
   el.querySelectorAll('[data-dis]').forEach(b => b.onmousedown = () => { dismissed.add(b.dataset.dis); render(true); });
   el.querySelectorAll('[data-undis]').forEach(b => b.onmousedown = () => { dismissed.delete(b.dataset.undis); render(true); });
 }
