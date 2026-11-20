@@ -55,8 +55,13 @@
   tr.err td { background:var(--redbg); }
   tr.warn td { background:var(--yel); }
   .issue { color:var(--red); font-size:12px; }
-  .newname { font-family:Menlo,monospace; font-size:12.5px; direction:ltr; text-align:left; white-space:nowrap; }
-  .orig { font-size:12px; color:var(--muted); }
+  .newname { font-family:Menlo,monospace; font-size:14.5px; direction:ltr; text-align:left; white-space:nowrap; }
+  .orig { font-size:14px; color:var(--muted); }
+  #fileRows td { border-bottom:1px solid #e3e7eb; padding-top:8px; padding-bottom:8px; font-size:14px; }
+  #fileRows td .issue { font-size:13.5px; }
+  #fileRows tr:nth-child(even) td { background:#eef1f4; }
+  #fileRows tr.err td { background:var(--redbg); }
+  #fileRows tr.warn td { background:var(--yel); }
   select { font:inherit; font-size:12px; padding:2px 4px; }
   .badge { display:inline-block; padding:1px 8px; border-radius:10px; background:#eef1f4; font-size:12px; }
   .badge.red { background:var(--redbg); color:var(--red); }
@@ -138,7 +143,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 12;
+const APP_VERSION = 13;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
