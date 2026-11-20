@@ -1131,7 +1131,7 @@ async function orderFor(mc, P, magBytes) {
 const LAYKEY = 'tamnunLayout';
 function layCfg() { try { return JSON.parse(localStorage.getItem(LAYKEY)) || {}; } catch (e) { return {}; } }
 function laySave(c) { try { localStorage.setItem(LAYKEY, JSON.stringify(c)); } catch (e) {} }
-const layJob = tab => /a3/i.test(tab) ? 'magneti A3' : 'magneti';
+const layJob = tab => /a3/i.test(tab) ? 'magneti A3' : 'pass magneti';
 $('#bLayout').onclick = async () => {
   const P = S.plan; if (!P) return;
   const mag = P.items.filter(i => i.machine === 'מגנטי');
