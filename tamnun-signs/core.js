@@ -116,10 +116,10 @@ const sameSize = (a, b, tol = 0.4) => a && b && Math.abs(a[0] - b[0]) <= tol && 
 function machineOf(text) {
   const t = norm(text);
   if (/pvc|פי וי סי|דורסט|durst/.test(t)) return 'דורסט';
-  if (/מתכתי|מגנט/.test(t)) return 'אפי מגנטי';
+  if (/מתכתי|מגנט/.test(t)) return 'מגנטי';
   return 'דיגיטל';
 }
-const MACHINES = ['דיגיטל', 'אפי מגנטי', 'דורסט'];
+const MACHINES = ['דיגיטל', 'מגנטי', 'דורסט'];
 
 /* ================================================================ TABLE (xlsx) */
 function cellText(v) {
@@ -215,7 +215,12 @@ async function readTableXlsx(buf, ExcelJS) {
       }
       const blockText = rows.map(r => r.format + ' ' + r.notes).join(' ');
       const hints = ws.name + ' ' + blockText + (real.length === 1 ? ' ' + allText : '');
-      const size = sizeFromText(fmt0) || sizeFromText(blockText) || (real.length === 1 ? (sizeFromText(ws.name) || sizeFromText(allText)) : sizeFromText(ws.name));
+      // "כובע A5" / "פס מתכתי" are not A5/A3 paper – only a written size counts for them
+      const special = /כובע|פס\b|פסים|פס /.test(fmt0 + ' ');
+      const explicit = z => (z && /\d+(\.\d+)?\s*([xX×*\/]|רוחב)/.test(z)) ? sizeFromText(z) : null;
+      const size = special
+        ? (explicit(fmt0) || explicit(blockText) || (real.length === 1 ? explicit(allText) : null))
+        : (sizeFromText(fmt0) || sizeFromText(blockText) || (real.length === 1 ? (sizeFromText(ws.name) || sizeFromText(allText)) : sizeFromText(ws.name)));
       tabs.push({
         name, sheet: clean(ws.name), format: fmt0, size,
         machine: machineOf(hints),
@@ -314,7 +319,7 @@ async function analyzeArtwork(buf, fileName, deps, opts = {}) {
 
 /* ================================================================ MATCHING */
 function pairScore(row, page, ri, pi) {
-  let s = 0;
+  let s = page.supp ? 0.7 : 0;      // a "השלמה" (completion) file sent later wins over the first file
   const ts = textScore(row.text, page.text);
   const rn = numsOf(row.text), pn = page.nums;
   if (ts != null) s += ts * 6;
@@ -420,7 +425,8 @@ const EN_PHRASES = {
   'מכנס פוטר': 'sweatpants', 'מכנסי פוטר': 'sweatpants', 'טופ פוטר': 'sweat top', 'בגד ים שלם': 'swimsuit one-piece',
   'טופ תחתון ביקיני': 'bikini top-bottom', "פיג'מות ילדים": 'pajamas kids', "פיג'מות מבוגרים": 'pajamas adults',
   'סוף עונה על אמת': 'end of season', 'פס מתכתי': 'magneti strip', 'דו צדדי': '2-sided', 'מבצע כמותי': 'deal',
-  'הזדמנות אחרונה': 'last chance',
+  'הזדמנות אחרונה': 'last chance', 'כל הקולציית קיץ עד': 'summer collection up to', 'כל הקולקציית קיץ עד': 'summer collection up to',
+  'כל הקולציית חורף עד': 'winter collection up to', 'כל הקולקציית חורף עד': 'winter collection up to',
 };
 const EN_WORDS = {
   'לבן': 'white', 'אדום': 'red', 'כחול': 'blue', 'שחור': 'black', 'צבעוני': '', 'מתכתי': 'magneti', 'פס': 'strip',
@@ -483,15 +489,19 @@ function buildPlan(tabs, arts, so, opts = {}) {
   const aOf = t => (String(t).match(/\bA\s?([0-6])\b/i) || [])[1] || null;
   const pairs = [];
   tabs.forEach((tab, ti) => arts.forEach((a, ai) => {
-    if (!tab.size || !a.size) return;
-    const d = Math.max(Math.abs(tab.size[0] - a.size[0]), Math.abs(tab.size[1] - a.size[1]));
-    let sc = d <= 0.4 ? 10 : d <= 1.5 ? 6 : -99;
+    if (!a.size) return;
+    let sc;
+    if (tab.size) {
+      const d = Math.max(Math.abs(tab.size[0] - a.size[0]), Math.abs(tab.size[1] - a.size[1]));
+      sc = d <= 0.4 ? 10 : d <= 1.5 ? 6 : -99;
+    } else sc = 4;                                                  // size not written in the table – the name decides
     const tName = tab.name + ' ' + tab.format + ' ' + (tab.sheet || ''), aName = a.name + ' ' + (a.title || '');
-    const tk = keyOf(tName), ak = keyOf(aName);
+    const tk = keyOf(tab.format + ' ' + tab.name), ak = keyOf(aName);
     for (const k of ['כובע', 'פס']) { if (tk.includes(k) && ak.includes(k)) sc += 4; else if (tk.includes(k) !== ak.includes(k)) sc -= 4; }
     const ta = aOf(tab.format) || aOf(tab.name), aa = aOf(aName);
     if (ta && aa) sc += ta === aa ? 2 : -2;
-    if (!a.hasText) sc -= 3;                                        // a scan / picture with no text at all
+    if (!tab.size && !(tk.includes('כובע') || tk.includes('פס')) && !(ta && aa && ta === aa)) sc = -99;
+    if (!a.hasText) sc -= 3;
     sc -= Math.min(3, Math.abs(a.pages.length - tab.rows.length) / 4);
     pairs.push({ ti, ai, sc });
   }));
@@ -500,11 +510,35 @@ function buildPlan(tabs, arts, so, opts = {}) {
     if (tabArt[p.ti] >= 0 || used.has(p.ai)) return;
     tabArt[p.ti] = p.ai; used.add(p.ai);
   });
+  // a type without a written size takes the size of its file
+  tabs.forEach((t, ti) => { if (!t.size && tabArt[ti] >= 0) t.size = arts[tabArt[ti]].size; });
+  // more files for the same type (e.g. "A3 מתכתי השלמה"): same size + same kind of name → added to that type
+  const extraArts = tabs.map(() => []);
+  arts.forEach((a, ai) => {
+    if (used.has(ai) || !a.hasText) return;
+    let best = -1, bs = 2;
+    tabs.forEach((t, ti) => {
+      const ba = tabArt[ti]; if (ba < 0) return;
+      if (!sameSize(a.size, arts[ba].size, 0.4)) return;
+      const p = pairs.find(x => x.ti === ti && x.ai === ai);
+      const sc = p ? p.sc + Math.min(3, Math.abs(a.pages.length - t.rows.length) / 4) : 0;   // page count does not matter here
+      if (sc > bs) { bs = sc; best = ti; }
+    });
+    if (best >= 0) { extraArts[best].push(ai); used.add(ai); }
+  });
+  // one "virtual" artwork per type: main file pages, then the extra files' pages (marked supp)
+  const virt = tabs.map((t, ti) => {
+    const ai = tabArt[ti]; if (ai < 0) return null;
+    if (!extraArts[ti].length) return arts[ai];
+    const pages = [];
+    [ai, ...extraArts[ti]].forEach((x, k) => arts[x].pages.forEach(p => pages.push({ ...p, index: pages.length, src: x, srcPage: p.index, supp: k > 0, file: arts[x].name })));
+    return { name: [ai, ...extraArts[ti]].map(x => arts[x].name).join(' + '), pages, size: arts[ai].size, virtual: true };
+  });
   const unusedArts = arts.map((a, i) => i).filter(i => !used.has(i));
 
   const items = [], missing = [], fixed = [], extras = [], zero = [], checks = [];
   tabs.forEach((tab, ti) => {
-    const ai = tabArt[ti], art = ai >= 0 ? arts[ai] : null;
+    const ai = tabArt[ti], art = virt[ti];
     const { res, extras: ex } = matchTab(tab, art);
     // still missing → the graphics bank (pages approved in earlier orders, same size)
     // order of trust: client page as is > made from this order's own files (same font/size/design)
@@ -523,18 +557,19 @@ function buildPlan(tabs, arts, so, opts = {}) {
       const m = res[ri];
       if (!row.qty) { zero.push({ tab: tab.name, row, match: m }); return; }
       if (!m) { missing.push({ tab: tab.name, ti, row, reason: art ? 'אין עמוד מתאים בקובץ' : 'אין קובץ בגודל ' + (tab.size ? tab.size.join('×') : '?') }); return; }
-      const artI = m.artIdx != null ? m.artIdx : ai;
+      let artI = m.artIdx != null ? m.artIdx : ai, pageI = m.page;
+      if (m.artIdx == null && art && art.virtual) { const vp = art.pages[m.page]; artI = vp.src; pageI = vp.srcPage; }
       const srcArt = artI < arts.length ? arts[artI] : opts.bankArts[artI - arts.length];
-      const page = srcArt.pages[m.page];
+      const page = srcArt.pages[pageI];
       const gen = m.kind !== 'ok' || !!m.bank;
       const nm = makeName(tab, row, page, gen, opts.en);
-      const it = { ti, tab: tab.name, machine: tab.machine, row, art: artI, page: m.page, kind: m.bank && m.kind === 'ok' ? 'bank' : m.kind, m, name: nm.name, noEn: nm.missing, qty: row.qty };
+      const it = { ti, tab: tab.name, machine: tab.machine, row, art: artI, page: pageI, vpage: m.page, kind: m.bank && m.kind === 'ok' ? 'bank' : m.kind, m, name: nm.name, noEn: nm.missing, qty: row.qty };
       // a bank page from another order may be a little bigger/smaller – fit it to this order's size
       if (m.bank && art && art.pages[0]) it.target = [art.pages[0].w / 2.54 * 72, art.pages[0].h / 2.54 * 72];
       items.push(it);
       if (gen || m.guess) fixed.push(it);
     });
-    if (art) ex.forEach(e => extras.push({ tab: tab.name, file: art.name, ...e }));
+    if (art) ex.forEach(e => extras.push({ tab: tab.name, file: art.pages[e.page].file || art.name, filePage: art.pages[e.page].srcPage != null ? art.pages[e.page].srcPage : e.page, ...e }));
     // totals
     const sum = tab.rows.reduce((a, r) => a + r.qty, 0);
     const soLine = so && so.lines.find(l => sameSize(l.size, tab.size) && (l.machine === tab.machine || !l.machine));
@@ -543,7 +578,7 @@ function buildPlan(tabs, arts, so, opts = {}) {
   // same file name twice → (2)
   const seen = {};
   items.forEach(it => { const k = it.machine + '/' + it.name; if (seen[k]) { seen[k]++; it.name = it.name.replace(/\.pdf$/, ` (${seen[k]}).pdf`); } else seen[k] = 1; });
-  return { items, missing, fixed, extras, zero, checks, tabArt, unusedArts };
+  return { items, missing, fixed, extras, zero, checks, tabArt, unusedArts, virt };
 }
 
 /* ================================================================ PDF OUTPUT */

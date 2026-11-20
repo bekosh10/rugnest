@@ -168,7 +168,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const desk = window.desk || null;
 
-const MLABEL = m => m === 'אפי מגנטי' ? 'מגנטי' : m;   // tab label (the export folder keeps its name)
+const MLABEL = m => m;
 const S = { removed: {}, cur: 0, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, pane: 'miss', open: {}, override: {} };
 
 /* ---------------- loading ---------------- */
@@ -594,9 +594,10 @@ function applyOverrides() {
     P.fixed = P.fixed.filter(i => i.row !== row);
     P.missing = P.missing.filter(m => m.row !== row);
     if (pg < 0) { P.missing.push({ tab: tab.name, ti, row, reason: 'סומן ידנית – בלי עמוד' }); continue; }
-    const page = S.arts[ai].pages[pg];
-    const nm = C.makeName(tab, row, page, false, S.en || {});
-    P.items.push({ ti, tab: tab.name, machine: tab.machine, row, art: ai, page: pg, kind: 'ok', m: { kind: 'ok', page: pg, manual: true }, name: nm.name, noEn: nm.missing, qty: row.qty, manual: true });
+    const va = P.virt[ti], vp = va.pages[pg];
+    const srcA = vp.src != null ? vp.src : ai, srcP = vp.srcPage != null ? vp.srcPage : pg;
+    const nm = C.makeName(tab, row, vp, false, S.en || {});
+    P.items.push({ ti, tab: tab.name, machine: tab.machine, row, art: srcA, page: srcP, vpage: pg, kind: 'ok', m: { kind: 'ok', page: pg, manual: true }, name: nm.name, noEn: nm.missing, qty: row.qty, manual: true });
     P.fixed.push(P.items[P.items.length - 1]);
   }
 }
@@ -620,7 +621,7 @@ function labelExtras() {
   S.table.forEach((tab, ti) => {
     const ex = P.extras.filter(e => e.tab === tab.name).sort((a, b) => a.page - b.page);
     if (!ex.length) return;
-    const rowOfPage = pg => { const it = P.items.find(i => i.ti === ti && i.page === pg); return it ? tab.rows.indexOf(it.row) : -1; };
+    const rowOfPage = pg => { const it = P.items.find(i => i.ti === ti && (i.vpage != null ? i.vpage : i.page) === pg && !i.m.bank); return it ? tab.rows.indexOf(it.row) : -1; };
     const used = {};
     ex.forEach(e => {
       let ri = e.twin != null ? rowOfPage(e.twin) : -1;
@@ -710,7 +711,7 @@ function render() {
   }
   if (P) S.table.forEach((tab, ti) => {
     if (ti !== S.cur) return;
-    const ai = P.tabArt[ti], art = ai >= 0 ? S.arts[ai] : null;
+    const ai = P.tabArt[ti], art = P.virt[ti] || null;
     const ck = P.checks[ti];
     const sumBadge = ck.so != null ? (ck.so === ck.sum ? `<span class="badge green">סה"כ ${ck.sum} = הזמנה ✓</span>` : `<span class="badge red">סה"כ ${ck.sum} ≠ הזמנה ${ck.so}</span>`) : `<span class="badge">סה"כ ${ck.sum}</span>`;
     out.push(`<div class="card tabcard"><h2 class="tabhead">${esc(tab.name)} <span class="badge">${esc(MLABEL(tab.machine))}</span>${tab.duplex ? '<span class="badge">דו צדדי</span>' : ''} ${sumBadge}
@@ -720,8 +721,8 @@ function render() {
     const extraRow = e => {
       const p = art.pages[e.page];
       out.push(`<tr class="off"><td></td><td class="muted">${esc(e.label)}</td><td class="st">${swatch(e.color)}${esc(C.COLOR_HE[e.color])}</td><td class="st">${esc(e.text) || '(ללא טקסט)'}</td><td class="n"></td>
-        <td>${p.thumb ? `<img class="th" src="${p.thumb}" title="עמוד ${e.page + 1} בקובץ">` : ''}</td><td></td>
-        <td class="fname"><span class="badge">לא בהזמנה – לא יוצא</span> <span class="muted">עמוד ${e.page + 1} בקובץ${e.twinRow ? ` · כפול של שורה ${e.twinRow}` : ''}</span></td></tr>`);
+        <td>${p.thumb ? `<img class="th" src="${p.thumb}" title="עמוד ${e.filePage + 1} בקובץ">` : ''}</td><td></td>
+        <td class="fname"><span class="badge">לא בהזמנה – לא יוצא</span> <span class="muted">עמוד ${e.filePage + 1} בקובץ ${esc(e.file || '')}${e.twinRow ? ` · כפול של שורה ${e.twinRow}` : ''}</span></td></tr>`);
     };
     P.extras.filter(e => e.ti === ti && e.anchor < 0).forEach(extraRow);
     tab.rows.forEach((row, ri) => {
@@ -731,9 +732,9 @@ function render() {
       const page = it ? S.allArts[it.art].pages[it.page] : null;
       let sel = '';
       if (art && row.qty && !off) {
-        const cur = it ? it.page : -1;
+        const cur = it ? (it.vpage != null ? it.vpage : it.page) : -1;
         sel = `<select data-k="${ti}:${ri}"><option value="auto">אוטומטי</option><option value="-1"${S.override[ti + ':' + ri] === -1 ? ' selected' : ''}>— בלי —</option>` +
-          art.pages.map((p, pi) => `<option value="${pi}"${S.override[ti + ':' + ri] === pi ? ' selected' : ''}>עמ' ${pi + 1}: ${esc(C.COLOR_HE[p.color])} ${esc(p.text.slice(0, 22)) || '(ללא טקסט)'}</option>`).join('') + '</select>';
+          art.pages.map((p, pi) => `<option value="${pi}"${S.override[ti + ':' + ri] === pi ? ' selected' : ''}>${p.supp ? 'השלמה · ' : ''}עמ' ${p.srcPage != null ? p.srcPage + 1 : pi + 1}: ${esc(C.COLOR_HE[p.color])} ${esc(p.text.slice(0, 22)) || '(ללא טקסט)'}</option>`).join('') + '</select>';
       }
       const status = off ? '<span class="badge">בוטל – לא יוצא</span>' : !row.qty ? '<span class="muted">כמות 0 – לא יוצא</span>'
         : ms ? `<span class="badge red">חסר</span> <span class="muted">${esc(ms.reason)}</span>`
@@ -794,7 +795,7 @@ function renderSide() {
       noEn.forEach(w => h.push(`<div class="it"><b>${esc(w)}</b> → <input class="en" data-w="${esc(w)}" placeholder="באנגלית" style="width:150px;direction:ltr;font:inherit;padding:3px 6px;border:1px solid var(--line);border-radius:6px"> <button class="small" data-sv="${esc(w)}">שמירה</button></div>`));
     }
     if (P.missing.length) { h.push('<div class="grp">שורות בטבלה בלי קובץ</div>'); P.missing.forEach(m => h.push(`<div class="it"><b>${swatch(m.row.color)}${esc(m.row.colorText)} ${esc(m.row.text)}</b> · ${m.row.qty} יח'<br><span class="muted">${esc(m.tab)} · שורה ${m.row.no} · ${esc(m.reason)}</span></div>`)); }
-    if (P.extras.length) { h.push('<div class="grp">עמודים בקבצים שלא בהזמנה (לא יוצאים)</div>'); P.extras.forEach(e => h.push(`<div class="it">${swatch(e.color)}<b>${esc(e.text) || '(ללא טקסט)'}</b>${e.twin != null ? ' <span class="badge">כפול</span>' : ''}<br><span class="muted">${esc(e.tab)} · שורה ${esc(e.label || '')} · עמוד ${e.page + 1} בקובץ${e.twinRow ? ` · כפול של שורה ${e.twinRow}` : ''}</span></div>`)); }
+    if (P.extras.length) { h.push('<div class="grp">עמודים בקבצים שלא בהזמנה (לא יוצאים)</div>'); P.extras.forEach(e => h.push(`<div class="it">${swatch(e.color)}<b>${esc(e.text) || '(ללא טקסט)'}</b>${e.twin != null ? ' <span class="badge">כפול</span>' : ''}<br><span class="muted">${esc(e.tab)} · שורה ${esc(e.label || '')} · עמוד ${e.filePage + 1} בקובץ ${esc(e.file || '')}${e.twinRow ? ` · כפול של שורה ${e.twinRow}` : ''}</span></div>`)); }
     if (P.unusedArts.length) { h.push('<div class="grp">קבצים שלא התאימו לאף לשונית</div>'); P.unusedArts.forEach(i => h.push(`<div class="it"><b>${esc(S.arts[i].name)}</b><br><span class="muted">גודל ${S.arts[i].size.map(x => x.toFixed(1)).join('×')} ס"מ</span></div>`)); }
     if (!S.so) h.push('<div class="grp">אין הזמנת עבודה – הסה"כים לא נבדקו</div>');
     el.innerHTML = h.length ? h.join('') : '<div class="empty">אין חוסרים ✓</div>';
