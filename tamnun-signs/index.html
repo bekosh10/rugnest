@@ -1015,7 +1015,8 @@ async function orderFor(mc, P, magBytes) {
     const cfg = layCfg(); sheetsInfo = [];
     for (const t of tabs) {
       const gs = magBytes[t] || []; if (!gs.length) continue;
-      const o = { ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, collect: (cfg.collect || {})[t] != null ? cfg.collect[t] : C.layoutCollectFor(t) };
+      const k = /a3/i.test(t) ? 'a3' : 'strip', kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
+      const o = { ...C.LAYOUT_DEF, width: kv(cfg.width) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect) != null ? kv(cfg.collect) : C.layoutCollectFor(t) };
       const sh = C.planLayout(gs, o), prints = sh.reduce((a, x) => a + x.copies, 0);
       sheetsOf[t] = prints; sheetsInfo.push({ label: /a3/i.test(t) ? 'A3' : 'פסים', prints, unique: sh.length });
     }
@@ -1058,21 +1059,19 @@ $('#bLayout').onclick = async () => {
     }
   });
   let cfg = layCfg(), cur = tabs[0];
-  const optsFor = t => ({ ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: (cfg.collect || {})[t] != null ? cfg.collect[t] : C.layoutCollectFor(t) });
+  // settings are kept per kind (A3 / strip), not per tab name – tab names change between orders
+  const kindOf = t => /a3/i.test(t) ? 'a3' : 'strip';
+  const KIND_HE = { a3: 'A3 מתכתי', strip: 'פס מתכתי' };
+  const kv = (obj, t) => obj && (obj[kindOf(t)] != null ? obj[kindOf(t)] : obj[t]);
+  const optsFor = t => ({ ...C.LAYOUT_DEF, width: kv(cfg.width, t) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect, t) != null ? kv(cfg.collect, t) : C.layoutCollectFor(t) });
   const soNo = () => ((S.so && S.so.soNumber) || '').replace(/\D/g, '');
+  const isWin = /win/i.test(navigator.platform || navigator.userAgent);
   const bg = document.createElement('div'); bg.className = 'modal-bg';
   bg.innerHTML = `<div class="modal wide"><button class="mx" title="סגירה">✕</button><h3>פריסת מגנטי – תצוגה לפני ייצוא</h3>
     <div class="mtabs" id="layTabs"></div>
-    <div class="lay-set">
-      <label>רוחב גיליון <input type="number" step="0.1" id="lW"> ס"מ</label>
-      <label>אורך מקסימלי <input type="number" step="1" id="lL"> ס"מ</label>
-      <label>רווח בין סוגים <input type="number" step="0.1" id="lG"> ס"מ</label>
-      <label>גלישה <input type="number" step="0.05" id="lB"> ס"מ</label>
-      <label title="שורה אחרונה של סוג עם 2 שלטים או פחות עוברת לגיליון השלמות בסוף"><input type="checkbox" id="lH"> גיליון השלמות</label>
-      <span class="muted" id="lInfo"></span>
-    </div>
+    <div class="lay-set"><span class="muted" id="lSum"></span><span class="muted" id="lInfo"></span></div>
     <div class="lay-sheets" id="laySh"></div>
-    <div class="foot"><button class="primary" id="lExp">ייצוא…</button><button id="lClose">סגירה</button></div></div>`;
+    <div class="foot"><button class="primary" id="lExp">ייצוא</button><button id="lCfg">⚙ הגדרות</button><button id="lClose">סגירה</button></div></div>`;
   document.body.appendChild(bg);
   const close = () => bg.remove();
   bg.querySelector('.mx').onclick = close; bg.querySelector('#lClose').onclick = close;
@@ -1080,7 +1079,7 @@ $('#bLayout').onclick = async () => {
     const o = optsFor(cur);
     bg.querySelector('#layTabs').innerHTML = tabs.map(t => `<button class="${t === cur ? 'on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('');
     bg.querySelectorAll('#layTabs button').forEach(b => b.onclick = () => { cur = b.dataset.t; draw(); });
-    bg.querySelector('#lW').value = o.width; bg.querySelector('#lL').value = o.maxLen; bg.querySelector('#lG').value = o.gap; bg.querySelector('#lB').value = o.bleed; bg.querySelector('#lH').checked = !!o.collect;
+    bg.querySelector('#lSum').textContent = `רוחב ${o.width} · אורך עד ${o.maxLen} · רווח ${o.gap} · גלישה ${o.bleed} ס"מ${o.collect ? ' · גיליון השלמות' : ''}  |  `;
     const gs = groupsOf[cur] || [];
     const sheets = C.planLayout(gs, o), CMP = 72 / 2.54, sc = 0.9;   // px per cm
     const prints = sheets.reduce((a, s) => a + s.copies, 0), units = sheets.reduce((a, s) => a + s.copies * s.cells.length, 0);
@@ -1104,61 +1103,74 @@ $('#bLayout').onclick = async () => {
         <div class="muted">${(s.W / CMP).toFixed(1)}×${(s.H / CMP).toFixed(1)} · ${s.cells.length} שלטים</div></div>`;
     }).join('') || '<div class="muted">אין שלטים</div>';
   };
-  const upd = () => {
-    const w = +bg.querySelector('#lW').value, L = +bg.querySelector('#lL').value, G = +bg.querySelector('#lG').value;
-    cfg.width = { ...(cfg.width || {}) }; if (w > 10) cfg.width[cur] = w;
-    const B = +bg.querySelector('#lB').value;
-    if (L > 20) cfg.maxLen = L; if (G >= 0) cfg.gap = G; if (B >= 0 && B <= 1) cfg.bleed = B;
-    cfg.collect = { ...(cfg.collect || {}), [cur]: bg.querySelector('#lH').checked };
-    laySave(cfg); draw();
-  };
-  ['#lW', '#lL', '#lG', '#lB', '#lH'].forEach(id => bg.querySelector(id).onchange = upd);
-  bg.querySelector('#lExp').onclick = () => exportDialog();
-  const isWin = /win/i.test(navigator.platform || navigator.userAgent);
-  const exportDialog = () => {
+  // ---- settings window: layout + export folders; nothing changes until "שמירה"
+  const settings = () => new Promise(res => {
+    const t = JSON.parse(JSON.stringify(cfg)); t.width = t.width || {}; t.collect = t.collect || {};
+    const kinds = ['a3', 'strip'];
     const d = document.createElement('div'); d.className = 'modal-bg';
-    const pick = async (key, title) => {
-      if (!desk) { toast('עובד רק בתוכנה המותקנת'); return; }
-      const f = await desk.pickFolder({ title, start: cfg[key] }); if (!f) return;
-      cfg[key] = f; laySave(cfg); fill();
-    };
     const fill = () => {
-      const so = soNo() || 'order', t = layJob(cur).toLowerCase(), star = isWin ? 'x' : '*';
-      d.innerHTML = `<div class="modal"><button class="mx" title="סגירה">✕</button><h3>הגדרות ייצוא פריסה</h3>
-        <h4 style="margin:10px 0 4px">פרינט</h4>
-        <div>תיקייה: <b dir="ltr" style="unicode-bidi:isolate">${esc(cfg.printDir || '— לא נבחרה —')}</b> <button class="small" id="pP">בחירה…</button></div>
-        <div class="muted" style="margin-top:4px">קובץ לכל גיליון: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnoon ${esc(t)} 001${star}6.pdf</span> (מספר גיליון ${star} כמות הדפסות). גרפיקה + נקודות + טקסט, בלי קווים.</div>
-        <label style="display:block;margin-top:6px"><input type="checkbox" id="pProof" ${cfg.proof ? 'checked' : ''}> גם קובץ proof לבדיקה (גרפיקה + חיתוך) בתיקיית הפרינט</label>
+      const so = soNo() || 'order', star = isWin ? 'x' : '*';
+      const kw = k => t.width[k] != null ? t.width[k] : C.layoutWidthFor(k === 'a3' ? 'a3' : ''), kc = k => t.collect[k] != null ? t.collect[k] : k === 'a3';
+      d.innerHTML = `<div class="modal"><button class="mx" title="סגירה">✕</button><h3>⚙ הגדרות פריסה וייצוא</h3>
+        <h4 style="margin:6px 0 6px">פריסה</h4>
+        <table class="cfgt" style="border-collapse:collapse;width:100%">
+          <tr><th style="text-align:right">סוג</th><th>רוחב גיליון (ס"מ)</th><th>גיליון השלמות</th></tr>
+          ${kinds.map(k => `<tr><td>${KIND_HE[k]}</td><td style="text-align:center"><input type="number" step="0.1" data-w="${k}" value="${kw(k)}" style="width:80px"></td>
+            <td style="text-align:center"><input type="checkbox" data-c="${k}" ${kc(k) ? 'checked' : ''}></td></tr>`).join('')}
+        </table>
+        <div class="lay-set" style="margin-top:10px">
+          <label>אורך מקסימלי <input type="number" step="1" id="sL" value="${t.maxLen || C.LAYOUT_DEF.maxLen}"> ס"מ</label>
+          <label>רווח בין סוגים <input type="number" step="0.1" id="sG" value="${t.gap != null ? t.gap : C.LAYOUT_DEF.gap}"> ס"מ</label>
+          <label>גלישה <input type="number" step="0.05" id="sB" value="${t.bleed != null ? t.bleed : C.LAYOUT_DEF.bleed}"> ס"מ</label>
+        </div>
+        <div class="muted">גיליון השלמות: שורה אחרונה של סוג עם 2 שלטים או פחות עוברת לגיליון השלמות בסוף.</div>
+        <h4 style="margin:14px 0 4px">פרינט</h4>
+        <div>תיקייה: <b dir="ltr" style="unicode-bidi:isolate">${esc(t.printDir || '— לא נבחרה —')}</b> <button class="small" id="pP">בחירה…</button></div>
+        <div class="muted" style="margin-top:4px">קובץ לכל גיליון: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnoon magneti a3 001${star}6.pdf</span> (מספר גיליון ${star} כמות הדפסות).</div>
+        <label style="display:block;margin-top:6px"><input type="checkbox" id="pProof" ${t.proof ? 'checked' : ''}> גם קובץ proof לבדיקה (גרפיקה + חיתוך) בתיקיית הפרינט</label>
         <h4 style="margin:14px 0 4px">קאט</h4>
-        <div>תיקייה: <b dir="ltr" style="unicode-bidi:isolate">${esc(cfg.cutDir || '— לא נבחרה —')}</b> <button class="small" id="pC">בחירה…</button></div>
-        <div class="muted" style="margin-top:4px">קובץ אחד עם כל הגיליונות: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnoon ${esc(t)} cut.pdf</span>. קווי חיתוך (Thru-cut) + נקודות, בלי טקסט.</div>
-        <p class="muted" style="margin-top:12px">ייוצאו כל הסוגים: ${tabs.map(esc).join(' · ')}. התיקיות נשמרות לפעם הבאה.</p>
-        <div class="foot"><button class="primary" id="pGo" ${cfg.printDir && cfg.cutDir ? '' : 'disabled'}>ייצוא</button><button id="pX">ביטול</button></div></div>`;
-      d.querySelector('.mx').onclick = () => d.remove(); d.querySelector('#pX').onclick = () => d.remove();
+        <div>תיקייה: <b dir="ltr" style="unicode-bidi:isolate">${esc(t.cutDir || '— לא נבחרה —')}</b> <button class="small" id="pC">בחירה…</button></div>
+        <div class="muted" style="margin-top:4px">קובץ אחד עם כל הגיליונות: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnoon magneti a3 cut.pdf</span></div>
+        <div class="foot"><button class="primary" id="sSave">שמירה</button><button id="sX">ביטול</button></div></div>`;
+      const read = () => {
+        d.querySelectorAll('[data-w]').forEach(i => { const v = +i.value; if (v > 10) t.width[i.dataset.w] = v; });
+        d.querySelectorAll('[data-c]').forEach(i => t.collect[i.dataset.c] = i.checked);
+        const L = +d.querySelector('#sL').value, G = +d.querySelector('#sG').value, B = +d.querySelector('#sB').value;
+        if (L > 20) t.maxLen = L; if (G >= 0) t.gap = G; if (B >= 0 && B <= 1) t.bleed = B;
+        t.proof = d.querySelector('#pProof').checked;
+      };
+      const pick = async (key, title) => {
+        read();
+        if (!desk) { toast('עובד רק בתוכנה המותקנת'); return; }
+        const f = await desk.pickFolder({ title, start: t[key] }); if (f) t[key] = f; fill();
+      };
+      const cancel = () => { d.remove(); res(false); };
+      d.querySelector('.mx').onclick = cancel; d.querySelector('#sX').onclick = cancel;
       d.querySelector('#pP').onclick = () => pick('printDir', 'תיקייה לקבצי פרינט');
       d.querySelector('#pC').onclick = () => pick('cutDir', 'תיקייה לקבצי קאט');
-      d.querySelector('#pProof').onchange = e => { cfg.proof = e.target.checked; laySave(cfg); };
-      d.querySelector('#pGo').onclick = go;
-    };
-    const go = async () => {
-      d.remove();
-      await busy('מייצא פריסה…', async () => {
-        const star = isWin ? 'x' : '*'; let n = 0;
-        try {
-          for (const t of tabs) {
-            const gs = groupsOf[t]; if (!gs.length) continue;
-            const r = await C.buildLayoutPdfs(gs, { ...optsFor(t), splitPrint: true }, `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
-            const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
-            for (const ps of r.printSheets) { await desk.bankWrite(cfg.printDir, `${base}${ps.collect ? ' hashlamot' : ''} ${String(ps.no).padStart(3, '0')}${star}${ps.copies}.pdf`, ps.bytes); n++; }
-            await desk.bankWrite(cfg.cutDir, `${base} cut.pdf`, r.cut); n++;
-            if (cfg.proof) { await desk.bankWrite(cfg.printDir, `${base} proof.pdf`, r.proof); n++; }
-          }
-          toast(`יוצאו ${n} קבצים<br>פרינט: <b>${esc(cfg.printDir)}</b><br>קאט: <b>${esc(cfg.cutDir)}</b>`, 9000);
-          desk.reveal(cfg.printDir);
-        } catch (e) { toast('שגיאה בייצוא: ' + esc(e.message || e), 9000); }
-      });
+      d.querySelector('#sSave').onclick = () => { read(); cfg = t; laySave(cfg); d.remove(); draw(); res(true); };
     };
     fill(); document.body.appendChild(d);
+  });
+  bg.querySelector('#lCfg').onclick = () => settings();
+  bg.querySelector('#lExp').onclick = async () => {
+    if (!desk) { toast('הייצוא עובד רק בתוכנה המותקנת'); return; }
+    if (!cfg.printDir || !cfg.cutDir) { toast('קודם בוחרים תיקיות לפרינט ולקאט בהגדרות'); if (!(await settings()) || !cfg.printDir || !cfg.cutDir) return; }
+    await busy('מייצא פריסה…', async () => {
+      const star = isWin ? 'x' : '*'; let n = 0;
+      try {
+        for (const t of tabs) {
+          const gs = groupsOf[t]; if (!gs.length) continue;
+          const r = await C.buildLayoutPdfs(gs, { ...optsFor(t), splitPrint: true }, `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
+          const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
+          for (const ps of r.printSheets) { await desk.bankWrite(cfg.printDir, `${base}${ps.collect ? ' hashlamot' : ''} ${String(ps.no).padStart(3, '0')}${star}${ps.copies}.pdf`, ps.bytes); n++; }
+          await desk.bankWrite(cfg.cutDir, `${base} cut.pdf`, r.cut); n++;
+          if (cfg.proof) { await desk.bankWrite(cfg.printDir, `${base} proof.pdf`, r.proof); n++; }
+        }
+        toast(`יוצאו ${n} קבצים<br>פרינט: <b>${esc(cfg.printDir)}</b><br>קאט: <b>${esc(cfg.cutDir)}</b>`, 9000);
+        desk.reveal(cfg.printDir);
+      } catch (e) { toast('שגיאה בייצוא: ' + esc(e.message || e), 9000); }
+    });
   };
   draw();
 };
