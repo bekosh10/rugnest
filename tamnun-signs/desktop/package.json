@@ -5,7 +5,7 @@
   "author": "Campus",
   "license": "UNLICENSED",
   "main": "main.js",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": { "start": "electron ." },
   "build": {
     "appId": "il.campus.tamnunsigns",

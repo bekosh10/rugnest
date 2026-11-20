@@ -51,7 +51,8 @@ function createWindow() {
 }
 
 /* ---------- bridge ---------- */
-ipcMain.handle('cfg:get', () => ({ ...readCfg(), version: currentVersion() }));
+const SHELL_VERSION = 2;   // 2 = export into sub-folders (machine / type)
+ipcMain.handle('cfg:get', () => ({ ...readCfg(), version: currentVersion(), shellVersion: SHELL_VERSION }));
 ipcMain.handle('cfg:set', (e, patch) => { const c = { ...readCfg(), ...patch }; writeCfg(c); return c; });
 
 ipcMain.handle('pick-folder', async (e, { title, start } = {}) => {
@@ -83,12 +84,12 @@ ipcMain.handle('read-file', async (e, p) => { const b = await fsp.readFile(p); r
 // write the export: <parent>/<folderName>/<machine>/<file>.pdf + report
 ipcMain.handle('export', async (e, { parent, folderName, files, report }) => {
   try {
-    const clean = s => String(s).replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
+    const clean = s => String(s).replace(/"/g, "''").replace(/[\\/:*?<>|]/g, '-').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
     let dir = path.join(parent, clean(folderName)), n = 2;
     while (fs.existsSync(dir)) dir = path.join(parent, `${clean(folderName)} (${n++})`);
     await fsp.mkdir(dir, { recursive: true });
     for (const f of files) {
-      const sub = path.join(dir, clean(f.sub));
+      const sub = path.join(dir, ...[].concat(f.sub).filter(Boolean).map(clean));
       await fsp.mkdir(sub, { recursive: true });
       await fsp.writeFile(path.join(sub, clean(f.name)), Buffer.from(f.data), { flag: 'wx' });
     }

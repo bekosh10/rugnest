@@ -556,13 +556,14 @@ $('#bExport').onclick = async () => {
     for (const it of P.items) {
       const bytes = await C.buildItemPdf(it, S.arts, PDFLib, cache);
       if (!bytes) { failed.push(it); continue; }
-      files.push({ sub: it.machine, name: it.name, data: bytes });
+      // machine / type (tab) – needs the newer installer; older shells get one level
+      files.push({ sub: S.shellVersion >= 2 ? [it.machine, it.tab] : it.machine, name: it.name, data: bytes });
     }
     failed.forEach(it => P.missing.push({ tab: it.tab, row: it.row, reason: 'לא הצלחתי ליצור את הקובץ – צריך קובץ מהלקוח' }));
     const report = await C.buildReport(P, S.table, S.so, ExcelJS);
     const folderName = ((S.so && S.so.soNumber) || 'הזמנה') + ' תמנון';
     const r = await desk.exportFiles({ parent, folderName, files, report });
-    if (r.ok) toast(`נוצרו ${files.length} קבצים ב-<b>${esc(r.dir)}</b>${failed.length ? `<br>${failed.length} קבצים לא נוצרו – ראי חוסרים` : ''}`, 9000);
+    if (r.ok) toast(`נוצרו ${files.length} קבצים ב-<b>${esc(r.dir)}</b>${failed.length ? `<br>${failed.length} קבצים לא נוצרו – ראי חוסרים` : ''}${S.shellVersion < 2 ? '<br>לתיקייה לכל סוג צריך להתקין את קובץ ההתקנה החדש' : ''}`, 9000);
     else toast('שגיאה בייצוא: ' + esc(r.error), 9000);
     if (failed.length) renderSide();
   });
@@ -573,6 +574,7 @@ $('#bExport').onclick = async () => {
   if (!desk) { $('#ver').textContent = 'גרסת דפדפן'; return; }
   const cfg = await desk.getCfg();
   S.en = cfg.en || {};
+  S.shellVersion = cfg.shellVersion || 1;
   $('#ver').textContent = 'גרסה ' + cfg.version;
   async function check() {
     $('#upd').textContent = 'בודק עדכונים…';
