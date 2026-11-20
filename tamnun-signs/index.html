@@ -971,7 +971,7 @@ $('#bExport').onclick = async () => {
 
 // magnet: how many print sheets a type will take, with the saved layout settings (cached per plan)
 function layOpts(t) {
-  const cfg = layCfg(), k = /a3/i.test(t) ? 'a3' : 'strip', kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
+  const cfg = layCfg(), k = C.layoutKind(t), kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
   return { ...C.LAYOUT_DEF, width: kv(cfg.width) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect) != null ? kv(cfg.collect) : C.layoutCollectFor(t) };
 }
 function magSheets(t, its) {
@@ -1107,16 +1107,16 @@ async function orderFor(mc, P, magBytes) {
     const cfg = layCfg(); sheetsInfo = [];
     for (const t of tabs) {
       const gs = magBytes[t] || []; if (!gs.length) continue;
-      const k = /a3/i.test(t) ? 'a3' : 'strip', kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
+      const k = C.layoutKind(t), kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
       const o = { ...C.LAYOUT_DEF, width: kv(cfg.width) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect) != null ? kv(cfg.collect) : C.layoutCollectFor(t) };
       const sh = C.planLayout(gs, o), prints = sh.reduce((a, x) => a + x.copies, 0);
-      sheetsOf[t] = prints; sheetsInfo.push({ label: /a3/i.test(t) ? 'A3' : 'פסים', prints, unique: sh.length });
+      sheetsOf[t] = prints; sheetsInfo.push({ label: C.layoutKind(t) === 'a3' ? 'A3' : 'פסים', prints, unique: sh.length });
     }
   }
   const rows = tabs.map(t => {
     const ti = its.filter(i => i.tab === t), tab = S.table.find(x => x.name === t) || {};
     const miss = P.missing.filter(m => m.tab === t).length, gen = ti.filter(i => i.kind !== 'ok').length;
-    const note = [tab.duplex ? 'דו צדדי' : '', gen ? `${gen} קבצים שנוצרו – לבדוק` : '', miss ? `${miss} חסרים` : ''].filter(Boolean).join(' · ');
+    const note = [tab.duplex ? 'דו צדדי' : '', miss ? `${miss} חסרים` : ''].filter(Boolean).join(' · ');
     return { type: t, files: ti.length, qty: ti.reduce((a, i) => a + i.qty, 0), note, sheets: sheetsOf[t] };
   });
   const detail = tabs.map(t => {
@@ -1131,7 +1131,7 @@ async function orderFor(mc, P, magBytes) {
 const LAYKEY = 'tamnunLayout';
 function layCfg() { try { return JSON.parse(localStorage.getItem(LAYKEY)) || {}; } catch (e) { return {}; } }
 function laySave(c) { try { localStorage.setItem(LAYKEY, JSON.stringify(c)); } catch (e) {} }
-const layJob = tab => /a3/i.test(tab) ? 'magneti A3' : 'pass magneti';
+const layJob = tab => C.layoutKind(tab) === 'a3' ? 'magneti A3' : 'pass magneti';
 $('#bLayout').onclick = async () => {
   const P = S.plan; if (!P) return;
   const mag = P.items.filter(i => i.machine === 'מגנטי');
@@ -1152,7 +1152,7 @@ $('#bLayout').onclick = async () => {
   });
   let cfg = layCfg(), cur = tabs[0];
   // settings are kept per kind (A3 / strip), not per tab name – tab names change between orders
-  const kindOf = t => /a3/i.test(t) ? 'a3' : 'strip';
+  const kindOf = t => C.layoutKind(t);
   const KIND_HE = { a3: 'A3 מתכתי', strip: 'פס מתכתי' };
   const kv = (obj, t) => obj && (obj[kindOf(t)] != null ? obj[kindOf(t)] : obj[t]);
   const optsFor = t => ({ ...C.LAYOUT_DEF, width: kv(cfg.width, t) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect, t) != null ? kv(cfg.collect, t) : C.layoutCollectFor(t) });
