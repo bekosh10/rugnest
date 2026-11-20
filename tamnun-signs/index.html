@@ -940,7 +940,7 @@ async function orderPdf(mc, rows, sheetsInfo) {
     T(c, v, x, y + 14, { size: i < 2 ? 12 : 10.5, bold: true, color: i < 2 ? blue : txt });
   });
   // table
-  const cols = [{ k: '#', w: 26 }, { k: 'סוג', w: sheetsInfo ? 185 : 235 }, { k: 'קבצים', w: 55 }, { k: 'כמות', w: 70 }];
+  const cols = [{ k: '#', w: 26 }, { k: 'סוג', w: sheetsInfo ? 185 : 235 }, { k: 'סוגים', w: 55 }, { k: 'כמות', w: 70 }];
   if (sheetsInfo) cols.push({ k: 'גיליונות הדפסה', w: 85 });
   cols.push({ k: 'הערות', w: W - 80 - cols.reduce((a, x) => a + x.w, 0) });
   let y = 100 + boxH + 22;
