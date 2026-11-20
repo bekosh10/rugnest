@@ -122,6 +122,8 @@
   .lay-set { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:10px; }
   .lay-set input { width:64px; }
   .lay-sheets { display:flex; gap:14px; overflow-x:auto; padding:8px 2px 12px; direction:ltr; }
+  button.att { padding:2px 7px; font-size:12px; }
+  button.att.on { background:#e8f5e9; border-color:#7cc58a; }
   .lay-sheets::-webkit-scrollbar { height:14px; -webkit-appearance:none; }
   .lay-sheets::-webkit-scrollbar-track { background:#e8edf3; border-radius:7px; }
   .lay-sheets::-webkit-scrollbar-thumb { background:#9aa7b8; border-radius:7px; border:3px solid #e8edf3; }
@@ -186,7 +188,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 const desk = window.desk || null;
 
 const MLABEL = m => m;
-const S = { removed: {}, cur: 0, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, pane: 'miss', open: {}, override: {} };
+const S = { removed: {}, cur: 0, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, pane: 'miss', open: {}, override: {}, attached: {} };
 
 /* ---------------- loading ---------------- */
 async function busy(msg, fn) {
@@ -259,7 +261,7 @@ document.addEventListener('drop', async e => {
   }
   addFiles(out);
 });
-$('#bClear').onclick = () => { S.genThumb = {}; Object.assign(S, { removed: {}, cur: 0, tablePdf: '', tableBuf: null, soBuf: null, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
+$('#bClear').onclick = () => { S.genThumb = {}; Object.assign(S, { removed: {}, cur: 0, tablePdf: '', tableBuf: null, soBuf: null, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {}, attached: {} }); recompute(); };
 
 /* ---------------- graphics bank (IndexedDB, stays on this computer) ---------------- */
 // every page that went out as-is is kept, so a sign missing next time can come from here
@@ -566,6 +568,7 @@ $('#bSave').onclick = async () => {
     so: S.soBuf ? { name: S.soName, data: b64(S.soBuf) } : null,
     arts: S.arts.map(a => ({ name: a.name, data: b64(a.bytes) })),
     override: S.override, removed: S.removed, cur: S.cur,
+    attached: Object.fromEntries(Object.entries(S.attached || {}).map(([k, a]) => [k, { name: a.name, data: b64(a.bytes) }])),
   };
   const blob = new Blob([JSON.stringify(job)], { type: 'application/octet-stream' });
   const a = document.createElement('a');
@@ -581,12 +584,13 @@ async function openJob(buf) {
   try { job = JSON.parse(new TextDecoder().decode(buf)); } catch (e) { toast('הקובץ לא נפתח – לא קובץ עבודה תקין'); return; }
   if (job.app !== 'tamnun-signs') { toast('זה לא קובץ עבודה של התוכנה'); return; }
   S.genThumb = {};
-  Object.assign(S, { removed: {}, cur: 0, tablePdf: '', tableBuf: null, soBuf: null, table: null, tableName: '', tableBuf: null, so: null, soName: '', soBuf: null, arts: [], plan: null, override: {} });
+  Object.assign(S, { removed: {}, cur: 0, tablePdf: '', tableBuf: null, soBuf: null, table: null, tableName: '', tableBuf: null, so: null, soName: '', soBuf: null, arts: [], plan: null, override: {}, attached: {} });
   const list = [{ name: job.table.name, buf: unb64(job.table.data) }];
   if (job.so) list.push({ name: job.so.name, buf: unb64(job.so.data) });
   job.arts.forEach(a => list.push({ name: a.name, buf: unb64(a.data) }));
   await addFiles(list, true);
   S.override = job.override || {}; S.removed = job.removed || {}; S.cur = job.cur || 0;
+  for (const [k, a] of Object.entries(job.attached || {})) { try { await attachBytes(k, unb64(a.data), a.name, true); } catch (e) {} }
   recompute();
   toast('העבודה נפתחה' + (job.saved ? ' (נשמרה ' + new Date(job.saved).toLocaleString('he-IL') + ')' : ''));
 }
@@ -594,11 +598,46 @@ async function openJob(buf) {
 /* ---------------- plan ---------------- */
 function recompute() {
   S.allArts = S.arts.concat(S.bankArts || []);
+  S.attIdx = {};
+  for (const [k, a] of Object.entries(S.attached || {})) { S.attIdx[k] = S.allArts.length; S.allArts.push(a); }
   S.plan = S.table ? C.buildPlan(S.table, S.arts, S.so, { en: S.en || {}, bankArts: S.bankArts || [] }) : null;
-  if (S.plan) { applyOverrides(); applyRemoved(); labelExtras(); }
+  if (S.plan) { applyOverrides(); applyAttached(); applyRemoved(); labelExtras(); }
   render();
   makeGenThumbs();
 }
+
+// a single page the user uploads for one row (her own file, or one the client sent later)
+function applyAttached() {
+  const P = S.plan;
+  for (const [k, ai] of Object.entries(S.attIdx || {})) {
+    const [ti, ri] = k.split(':').map(Number);
+    const tab = S.table[ti], row = tab && tab.rows[ri]; if (!row || !row.qty) continue;
+    P.items = P.items.filter(i => i.row !== row);
+    P.fixed = P.fixed.filter(i => i.row !== row);
+    P.missing = P.missing.filter(m => m.row !== row);
+    const pg = S.allArts[ai].pages[0];
+    const nm = C.makeName(tab, row, pg, false, S.en || {});
+    P.items.push({ ti, tab: tab.name, machine: tab.machine, row, art: ai, page: 0, kind: 'ok', m: { kind: 'ok', page: 0, manual: true, attached: true }, name: nm.name, noEn: nm.missing, qty: row.qty, manual: true, attached: true });
+    P.fixed.push(P.items[P.items.length - 1]);
+  }
+}
+async function attachBytes(k, bytes, name, quiet) {
+  const a = await C.analyzeArtwork(bytes.slice(), name, deps, { thumb: 160, keepThumb: true });
+  if (!a.pages.length) throw new Error('empty');
+  a.attached = true; S.attached[k] = a;
+  if (!quiet && a.pages.length > 1) toast(`בקובץ ${a.pages.length} עמודים – נלקח העמוד הראשון`);
+}
+const fAtt = document.createElement('input'); fAtt.type = 'file'; fAtt.accept = '.pdf,application/pdf'; fAtt.style.display = 'none'; document.body.appendChild(fAtt);
+let attKey = null;
+fAtt.onchange = async () => {
+  const f = fAtt.files[0]; fAtt.value = ''; if (!f || !attKey) return;
+  const k = attKey; attKey = null;
+  await busy('טוען קובץ…', async () => {
+    try { await attachBytes(k, new Uint8Array(await f.arrayBuffer()), f.name); recompute(); toast('הקובץ שויך לשורה ✓ – ייכנס לבנק הגרפיקות בייצוא'); }
+    catch (e) { toast('לא הצלחתי לקרוא את הקובץ'); }
+  });
+};
+
 // manual page choice per row: key = tabIndex:rowIndex → page index (or -1 = none)
 function applyOverrides() {
   const P = S.plan;
@@ -773,10 +812,13 @@ function render() {
         : ms ? `<span class="badge red">חסר</span> <span class="muted">${esc(ms.reason)}</span>`
         : it.kind !== 'ok' ? `<span class="badge yel">${MKIND[it.kind]}${it.m.bank && it.kind !== 'bank' ? ' (מהבנק)' : ''} – לבדוק</span>`
         : it.m && it.m.guess ? '<span class="badge yel">שויך לפי סדר (עמוד בלי טקסט) – לבדוק</span>'
+        : it.attached ? '<span class="badge">📎 קובץ שהועלה</span>'
         : it.manual ? '<span class="badge yel">שיוך ידני</span>' : '';
       const rmBtn = row.qty ? `<button class="rm" data-rm="${ti}:${ri}" title="${off ? 'להחזיר' : 'לבטל את השורה – לא ייצא קובץ'}">${off ? '↺' : '✕'}</button>` : '';
       out.push(`<tr class="${cls}"><td>${rmBtn}</td><td class="muted">${row.no}</td><td class="st">${swatch(row.color)}${esc(row.colorText)}</td><td class="st">${esc(row.text)}</td><td class="n st"><b>${row.qty || ''}</b></td>
-        <td>${thumbOf(it, page) ? `<img class="th" src="${thumbOf(it, page)}" title="${it && it.kind !== 'ok' ? 'הקובץ שנוצר (מעמוד ' + (it.page + 1) + ')' : 'עמוד ' + (it ? it.page + 1 : '')}">` : ''}</td><td>${sel}</td>
+        <td>${thumbOf(it, page) ? `<img class="th" src="${thumbOf(it, page)}" title="${it && it.kind !== 'ok' ? 'הקובץ שנוצר (מעמוד ' + (it.page + 1) + ')' : 'עמוד ' + (it ? it.page + 1 : '')}">` : ''}</td><td>${sel}${row.qty && !off ? (S.attached && S.attached[ti + ':' + ri]
+          ? ` <button class="small att on" data-att="${ti}:${ri}" title="קובץ שהעלית: ${esc(S.attached[ti + ':' + ri].name)} – לחיצה מבטלת">📎 ✕</button>`
+          : ` <button class="small att" data-att="${ti}:${ri}" title="העלאת קובץ PDF לשורה הזו (שלט שהכנת או שהלקוח שלח)">📎</button>`) : ''}</td>
         <td class="fname">${it ? `<span class="fn" dir="ltr">${esc(it.name)}</span>` : ''} ${status}</td></tr>`);
       P.extras.filter(e => e.ti === ti && e.anchor === ri).forEach(extraRow);
     });
@@ -788,6 +830,11 @@ function render() {
   document.querySelectorAll('.mtabs button').forEach(b => b.onclick = () => {
     const m = b.dataset.m; S.lastOf = S.lastOf || {};
     S.cur = S.lastOf[m] != null ? S.lastOf[m] : S.table.findIndex(t => t.machine === m); render();
+  });
+  document.querySelectorAll('button[data-att]').forEach(b => b.onclick = () => {
+    const k = b.dataset.att;
+    if (S.attached[k]) { delete S.attached[k]; recompute(); return; }
+    attKey = k; fAtt.click();
   });
   document.querySelectorAll('button[data-rm]').forEach(b => b.onclick = () => { const k = b.dataset.rm; if (S.removed[k]) delete S.removed[k]; else S.removed[k] = true; recompute(); });
   document.querySelectorAll('select[data-k]').forEach(s => s.onchange = () => {
