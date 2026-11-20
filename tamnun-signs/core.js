@@ -804,6 +804,104 @@ async function buildItemPdf(item, arts, PDFLib, cache) {
   }
 }
 
+
+/* ================================================================ EFI LAYOUT (print + cut, like Griffin) */
+const CM = 72 / 2.54;
+const LAYOUT_DEF = { width: 124, maxLen: 295, gap: 2.5, top: 1, bottom: 2, side: 0.8 };
+function layoutWidthFor(tabName) { return /a3/i.test(tabName || '') ? 122 : 124; }
+const COLOR_ORDER = ['red', 'white', 'blue', 'black'];
+// groups: [{w,h (pt), qty, color}] in table order → sheets [{W,H, cells:[{g,x,y}]}] (pt, origin bottom-left)
+function planLayout(groups, o) {
+  o = { ...LAYOUT_DEF, ...(o || {}) };
+  const W = o.width * CM, maxH = o.maxLen * CM, top = o.top * CM, bot = o.bottom * CM, gap = o.gap * CM;
+  const order = [...groups.keys()].sort((a, b) => {
+    const ca = COLOR_ORDER.indexOf(groups[a].color), cb = COLOR_ORDER.indexOf(groups[b].color);
+    return ((ca < 0 ? 9 : ca) - (cb < 0 ? 9 : cb)) || a - b;
+  });
+  const sheets = []; let sh = null, cy = 0;
+  const newSheet = () => { sh = { cells: [], used: 0 }; sheets.push(sh); cy = 0; };
+  const avail = maxH - top - bot;
+  for (const gi of order) {
+    const g = groups[gi]; if (!g.qty) continue;
+    // turn the sign 90° when that fills the width better (A3 42×29.7 → 4 standing across)
+    const aw = W - 2 * o.side * CM + 0.5, fill = w => Math.floor(aw / w) * w;
+    const rot = fill(g.h) > fill(g.w) * 1.01;
+    const cw = rot ? g.h : g.w, ch = rot ? g.w : g.h;
+    const cols = Math.max(1, Math.floor(aw / cw));
+    if (!sh) newSheet(); else if (sh.cells.length) cy += gap;
+    let left = g.qty;
+    while (left > 0) {
+      if (cy + ch > avail + 0.5) newSheet();
+      const n = Math.min(cols, left), x0 = (W - cols * cw) / 2;
+      for (let c = 0; c < n; c++) sh.cells.push({ g: gi, x: x0 + c * cw, top: cy, w: cw, h: ch, rot });
+      cy += ch; sh.used = cy; left -= n;
+    }
+  }
+  for (const s of sheets) {
+    s.W = W; s.H = top + s.used + bot;
+    for (const c of s.cells) c.y = s.H - top - c.top - c.h;
+  }
+  // identical sheets → one sheet printed N times
+  const uniq = [], seen = {};
+  for (const s of sheets) {
+    const sig = s.H.toFixed(1) + '|' + s.cells.map(c => `${c.g}@${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(';');
+    if (seen[sig]) seen[sig].copies++; else { s.copies = 1; seen[sig] = s; uniq.push(s); }
+  }
+  return uniq;
+}
+function regMarks(W, H) {
+  const s = 0.2 * CM, d = 0.6 * CM, r = d / 2, k = 0.5523 * r;
+  const pts = [[s, s], [W - s - d, s], [W - s - d - 5.08 * CM, s], [s, H - s - d], [W - s - d, H - s - d]];
+  return pts.map(([x, y]) => { const cx = x + r, cy = y + r, f = v => v.toFixed(3);
+    return `${f(cx + r)} ${f(cy)} m ${f(cx + r)} ${f(cy + k)} ${f(cx + k)} ${f(cy + r)} ${f(cx)} ${f(cy + r)} c ` +
+      `${f(cx - k)} ${f(cy + r)} ${f(cx - r)} ${f(cy + k)} ${f(cx - r)} ${f(cy)} c ${f(cx - r)} ${f(cy - k)} ${f(cx - k)} ${f(cy - r)} ${f(cx)} ${f(cy - r)} c ` +
+      `${f(cx + k)} ${f(cy - r)} ${f(cx + r)} ${f(cy - k)} ${f(cx + r)} ${f(cy)} c h f`; }).join('\n');
+}
+function layerKit(PDFLib, doc) {
+  const ctx = doc.context, N = PDFLib.PDFName, S = PDFLib.PDFString;
+  const cut = ctx.register(ctx.obj({ Type: 'OCG', Name: S.of('Thru-cut') }));
+  const reg = ctx.register(ctx.obj({ Type: 'OCG', Name: S.of('Register') }));
+  doc.catalog.set(N.of('OCProperties'), ctx.obj({ OCGs: [cut, reg], D: { Order: [cut, reg], ON: [cut, reg] } }));
+  const sep = (name, c1) => ctx.register(ctx.obj([N.of('Separation'), N.of(name), N.of('DeviceCMYK'),
+    ctx.obj({ FunctionType: 2, Domain: [0, 1], Range: [0, 1, 0, 1, 0, 1, 0, 1], C0: [0, 0, 0, 0], C1: c1, N: 1 })]));
+  const csAll = sep('All', [1, 1, 1, 1]), csCut = sep('Thru-cut', [0.7, 0.85, 0, 0]);
+  return (page, body) => {
+    const res = page.node.normalizedEntries().Resources;
+    const add = (cat, k, v) => { let d = res.lookup(N.of(cat)); if (!d) { d = ctx.obj({}); res.set(N.of(cat), d); } d.set(N.of(k), v); };
+    add('Properties', 'Pr1', reg); add('Properties', 'Pr2', cut);
+    add('ColorSpace', 'CSall', csAll); add('ColorSpace', 'CScut', csCut);
+    page.node.addContentStream(ctx.register(ctx.stream(body)));
+  };
+}
+// groups[i].bytes = single-page pdf of the sign
+// label: e.g. "26006897 tamnoon magneti A3" – goes 5 cm left of the 2nd bottom dot (print file only)
+async function buildLayoutPdfs(groups, o, label, PDFLib) {
+  for (const g of groups) if (!g.w) { const d = await PDFLib.PDFDocument.load(g.bytes); const { width, height } = d.getPage(0).getSize(); g.w = width; g.h = height; }
+  const sheets = planLayout(groups, o);
+  const pr = await PDFLib.PDFDocument.create(), cu = await PDFLib.PDFDocument.create();
+  const prL = layerKit(PDFLib, pr), cuL = layerKit(PDFLib, cu);
+  const font = await pr.embedFont(PDFLib.StandardFonts.Helvetica);
+  const emb = {};
+  for (let si = 0; si < sheets.length; si++) {
+    const s = sheets[si];
+    const p = pr.addPage([s.W, s.H]), c = cu.addPage([s.W, s.H]);
+    for (const cell of s.cells) {
+      if (!emb[cell.g]) [emb[cell.g]] = await pr.embedPdf(groups[cell.g].bytes, [0]);
+      if (cell.rot) p.drawPage(emb[cell.g], { x: cell.x + cell.w, y: cell.y, width: cell.h, height: cell.w, rotate: PDFLib.degrees(90) });
+      else p.drawPage(emb[cell.g], { x: cell.x, y: cell.y, width: cell.w, height: cell.h });
+    }
+    const txt = `${String(label).replace(/[^\x20-\x7e]+/g, ' ').replace(/\s+/g, ' ').trim()}   sheet ${si + 1}/${sheets.length} x ${s.copies}`;
+    const size = 16, tw = font.widthOfTextAtSize(txt, size);
+    const dot2 = s.W - 0.2 * CM - 0.6 * CM - 5.08 * CM;           // left edge of the 2nd bottom dot
+    p.drawText(txt, { x: Math.max(1.2 * CM, dot2 - 5 * CM - tw), y: 0.5 * CM - size * 0.35, size, font, color: PDFLib.cmyk(0, 0, 0, 1) });
+    const marks = `q /OC /Pr1 BDC /CSall cs 1 scn\n${regMarks(s.W, s.H)}\nEMC Q\n`;
+    prL(p, marks);
+    const rects = s.cells.map(z => `${z.x.toFixed(3)} ${z.y.toFixed(3)} ${z.w.toFixed(3)} ${z.h.toFixed(3)} re S`).join('\n');
+    cuL(c, `${marks}q /OC /Pr2 BDC /CScut CS 1 SCN 1 w 0 J 0 j\n${rects}\nEMC Q\n`);
+  }
+  return { print: await pr.save(), cut: await cu.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies })) };
+}
+
 /* ================================================================ REPORT (xlsx) */
 async function buildReport(plan, tabs, so, ExcelJS) {
   const wb = new ExcelJS.Workbook();
@@ -835,6 +933,6 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 }
 
 const api = { CORE_VERSION, norm, numsOf, wordsOf, textScore, classifyPixels, sizeFromText, machineOf, MACHINES, COLOR_HE,
-  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, sameSize, matchWords, buildItemPdf, buildReport, fileSafe };
+  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, sameSize, matchWords, buildItemPdf, buildReport, fileSafe, planLayout, buildLayoutPdfs, layoutWidthFor, LAYOUT_DEF };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TamnunCore = api;
 })(typeof self !== 'undefined' ? self : this);

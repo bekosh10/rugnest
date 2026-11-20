@@ -115,6 +115,13 @@
   .modal .mx { position:sticky; top:0; float:left; margin:-6px -8px 0 0; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:18px; line-height:1; padding:0; color:var(--muted); z-index:2; }
   .modal .mx:hover { background:var(--redbg); color:var(--red); }
   .modal .foot { display:flex; gap:8px; margin-top:16px; }
+  .modal.wide { width:min(1300px,97vw); max-height:92vh; }
+  .lay-set { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:10px; }
+  .lay-set input { width:64px; }
+  .lay-sheets { display:flex; gap:14px; overflow-x:auto; padding:8px 2px 12px; direction:ltr; }
+  .lay-sh { flex:0 0 auto; text-align:center; font-size:12px; }
+  .lay-sh svg { background:#fff; border:1px solid #bbb; box-shadow:0 1px 4px rgba(0,0,0,.15); display:block; }
+  .lay-sh .cp { font-weight:bold; color:var(--red); }
   .busy { position:fixed; inset:0; background:rgba(255,255,255,.7); display:flex; align-items:center; justify-content:center; z-index:40; font-size:18px; font-weight:600; }
   .tabhead { display:flex; align-items:center; gap:10px; }
   .tabhead .r { margin-inline-start:auto; }
@@ -131,6 +138,7 @@
   <button id="bSave" disabled>שמירת עבודה</button>
   <input type="file" id="fOpen" accept=".tamnun" style="display:none">
   <button id="bClear">ניקוי</button>
+  <button id="bLayout" disabled>פריסת מגנטי</button>
   <button id="bExport" class="primary" disabled>ייצוא</button>
 </header>
 <main>
@@ -686,6 +694,7 @@ function render() {
   $('#soLbl').textContent = S.so && S.so.soNumber || '';
   const P = S.plan;
   $('#bExport').disabled = !P || !P.items.length;
+  $('#bLayout').disabled = !P || !P.items.some(i => i.machine === 'מגנטי');
   $('#bSave').disabled = !S.tableBuf;
   const out = [];
   if (P) {
@@ -873,6 +882,100 @@ $('#bExport').onclick = async () => {
     else toast('שגיאה בייצוא: ' + esc(r.error), 9000);
     if (failed.length) renderSide();
   });
+};
+
+
+/* ---------------- EFI layout (magnet): preview + export ---------------- */
+const LAYKEY = 'tamnunLayout';
+function layCfg() { try { return JSON.parse(localStorage.getItem(LAYKEY)) || {}; } catch (e) { return {}; } }
+function laySave(c) { try { localStorage.setItem(LAYKEY, JSON.stringify(c)); } catch (e) {} }
+const layJob = tab => /a3/i.test(tab) ? 'magneti A3' : 'magneti pass';
+$('#bLayout').onclick = async () => {
+  const P = S.plan; if (!P) return;
+  const mag = P.items.filter(i => i.machine === 'מגנטי');
+  const tabs = [...new Set(mag.map(i => i.tab))];
+  const groupsOf = {};
+  await busy('מכין פריסה…', async () => {
+    const cache = {};
+    for (const t of tabs) {
+      groupsOf[t] = [];
+      for (const it of mag.filter(i => i.tab === t)) {
+        const bytes = await C.buildItemPdf(it, S.allArts, PDFLib, cache);
+        if (!bytes) continue;
+        const d = await PDFLib.PDFDocument.load(bytes); const sz = d.getPage(0).getSize();
+        const art = S.allArts[it.art], page = art && art.pages[it.vpage != null ? it.vpage : it.page];
+        groupsOf[t].push({ bytes, w: sz.width, h: sz.height, qty: it.qty, color: it.row.color, thumb: thumbOf(it, page), name: it.name });
+      }
+    }
+  });
+  let cfg = layCfg(), cur = tabs[0];
+  const optsFor = t => ({ ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen });
+  const soNo = () => ((S.so && S.so.soNumber) || '').replace(/\D/g, '');
+  const bg = document.createElement('div'); bg.className = 'modal-bg';
+  bg.innerHTML = `<div class="modal wide"><button class="mx" title="סגירה">✕</button><h3>פריסת מגנטי – תצוגה לפני ייצוא</h3>
+    <div class="mtabs" id="layTabs"></div>
+    <div class="lay-set">
+      <label>רוחב גיליון <input type="number" step="0.1" id="lW"> ס"מ</label>
+      <label>אורך מקסימלי <input type="number" step="1" id="lL"> ס"מ</label>
+      <label>רווח בין סוגים <input type="number" step="0.1" id="lG"> ס"מ</label>
+      <span class="muted" id="lInfo"></span>
+    </div>
+    <div class="lay-sheets" id="laySh"></div>
+    <div class="foot"><button class="primary" id="lExp">ייצוא פריסה (פרינט + קאט)</button><button id="lClose">סגירה</button></div></div>`;
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.querySelector('.mx').onclick = close; bg.querySelector('#lClose').onclick = close;
+  const draw = () => {
+    const o = optsFor(cur);
+    bg.querySelector('#layTabs').innerHTML = tabs.map(t => `<button class="${t === cur ? 'on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('');
+    bg.querySelectorAll('#layTabs button').forEach(b => b.onclick = () => { cur = b.dataset.t; draw(); });
+    bg.querySelector('#lW').value = o.width; bg.querySelector('#lL').value = o.maxLen; bg.querySelector('#lG').value = o.gap;
+    const gs = groupsOf[cur] || [];
+    const sheets = C.planLayout(gs, o), CMP = 72 / 2.54, sc = 0.9;   // px per cm
+    const prints = sheets.reduce((a, s) => a + s.copies, 0), units = sheets.reduce((a, s) => a + s.copies * s.cells.length, 0);
+    bg.querySelector('#lInfo').textContent = `${sheets.length} גיליונות שונים · ${prints} הדפסות · ${units} שלטים (בהזמנה ${gs.reduce((a, g) => a + g.qty, 0)})`;
+    const label = `${soNo()} tamnoon ${layJob(cur)}`;
+    bg.querySelector('#laySh').innerHTML = sheets.map((s, si) => {
+      const W = s.W / CMP, H = s.H / CMP;
+      const cells = s.cells.map(c => {
+        const g = gs[c.g], x = c.x / CMP, y = (s.H - c.y - c.h) / CMP, w = c.w / CMP, h = c.h / CMP;
+        const fill = { red: '#e03030', white: '#f4f4f4', blue: '#2a5bd7', black: '#222' }[g.color] || '#ccc';
+        const img = g.thumb ? (c.rot
+          ? `<image href="${g.thumb}" x="0" y="0" width="${h}" height="${w}" preserveAspectRatio="none" transform="translate(${x},${y + h}) rotate(-90)"/>`
+          : `<image href="${g.thumb}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>`) : '';
+        return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>${img}<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#7a2bd6" stroke-width="0.25"/><title>${esc(g.name)}</title>`;
+      }).join('');
+      const dots = [[0.5, H - 0.5], [W - 0.5, H - 0.5], [W - 0.5 - 5.08, H - 0.5], [0.5, 0.5], [W - 0.5, 0.5]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="0.3"/>`).join('');
+      const tx = W - 0.8 - 5.08 - 5;
+      return `<div class="lay-sh"><div>גיליון ${si + 1}/${sheets.length} ${s.copies > 1 ? `<span class="cp">× ${s.copies}</span>` : ''}</div>
+        <svg width="${W * sc}" height="${H * sc}" viewBox="0 0 ${W} ${H}">${cells}${dots}<text x="${tx}" y="${H - 0.35}" font-size="0.9" text-anchor="end">${esc(label)} sheet ${si + 1}/${sheets.length} x ${s.copies}</text></svg>
+        <div class="muted">${(s.W / CMP).toFixed(1)}×${(s.H / CMP).toFixed(1)} · ${s.cells.length} שלטים</div></div>`;
+    }).join('') || '<div class="muted">אין שלטים</div>';
+  };
+  const upd = () => {
+    const w = +bg.querySelector('#lW').value, L = +bg.querySelector('#lL').value, G = +bg.querySelector('#lG').value;
+    cfg.width = { ...(cfg.width || {}) }; if (w > 10) cfg.width[cur] = w;
+    if (L > 20) cfg.maxLen = L; if (G >= 0) cfg.gap = G;
+    laySave(cfg); draw();
+  };
+  ['#lW', '#lL', '#lG'].forEach(id => bg.querySelector(id).onchange = upd);
+  bg.querySelector('#lExp').onclick = async () => {
+    if (!desk) { toast('הייצוא עובד רק בתוכנה המותקנת'); return; }
+    const parent = await desk.pickFolder({ title: 'איפה לשמור את הפריסה?' });
+    if (!parent) return;
+    await busy('מייצא פריסה…', async () => {
+      const files = [];
+      for (const t of tabs) {
+        const gs = groupsOf[t]; if (!gs.length) continue;
+        const r = await C.buildLayoutPdfs(gs, optsFor(t), `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
+        const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
+        files.push({ sub: [], name: `${base} print.pdf`, data: r.print }, { sub: [], name: `${base} cut.pdf`, data: r.cut });
+      }
+      const res = await desk.exportFiles({ parent, folderName: `${soNo() || 'הזמנה'} פריסת מגנטי`, files });
+      toast(res.ok ? `הפריסה נשמרה ב-<b>${esc(res.dir)}</b>` : 'שגיאה: ' + esc(res.error), 9000);
+    });
+  };
+  draw();
 };
 
 /* ---------------- version / update ---------------- */
