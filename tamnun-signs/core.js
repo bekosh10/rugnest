@@ -191,7 +191,7 @@ async function readTableXlsx(buf, ExcelJS) {
       let colorText = clean(cellText(g[cColor])), text = cText >= 0 ? clean(cellText(g[cText])) : '';
       // "בייבי" written in the colour column (tabs without a text column)
       if (!text && colorText && !/לבן|אדום|כחול|שחור|צבעוני/.test(colorText)) { text = colorText; colorText = ''; }
-      rows.push({ sheetRow: r + 1, format: fmt, colorText, color: rowColor(colorText) || (/בייבי/.test(text) ? 'color' : ''), text, notes, q, qty });
+      rows.push({ no: rows.length + 1, sheetRow: r + 1, format: fmt, colorText, color: rowColor(colorText) || (/בייבי/.test(text) ? 'color' : ''), text, notes, q, qty });
     }
     if (!rows.length) return;
     const hints = ws.name + ' ' + rows.map(r => r.format + ' ' + r.notes).join(' ') + ' ' + allText;
@@ -597,9 +597,9 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 
   const s2 = wb.addWorksheet('חוסרים', rtl);
   s2.columns = [{ header: 'סוג', width: 22 }, { header: 'שורה', width: 6 }, { header: 'צבע', width: 10 }, { header: 'שילוט', width: 28 }, { header: 'כמות', width: 8 }, { header: 'בעיה', width: 40 }];
-  plan.missing.forEach(m => s2.addRow([m.tab, m.row.sheetRow, m.row.colorText, m.row.text, m.row.qty, m.reason]));
+  plan.missing.forEach(m => s2.addRow([m.tab, m.row.no, m.row.colorText, m.row.text, m.row.qty, m.reason]));
   plan.extras.forEach(e => s2.addRow([e.tab, e.label || '', COLOR_HE[e.color], e.text, '', `עמוד ${e.page + 1} בקובץ – לא בהזמנה${e.twinRow ? ` (כפול של שורה ${e.twinRow})` : e.twin != null ? ' (כפול)' : ''}`]));
-  (plan.removed || []).forEach(r => s2.addRow([r.tab, r.row.sheetRow, r.row.colorText, r.row.text, r.row.qty, 'בוטל ידנית – לא יצא קובץ']));
+  (plan.removed || []).forEach(r => s2.addRow([r.tab, r.row.no, r.row.colorText, r.row.text, r.row.qty, 'בוטל ידנית – לא יצא קובץ']));
   plan.checks.forEach(c => { if (c.so != null && c.so !== c.sum) s2.addRow([c.tab, '', '', '', c.sum, `סה"כ בטבלה ${c.sum} – בהזמנה ${c.so}`]); });
   head(s2);
 

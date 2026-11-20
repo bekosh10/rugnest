@@ -225,13 +225,14 @@ document.addEventListener('drop', async e => {
   }
   addFiles(out);
 });
-$('#bClear').onclick = () => { Object.assign(S, { removed: {}, cur: 0, tablePdf: '', table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
+$('#bClear').onclick = () => { S.genThumb = {}; Object.assign(S, { removed: {}, cur: 0, tablePdf: '', table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
 
 /* ---------------- plan ---------------- */
 function recompute() {
   S.plan = S.table ? C.buildPlan(S.table, S.arts, S.so) : null;
   if (S.plan) { applyOverrides(); applyRemoved(); labelExtras(); }
   render();
+  makeGenThumbs();
 }
 // manual page choice per row: key = tabIndex:rowIndex → page index (or -1 = none)
 function applyOverrides() {
@@ -277,14 +278,42 @@ function labelExtras() {
       let ri = e.twin != null ? rowOfPage(e.twin) : -1;
       if (ri < 0) { let best = -1, bp = -1; P.items.filter(i => i.ti === ti && i.page < e.page).forEach(i => { if (i.page > bp) { bp = i.page; best = tab.rows.indexOf(i.row); } }); ri = best; }
       e.ti = ti; e.anchor = ri;
-      const base = ri >= 0 ? tab.rows[ri].sheetRow : (tab.rows[0] ? tab.rows[0].sheetRow - 1 : 0);
+      const base = ri >= 0 ? tab.rows[ri].no : 0;
       used[base] = (used[base] || 0) + 1;
       e.label = base + LET[used[base] - 1];
-      e.twinRow = e.twin != null && rowOfPage(e.twin) >= 0 ? tab.rows[rowOfPage(e.twin)].sheetRow : null;
+      e.twinRow = e.twin != null && rowOfPage(e.twin) >= 0 ? tab.rows[rowOfPage(e.twin)].no : null;
     });
   });
 }
 const isRemoved = (ti, ri) => !!S.removed[ti + ':' + ri];
+// preview of a file the app made (the source page would show the old number/colour)
+S.genThumb = {};
+const genKey = it => [it.art, it.page, it.m.kind, it.m.toNum || '', it.m.to || ''].join(':');
+async function makeGenThumbs() {
+  const P = S.plan; if (!P) return;
+  let changed = false;
+  for (const it of P.fixed) {
+    if (it.kind === 'ok') continue;
+    const k = genKey(it); if (k in S.genThumb) continue;
+    S.genThumb[k] = null;
+    try {
+      const bytes = await C.buildItemPdf(it, S.arts, PDFLib, {});
+      if (!bytes) { S.genThumb[k] = 'fail'; changed = true; continue; }
+      const doc = await pdfjs.getDocument({ data: bytes }).promise;
+      const pg = await doc.getPage(1);
+      const v1 = pg.getViewport({ scale: 1 }), sc = 160 / Math.max(v1.width, v1.height), vp = pg.getViewport({ scale: sc });
+      const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+      await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+      S.genThumb[k] = cv.toDataURL('image/png'); await doc.destroy(); changed = true;
+    } catch (e) { console.error(e); S.genThumb[k] = 'fail'; changed = true; }
+  }
+  if (changed) render();
+}
+const thumbOf = (it, page) => {
+  if (it && it.kind !== 'ok') { const g = S.genThumb[genKey(it)]; if (g && g !== 'fail') return g; }
+  return page && page.thumb;
+};
 const itemOf = row => S.plan && S.plan.items.find(i => i.row === row);
 const missOf = row => S.plan && S.plan.missing.find(m => m.row === row);
 
@@ -298,7 +327,7 @@ function inputsChips() {
   return chips.join('');
 }
 const swatch = c => c ? `<span class="sw ${c}"></span>` : '';
-const MKIND = { swap: 'צבע הוחלף', number: 'מספר שונה', ok: 'שיוך ידני' };
+const MKIND = { swap: 'נוצר – צבע הוחלף', number: 'נוצר – מספר שונה', ok: 'שיוך ידני' };
 
 function render() {
   $('#inputs').innerHTML = inputsChips();
@@ -361,8 +390,8 @@ function render() {
         : it.kind !== 'ok' ? `<span class="badge yel">${MKIND[it.kind]} – לבדוק</span>`
         : it.manual ? '<span class="badge yel">שיוך ידני</span>' : '';
       const rmBtn = row.qty ? `<button class="rm" data-rm="${ti}:${ri}" title="${off ? 'להחזיר' : 'לבטל את השורה – לא ייצא קובץ'}">${off ? '↺' : '✕'}</button>` : '';
-      out.push(`<tr class="${cls}"><td>${rmBtn}</td><td class="muted">${row.sheetRow}</td><td class="st">${swatch(row.color)}${esc(row.colorText)}</td><td class="st">${esc(row.text)}</td><td class="n st"><b>${row.qty || ''}</b></td>
-        <td>${page && page.thumb ? `<img class="th" src="${page.thumb}" title="עמוד ${it.page + 1}">` : ''}</td><td>${sel}</td>
+      out.push(`<tr class="${cls}"><td>${rmBtn}</td><td class="muted">${row.no}</td><td class="st">${swatch(row.color)}${esc(row.colorText)}</td><td class="st">${esc(row.text)}</td><td class="n st"><b>${row.qty || ''}</b></td>
+        <td>${thumbOf(it, page) ? `<img class="th" src="${thumbOf(it, page)}" title="${it && it.kind !== 'ok' ? 'הקובץ שנוצר (מעמוד ' + (it.page + 1) + ')' : 'עמוד ' + (it ? it.page + 1 : '')}">` : ''}</td><td>${sel}</td>
         <td class="fname">${it ? `<span class="fn" dir="rtl">${esc(it.name)}</span>` : ''} ${status}</td></tr>`);
       P.extras.filter(e => e.ti === ti && e.anchor === ri).forEach(extraRow);
     });
@@ -395,17 +424,17 @@ function renderSide() {
     const h = [];
     const bad = P.checks.filter(c => c.so != null && c.so !== c.sum);
     if (bad.length) { h.push('<div class="grp">סה"כ לא תואם להזמנה</div>'); bad.forEach(c => h.push(`<div class="it"><b>${esc(c.tab)}</b><br><span class="muted">בטבלה ${c.sum} · בהזמנה ${c.so}</span></div>`)); }
-    if (P.missing.length) { h.push('<div class="grp">שורות בטבלה בלי קובץ</div>'); P.missing.forEach(m => h.push(`<div class="it"><b>${swatch(m.row.color)}${esc(m.row.colorText)} ${esc(m.row.text)}</b> · ${m.row.qty} יח'<br><span class="muted">${esc(m.tab)} · שורה ${m.row.sheetRow} · ${esc(m.reason)}</span></div>`)); }
+    if (P.missing.length) { h.push('<div class="grp">שורות בטבלה בלי קובץ</div>'); P.missing.forEach(m => h.push(`<div class="it"><b>${swatch(m.row.color)}${esc(m.row.colorText)} ${esc(m.row.text)}</b> · ${m.row.qty} יח'<br><span class="muted">${esc(m.tab)} · שורה ${m.row.no} · ${esc(m.reason)}</span></div>`)); }
     if (P.extras.length) { h.push('<div class="grp">עמודים בקבצים שלא בהזמנה (לא יוצאים)</div>'); P.extras.forEach(e => h.push(`<div class="it">${swatch(e.color)}<b>${esc(e.text) || '(ללא טקסט)'}</b>${e.twin != null ? ' <span class="badge">כפול</span>' : ''}<br><span class="muted">${esc(e.tab)} · שורה ${esc(e.label || '')} · עמוד ${e.page + 1} בקובץ${e.twinRow ? ` · כפול של שורה ${e.twinRow}` : ''}</span></div>`)); }
     if (P.unusedArts.length) { h.push('<div class="grp">קבצים שלא התאימו לאף לשונית</div>'); P.unusedArts.forEach(i => h.push(`<div class="it"><b>${esc(S.arts[i].name)}</b><br><span class="muted">גודל ${S.arts[i].size.map(x => x.toFixed(1)).join('×')} ס"מ</span></div>`)); }
     if (!S.so) h.push('<div class="grp">אין הזמנת עבודה – הסה"כים לא נבדקו</div>');
     el.innerHTML = h.length ? h.join('') : '<div class="empty">אין חוסרים ✓</div>';
   } else if (S.pane === 'fix') {
-    const rem = (P.removed || []).length ? '<div class="grp">בוטלו ידנית – לא יוצאים</div>' + P.removed.map(r => `<div class="it" style="color:#8a949e"><s>${esc(r.row.colorText)} ${esc(r.row.text)}</s> · ${r.row.qty} יח'<br><span class="muted">${esc(r.tab)} · שורה ${r.row.sheetRow}</span></div>`).join('') : '';
+    const rem = (P.removed || []).length ? '<div class="grp">בוטלו ידנית – לא יוצאים</div>' + P.removed.map(r => `<div class="it" style="color:#8a949e"><s>${esc(r.row.colorText)} ${esc(r.row.text)}</s> · ${r.row.qty} יח'<br><span class="muted">${esc(r.tab)} · שורה ${r.row.no}</span></div>`).join('') : '';
     el.innerHTML = rem + (P.fixed.length ? P.fixed.map(i => {
       const art = S.arts[i.art], p = art.pages[i.page];
       const what = i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
-      return `<div class="it"><b class="fn" dir="rtl">${esc(i.name)}</b><br><span class="muted">${esc(i.tab)} · ${what}</span>${p.thumb ? `<img class="th" style="margin-top:4px" src="${p.thumb}">` : ''}</div>`;
+      return `<div class="it"><b class="fn" dir="rtl">${esc(i.name)}</b><br><span class="muted">${esc(i.tab)} · ${what}</span>${thumbOf(i, p) ? `<img class="th" style="margin-top:4px" src="${thumbOf(i, p)}">` : ''}</div>`;
     }).join('') + '<div class="muted" style="padding-top:8px">קבצים שנוצרו מתחילים ב-!!!!!!!!!! – לבדוק בעין לפני הדפסה.</div>' : (rem ? '' : '<div class="empty">לא תוקן כלום – הכל הגיע תקין ✓</div>'));
   } else {
     const h = ['<table class="sum">'];
