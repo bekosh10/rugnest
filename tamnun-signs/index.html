@@ -1255,17 +1255,27 @@ $('#bLayout').onclick = async () => {
     if (!desk) { toast('הייצוא עובד רק בתוכנה המותקנת'); return; }
     if (!cfg.printDir || !cfg.cutDir) { toast('קודם בוחרים תיקיות לפרינט ולקאט בהגדרות'); if (!(await settings()) || !cfg.printDir || !cfg.cutDir) return; }
     await busy('מייצא פריסה…', async () => {
-      const star = isWin ? 'x' : '*'; let n = 0;
+      const star = isWin ? 'x' : '*'; let n = 0, old = false;
       try {
         for (const t of tabs) {
           const gs = groupsOf[t]; if (!gs.length) continue;
           const r = await C.buildLayoutPdfs(gs, { ...optsFor(t), splitPrint: true }, `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
           const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
-          for (const ps of r.printSheets) { await desk.bankWrite(cfg.printDir, `${base}${ps.collect ? ' hashlamot' : ''} ${String(ps.no).padStart(3, '0')}${star}${ps.copies}.pdf`, ps.bytes); n++; }
-          await desk.bankWrite(cfg.cutDir, `${base} cut.pdf`, r.cut); n++;
-          if (cfg.proof) { await desk.bankWrite(cfg.printDir, `${base} proof.pdf`, r.proof); n++; }
+          const pf = r.printSheets.map(ps => ({ name: `${base}${ps.collect ? ' hashlamot' : ''} ${String(ps.no).padStart(3, '0')}${star}${ps.copies}.pdf`, data: ps.bytes }));
+          if (cfg.proof) pf.push({ name: `${base} proof.pdf`, data: r.proof });
+          const cf = [{ name: `${base} cut.pdf`, data: r.cut }];
+          if (desk.bankWrite) {
+            for (const f of pf) { await desk.bankWrite(cfg.printDir, f.name, f.data); n++; }
+            for (const f of cf) { await desk.bankWrite(cfg.cutDir, f.name, f.data); n++; }
+          } else {
+            // older installer: no direct write – a sub-folder per order inside the chosen folders
+            const fix = f => ({ sub: [], name: f.name.replace(/\*/g, 'x'), data: f.data });
+            await desk.exportFiles({ parent: cfg.printDir, folderName: `${soNo() || 'order'} print`, files: pf.map(fix) });
+            await desk.exportFiles({ parent: cfg.cutDir, folderName: `${soNo() || 'order'} cut`, files: cf.map(fix) });
+            n += pf.length + cf.length; old = true;
+          }
         }
-        toast(`יוצאו ${n} קבצים<br>פרינט: <b>${esc(cfg.printDir)}</b><br>קאט: <b>${esc(cfg.cutDir)}</b>`, 9000);
+        toast(`יוצאו ${n} קבצים<br>פרינט: <b>${esc(cfg.printDir)}</b><br>קאט: <b>${esc(cfg.cutDir)}</b>${old ? '<br>במחשב הזה יש התקנה ישנה – הקבצים נשמרו בתת-תיקייה. להתקנה החדשה הם ייכתבו ישר לתיקייה.' : ''}`, 12000);
         desk.reveal(cfg.printDir);
       } catch (e) { toast('שגיאה בייצוא: ' + esc(e.message || e), 9000); }
     });
