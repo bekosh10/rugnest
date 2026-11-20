@@ -126,7 +126,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 4;
+const APP_VERSION = 5;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -212,10 +212,9 @@ function parseFile(f, S, ov = {}) {
 
 function buildName(r, order, S, qty) {
   const p = [String(order || '').trim(), S.client];
-  if (!r.large) p.push(r.divEn);
+  if (r.large) p.push(sizeKey(S.largeSize)); else p.push(r.divEn);
   p.push(r.genderEn, r.promoEn);
   if (r.subEn) p.push(r.subEn);
-  if (r.large) p.push(sizeKey(S.largeSize));
   if (qty !== '' && qty != null) p.push('x' + qty);
   return p.filter(Boolean).join(' ').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim() + r.ext;
 }
