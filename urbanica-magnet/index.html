@@ -136,7 +136,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 9;
+const APP_VERSION = 10;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -256,6 +256,12 @@ function compute(files, S, ovs, qty, order, sizes = {}, dismissed = new Set()) {
       // files are often built at 1:10 (5.9×15.9 for 59×159) – both scales are fine
       const fits = sc => Math.abs(got[0] - exp[0] / sc) <= tol / sc && Math.abs(got[1] - exp[1] / sc) <= tol / sc;
       r.sizeSt = fits(1) || fits(10) ? 'ok' : 'bad';
+      // a wrong size that is exactly the other magnet's size → say so
+      if (r.sizeSt === 'bad') {
+        const other = (r.large ? '59x159' : sizeKey(S.largeSize)).split('x').map(Number).sort((a, b) => a - b);
+        const fitsO = sc => Math.abs(got[0] - other[0] / sc) <= tol / sc && Math.abs(got[1] - other[1] / sc) <= tol / sc;
+        r.realIs = fitsO(1) || fitsO(10) ? other.join('×') : '';
+      }
     } else if (rs) r.sizeSt = rs.st === 'got' ? '' : rs.st;
   }
   const seen = {};
@@ -546,7 +552,7 @@ function renderFiles() {
       else if (i === 'size') notes.push(`גודל: <select data-ov="size" data-f="${esc(r.rel)}"><option value="">בחירה…</option><option value="reg">רגיל 59×159</option><option value="large">גדול ${esc(S.largeSize)}</option></select>`);
       else notes.push(`<span class="issue">${esc(ISSUE_TEXT[i])}</span>`);
     }
-    if (r.sizeSt === 'bad') notes.push(`<span class="issue">גודל בפועל \u2066${esc(r.real)}\u2069 ס״מ</span>`);
+    if (r.sizeSt === 'bad') notes.push(`<span class="issue">גודל בפועל \u2066${esc(r.real)}\u2069 ס״מ${r.realIs ? ` – זה גודל של \u2066${esc(r.realIs)}\u2069, לא של \u2066${esc(r.size.replace('x', '×'))}\u2069` : ''}</span>`);
     else if (r.sizeSt === 'wait') notes.push('<span class="muted">בודק גודל…</span>');
     else if (r.sizeSt === 'unk') notes.push('<span class="muted">לא הצלחתי למדוד גודל</span>');
     if (ov.gender || ov.div || ov.size) notes.push(`<button class="small x" title="ביטול בחירה ידנית" data-reset="${esc(r.rel)}">↺</button>`);
@@ -576,7 +582,7 @@ function renderSide() {
     if (sizeNoApi) body += '<div class="muted">כדי למדוד גדלים צריך להתקין את הקובץ החדש של האפליקציה.</div>';
     else {
       if (sizeProg && sizeProg.done < sizeProg.total) body += `<div class="muted">בודק גדלים ${sizeProg.done}/${sizeProg.total}…</div>`;
-      body += C.sizeBad.length ? `<table><tbody>${C.sizeBad.map(r => `<tr><td><bdi>${esc(r.genderHe)} · ${esc(r.promoHe)}${r.subHe ? ' · ' + esc(r.subHe) : ''}</bdi> · ${esc(r.large ? colHe(LARGE) : r.divHe)}<br><span class="issue">בפועל \u2066${esc(r.real)}\u2069 – בשם \u2066${esc(r.size.replace('x', '×'))}\u2069</span></td></tr>`).join('')}</tbody></table>`
+      body += C.sizeBad.length ? `<table><tbody>${C.sizeBad.map(r => `<tr><td><bdi>${esc(r.genderHe)} · ${esc(r.promoHe)}${r.subHe ? ' · ' + esc(r.subHe) : ''}</bdi> · ${esc(r.large ? colHe(LARGE) : r.divHe)}<br><span class="issue">בפועל \u2066${esc(r.real)}\u2069 – בשם \u2066${esc(r.size.replace('x', '×'))}\u2069</span>${r.realIs ? `<br><span class="issue"><b>זה קובץ של \u2066${esc(r.realIs)}\u2069</b></span>` : ''}</td></tr>`).join('')}</tbody></table>`
         : (sizeProg && sizeProg.done >= sizeProg.total ? '<div class="muted">✓ כל הקבצים בגודל הנכון</div>' : '');
       const unk = C.recs.filter(r => r.sizeSt === 'unk').length;
       if (unk) body += `<div class="muted" style="margin-top:6px">${unk} קבצים לא נמדדו</div>`;
