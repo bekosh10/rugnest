@@ -407,6 +407,22 @@ function matchTab(tab, art, mo = {}) {
       if (pageUse[src] == null) pageUse[src] = 'src';
     }
   });
+  // pass 4 – a sign whose words are part of another sign ("חולצות" ← "חולצות מכופתרות"): drop the extra words
+  rows.forEach((r, ri) => {
+    if (res[ri]) return;
+    const rw = matchWords(r.text);
+    if (!rw.length || numsOf(r.text).length) return;
+    const cand = pages.map((p, pi) => {
+      const pw = wordsOf(p.text);
+      if (p.nums.length || !rw.every(w => pw.includes(w)) || pw.length <= rw.length) return null;
+      const okColor = p.color === r.color || canSwap(r.color, p.color);
+      return okColor ? { pi, extra: pw.length - rw.length, same: p.color === r.color } : null;
+    }).filter(Boolean).sort((a, b) => a.extra - b.extra || b.same - a.same)[0];
+    if (cand) {
+      res[ri] = { kind: 'trim', page: cand.pi, keep: r.text, from: pages[cand.pi].color, to: cand.same ? null : r.color };
+      if (pageUse[cand.pi] == null) pageUse[cand.pi] = 'src';
+    }
+  });
   // extra pages
   const extras = [];
   pages.forEach((p, pi) => {
@@ -757,6 +773,116 @@ function changeNumber(PDFLib, doc, page, fromNum, toNum, lay, bg) {
 }
 
 // one output PDF for an item
+
+// ---- remove words from a one-line sign and centre what is left (glyphs already in the font)
+function pdfStr(src, i) {               // parse (literal) or <hex> at src[i]; returns {bytes, end}
+  const out = [];
+  if (src[i] === '<') {
+    let j = i + 1, hex = '';
+    while (src[j] !== '>') { if (/[0-9a-fA-F]/.test(src[j])) hex += src[j]; j++; }
+    if (hex.length % 2) hex += '0';
+    for (let k = 0; k < hex.length; k += 2) out.push(parseInt(hex.slice(k, k + 2), 16));
+    return { bytes: out, end: j + 1 };
+  }
+  let j = i + 1, depth = 1;
+  while (j < src.length) {
+    const c = src[j];
+    if (c === '\\') {
+      const n = src[j + 1];
+      const map = { n: 10, r: 13, t: 9, b: 8, f: 12, '(': 40, ')': 41, '\\': 92 };
+      if (n in map) { out.push(map[n]); j += 2; continue; }
+      if (/[0-7]/.test(n)) { let o = ''; let k = j + 1; while (k < j + 4 && /[0-7]/.test(src[k])) o += src[k++]; out.push(parseInt(o, 8) & 255); j = k; continue; }
+      if (n === '\r' || n === '\n') { j += 2; if (n === '\r' && src[j] === '\n') j++; continue; }
+      out.push(n.charCodeAt(0)); j += 2; continue;
+    }
+    if (c === '(') depth++;
+    if (c === ')') { depth--; if (!depth) break; }
+    out.push(c.charCodeAt(0) & 255); j++;
+  }
+  return { bytes: out, end: j + 1 };
+}
+function toUniMap(PDFLib, font) {
+  const tu = font.lookup(PDFLib.PDFName.of('ToUnicode'));
+  if (!tu) return null;
+  const u8 = PDFLib.decodePDFRawStream(tu).decode();
+  let t = ''; for (let i = 0; i < u8.length; i++) t += String.fromCharCode(u8[i]);
+  const map = {}, hx = h => parseInt(h, 16), uni = h => { let r = ''; for (let k = 0; k < h.length; k += 4) r += String.fromCharCode(parseInt(h.slice(k, k + 4), 16)); return r; };
+  for (const blk of t.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) for (const m of blk[1].matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) map[hx(m[1])] = uni(m[2]);
+  for (const blk of t.matchAll(/beginbfrange([\s\S]*?)endbfrange/g)) for (const m of blk[1].matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*(<[0-9a-fA-F]+>|\[[^\]]*\])/g)) {
+    const a = hx(m[1]), b = hx(m[2]);
+    if (m[3][0] === '<') { const base = hx(m[3].slice(1, -1)); for (let c = a; c <= b; c++) map[c] = String.fromCharCode(base + c - a); }
+    else { const arr = [...m[3].matchAll(/<([0-9a-fA-F]+)>/g)].map(x => uni(x[1])); for (let c = a; c <= b; c++) map[c] = arr[c - a] || ''; }
+  }
+  return map;
+}
+function trimWords(PDFLib, doc, page, keepText) {
+  const N = PDFLib.PDFName.of;
+  let s = getContent(PDFLib, doc, page);
+  // exactly one text-showing operator on the page
+  const shows = [...s.matchAll(/(\((?:\\.|[^\\)])*\)|<[0-9a-fA-F\s]*>)\s*Tj|\[((?:\\.|[^\]])*)\]\s*TJ/g)];
+  if (shows.length !== 1) return false;
+  const sh = shows[0], before = s.slice(0, sh.index);
+  const tf = [...before.matchAll(/\/(\S+)\s+([-\d.]+)\s+Tf/g)].pop();
+  const tm = [...before.matchAll(/([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+Tm/g)].pop();
+  if (!tf || !tm) return false;
+  const font = page.node.Resources().lookup(N('Font')).lookup(N(tf[1]));
+  if (!font) return false;
+  const uniMap = toUniMap(PDFLib, font); if (!uniMap) return false;
+  const two = font.lookup(N('Subtype')).asString() === '/Type0';
+  let wOf;
+  if (two) {
+    const df = font.lookup(N('DescendantFonts')).lookup(0), W = df.lookup(N('W')), dwO = df.lookup(N('DW')), dw = dwO ? dwO.asNumber() : 1000;
+    const wm = {};
+    if (W) for (let i = 0; i < W.size();) {
+      const a = W.lookup(i).asNumber(), nx = W.lookup(i + 1);
+      if (nx instanceof PDFLib.PDFArray) { for (let k = 0; k < nx.size(); k++) wm[a + k] = nx.lookup(k).asNumber(); i += 2; }
+      else { const b = nx.asNumber(), w = W.lookup(i + 2).asNumber(); for (let c = a; c <= b; c++) wm[c] = w; i += 3; }
+    }
+    wOf = c => (wm[c] != null ? wm[c] : dw);
+  } else {
+    const Wd = font.lookup(N('Widths')), fc = font.lookup(N('FirstChar')).asNumber();
+    wOf = c => { const i = c - fc; return Wd && i >= 0 && i < Wd.size() ? Wd.lookup(i).asNumber() : 0; };
+  }
+  // glyphs in drawing order, with the TJ kerning after each
+  const glyphs = [];
+  const addStr = bytes => { for (let i = 0; i < bytes.length; i += two ? 2 : 1) { const c = two ? (bytes[i] << 8) | bytes[i + 1] : bytes[i]; glyphs.push({ c, u: uniMap[c] || '', adj: 0 }); } };
+  if (sh[1]) addStr(pdfStr(sh[1], 0).bytes);
+  else {
+    const src = sh[2]; let i = 0;
+    while (i < src.length) {
+      const ch = src[i];
+      if (ch === '(' || ch === '<') { const r = pdfStr(src, i); addStr(r.bytes); i = r.end; }
+      else if (/[-\d.]/.test(ch)) { const m = src.slice(i).match(/^[-\d.]+/); if (glyphs.length) glyphs[glyphs.length - 1].adj += +m[0]; i += m[0].length; }
+      else i++;
+    }
+  }
+  // words = runs between spaces; Hebrew is stored in visual order (reversed)
+  const words = []; let cur = [];
+  glyphs.forEach((g, gi) => { if (g.u === ' ') { if (cur.length) words.push(cur); cur = []; } else cur.push(gi); });
+  if (cur.length) words.push(cur);
+  const keep = wordsOf(keepText);
+  const txt = w => w.map(gi => glyphs[gi].u).join('');
+  const rev = w => [...txt(w)].reverse().join('');
+  const kept = words.filter(w => keep.includes(norm(txt(w))) || keep.includes(norm(rev(w))));
+  if (!kept.length || kept.length !== keep.length || kept.length === words.length) return false;
+  const fsz = +tf[2], a = +tm[1];
+  const width = list => list.reduce((acc, g, k) => acc + wOf(g.c) - (k < list.length - 1 ? g.adj : 0), 0) / 1000 * fsz * a;
+  const oldW = width(glyphs);
+  const spaceG = glyphs.find(g => g.u === ' ');
+  const newList = [];
+  kept.forEach((w, k) => { if (k) newList.push({ ...spaceG, adj: 0 }); w.forEach(gi => newList.push({ ...glyphs[gi] })); });
+  newList[newList.length - 1] = { ...newList[newList.length - 1], adj: 0 };
+  const newW = width(newList);
+  const centre = +tm[5] + oldW / 2, newE = centre - newW / 2;
+  const hex = c => c.toString(16).padStart(two ? 4 : 2, '0');
+  const tj = '[' + newList.map(g => `<${hex(g.c)}>${g.adj ? ' ' + g.adj : ''}`).join(' ') + '] TJ';
+  const tmNew = `${tm[1]} ${tm[2]} ${tm[3]} ${tm[4]} ${newE.toFixed(4)} ${tm[6]} Tm`;
+  s = s.slice(0, sh.index) + tj + s.slice(sh.index + sh[0].length);
+  s = s.slice(0, tm.index) + tmNew + s.slice(tm.index + tm[0].length);
+  setContent(PDFLib, doc, page, s);
+  return true;
+}
+
 async function buildItemPdf(item, arts, PDFLib, cache) {
   const art = arts[item.art];
   const key = item.art;
@@ -770,6 +896,10 @@ async function buildItemPdf(item, arts, PDFLib, cache) {
   const m = item.m;
   let ok = true;
   if (m.kind === 'swap') ok = swapColors(PDFLib, out, pg, m.from, m.to, cache[key].pal);
+  if (m.kind === 'trim') {
+    ok = trimWords(PDFLib, out, pg, m.keep);
+    if (ok && m.to) ok = swapColors(PDFLib, out, pg, m.from, m.to, cache[key].pal);
+  }
   if (m.kind === 'number') {
     ok = changeNumber(PDFLib, out, pg, m.fromNum, m.toNum, cache[key].lay, m.to || m.from);
     if (ok && m.to) ok = swapColors(PDFLib, out, pg, m.from, m.to, cache[key].pal);
@@ -1012,7 +1142,7 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 
   const s1 = wb.addWorksheet('קבצים', rtl);
   s1.columns = [{ header: 'מכונה', width: 12 }, { header: 'סוג', width: 22 }, { header: 'שם קובץ', width: 55 }, { header: 'כמות', width: 8 }, { header: 'הערה', width: 30 }];
-  MACHINES.forEach(mc => plan.items.filter(i => i.machine === mc).forEach(i => s1.addRow([mc, i.tab, i.name, i.qty, i.kind === 'ok' ? '' : (i.kind === 'swap' ? 'צבע הוחלף – לבדוק' : 'מספר שונה – לבדוק')])));
+  MACHINES.forEach(mc => plan.items.filter(i => i.machine === mc).forEach(i => s1.addRow([mc, i.tab, i.name, i.qty, i.kind === 'ok' ? '' : (i.kind === 'swap' ? 'צבע הוחלף – לבדוק' : i.kind === 'trim' ? 'מילים הוסרו – לבדוק' : 'מספר שונה – לבדוק')])));
   head(s1);
 
   const s2 = wb.addWorksheet('חוסרים', rtl);

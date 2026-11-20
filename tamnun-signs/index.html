@@ -693,7 +693,7 @@ function labelExtras() {
 const isRemoved = (ti, ri) => !!S.removed[ti + ':' + ri];
 // preview of a file the app made (the source page would show the old number/colour)
 S.genThumb = {};
-const genKey = it => [it.art, it.page, it.m.kind, it.m.toNum || '', it.m.to || ''].join(':');
+const genKey = it => [it.art, it.page, it.m.kind, it.m.toNum || '', it.m.to || '', it.m.keep || ''].join(':');
 async function makeGenThumbs() {
   const P = S.plan; if (!P) return;
   let changed = false;
@@ -732,7 +732,7 @@ function inputsChips() {
   return chips.join('');
 }
 const swatch = c => c ? `<span class="sw ${c}"></span>` : '';
-const MKIND = { swap: 'נוצר – צבע הוחלף', number: 'נוצר – מספר שונה', ok: 'שיוך ידני', bank: 'מבנק הגרפיקות' };
+const MKIND = { swap: 'נוצר – צבע הוחלף', number: 'נוצר – מספר שונה', trim: 'נוצר – מילים הוסרו', ok: 'שיוך ידני', bank: 'מבנק הגרפיקות' };
 
 
 // the print-shop work order (SO) as uploaded – under the summaries
@@ -890,7 +890,7 @@ function renderSide() {
     const rem = (P.removed || []).length ? '<div class="grp">בוטלו ידנית – לא יוצאים</div>' + P.removed.map(r => `<div class="it" style="color:#8a949e"><s>${esc(r.row.colorText)} ${esc(r.row.text)}</s> · ${r.row.qty} יח'<br><span class="muted">${esc(r.tab)} · שורה ${r.row.no}</span></div>`).join('') : '';
     el.innerHTML = rem + (P.fixed.length ? P.fixed.map(i => {
       const art = S.allArts[i.art], p = art.pages[i.page];
-      const what = i.kind === 'bank' ? 'נלקח מבנק הגרפיקות' : i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.m && i.m.guess ? `שויך לפי סדר לעמוד ${i.page + 1} (אין בו טקסט קריא)` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
+      const what = i.kind === 'bank' ? 'נלקח מבנק הגרפיקות' : i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.m && i.m.guess ? `שויך לפי סדר לעמוד ${i.page + 1} (אין בו טקסט קריא)` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : i.kind === 'trim' ? `נוצר מעמוד ${i.page + 1} – נשאר רק "${i.m.keep}"${i.m.to ? ' והצבע הוחלף ל' + C.COLOR_HE[i.m.to] : ''}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
       return `<div class="it"><b class="fn" dir="ltr">${esc(i.name)}</b><br><span class="muted">${esc(i.tab)} · ${what}</span>${thumbOf(i, p) ? `<img class="th" style="margin-top:4px" src="${thumbOf(i, p)}">` : ''}</div>`;
     }).join('') + '<div class="muted" style="padding-top:8px">קבצים שנוצרו מתחילים ב-!!!!!!!!!! – לבדוק בעין לפני הדפסה.</div>' : (rem ? '' : '<div class="empty">לא תוקן כלום – הכל הגיע תקין ✓</div>'));
   } else {
