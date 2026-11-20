@@ -5,15 +5,29 @@
   "author": "Campus",
   "license": "UNLICENSED",
   "main": "main.js",
-  "version": "1.2.0",
-  "scripts": { "start": "electron ." },
+  "version": "1.3.0",
+  "scripts": {
+    "start": "electron ."
+  },
   "build": {
     "appId": "il.campus.tamnunsigns",
     "productName": "Tamnun Signs",
-    "files": ["main.js", "preload.js", "app/**/*", "build/icon.png"],
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "build/icon.png"
+    ],
     "asar": true,
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "signAndEditExecutable": false
     },
@@ -26,13 +40,39 @@
     },
     "mac": {
       "category": "public.app-category.productivity",
-      "target": [{ "target": "zip", "arch": ["arm64"] }],
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
       "identity": null,
       "icon": "build/icon.png",
       "artifactName": "tamnun-signs-mac-${arch}.${ext}"
     },
-    "directories": { "output": "dist" },
-    "publish": null
+    "directories": {
+      "output": "dist"
+    },
+    "publish": null,
+    "fileAssociations": [
+      {
+        "ext": "tamnun",
+        "name": "Tamnun Signs job",
+        "role": "Editor",
+        "icon": "build/icon.png"
+      },
+      {
+        "ext": "tamnunbank",
+        "name": "Tamnun Signs graphics bank",
+        "role": "Editor",
+        "icon": "build/icon.png"
+      }
+    ]
   },
-  "devDependencies": { "electron": "33.2.1", "electron-builder": "25.1.8" }
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  }
 }

@@ -507,15 +507,16 @@ function buildPlan(tabs, arts, so, opts = {}) {
     const ai = tabArt[ti], art = ai >= 0 ? arts[ai] : null;
     const { res, extras: ex } = matchTab(tab, art);
     // still missing → the graphics bank (pages approved in earlier orders, same size)
-    // order of trust: client page as is > bank page as is > made from a client page > made from a bank page
+    // order of trust: client page as is > made from this order's own files (same font/size/design)
+    // > bank page as is > made from a bank page. The bank is only for what this order cannot make itself.
     (opts.bankArts || []).forEach((ba, bi) => {
-      const left = tab.rows.map((r, ri) => ri).filter(ri => tab.rows[ri].qty && (!res[ri] || res[ri].kind !== 'ok' || res[ri].guess || res[ri].bank));
+      const left = tab.rows.map((r, ri) => ri).filter(ri => tab.rows[ri].qty && (!res[ri] || (res[ri].bank && res[ri].kind !== 'ok')));
       if (!left.length || !sameSize(tab.size, ba.size, 1.5)) return;
       const r2 = matchTab({ rows: left.map(ri => tab.rows[ri]) }, ba, { noGuess: true }).res;
       r2.forEach((m, k) => {
         if (!m) return;
         const cur = res[left[k]];
-        if (!cur || (m.kind === 'ok' && !(cur.bank && cur.kind === 'ok'))) res[left[k]] = { ...m, bank: true, artIdx: arts.length + bi };
+        if (!cur || m.kind === 'ok') res[left[k]] = { ...m, bank: true, artIdx: arts.length + bi };
       });
     });
     tab.rows.forEach((row, ri) => {

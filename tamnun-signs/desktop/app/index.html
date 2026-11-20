@@ -492,7 +492,16 @@ async function bankImport(buf) {
 }
 (async () => {
   await bankDirInfo();
-  if (useFolder()) { try { await folderSeed(); } catch (e) { console.error(e); } }
+  if (useFolder()) {
+    try {
+      const d = JSON.parse(new TextDecoder().decode(await desk.bankRead(S.bankDir.dir, 'dictionary.json')));
+      if (d && d.en) { S.en = d.en; if (desk.setCfg) desk.setCfg({ en: d.en }); }
+    } catch (e) {
+      // no shared dictionary yet – put this computer's one there
+      if (S.en && Object.keys(S.en).length) { try { await desk.bankWrite(S.bankDir.dir, 'dictionary.json', new TextEncoder().encode(JSON.stringify({ app: 'tamnun-signs-dictionary', saved: new Date().toISOString(), en: S.en }, null, 1))); } catch (err) {} }
+    }
+    try { await folderSeed(); } catch (e) { console.error(e); }
+  }
   else { try { await bankSyncShared(); } catch (e) {} }
   await bankLoad();
   if (S.table) recompute();
@@ -513,7 +522,7 @@ $('#bDict').onclick = () => {
   };
   const draw = () => {
     bg.innerHTML = `<div class="modal" style="width:min(640px,94vw)"><button class="mx" id="dX" title="סגירה">✕</button><h3>מילון שמות – עברית ← אנגלית</h3>
-      <div class="muted" style="margin-bottom:8px">משמש לשמות הקבצים. שורה צהובה = שונתה אצלך. ביטויים ארוכים קודמים למילים בודדות.</div>
+      <div class="muted" style="margin-bottom:8px">משמש לשמות הקבצים. שורה צהובה = שונתה אצלך. ביטויים ארוכים קודמים למילים בודדות.${useFolder() ? ' המילון נשמר גם בתיקיית הבנק – משותף לכל המחשבים.' : ''}</div>
       <div style="display:flex;gap:6px;margin-bottom:10px"><input id="nk" placeholder="מילה / ביטוי בעברית" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;width:200px">
         <input id="nv" placeholder="באנגלית" style="direction:ltr;font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;width:180px"><button class="small" id="nadd">הוספה</button></div>
       <div style="max-height:52vh;overflow:auto"><table>${rowsHtml()}</table></div>
@@ -523,7 +532,8 @@ $('#bDict').onclick = () => {
     bg.querySelector('#nadd').onclick = () => { const k = bg.querySelector('#nk').value.trim(), v = bg.querySelector('#nv').value.trim(); if (k && v) { user[k] = v; draw(); } };
     bg.querySelector('#dcancel').onclick = () => bg.remove();
     bg.querySelector('#dX').onclick = () => bg.remove();
-    bg.querySelector('#dsave').onclick = async () => { S.en = user; if (desk) await desk.setCfg({ en: user }); bg.remove(); recompute(); toast('המילון נשמר'); };
+    bg.querySelector('#dsave').onclick = async () => { S.en = user; if (desk) await desk.setCfg({ en: user });
+      if (useFolder()) { try { await desk.bankWrite(S.bankDir.dir, 'dictionary.json', new TextEncoder().encode(JSON.stringify({ app: 'tamnun-signs-dictionary', saved: new Date().toISOString(), en: user }, null, 1))); } catch (e) {} } bg.remove(); recompute(); toast('המילון נשמר'); };
   };
   draw(); document.body.appendChild(bg);
 };
@@ -884,6 +894,17 @@ $('#bExport').onclick = async () => {
   }
   check();
 })();
+// double-clicked .tamnun / .tamnunbank (installer 4+)
+async function openPath(p) {
+  try {
+    const buf = await desk.readFile(p);
+    if (/\.tamnunbank$/i.test(p)) await bankImport(buf); else await openJob(buf);
+  } catch (e) { toast('לא הצלחתי לפתוח: ' + esc(p)); }
+}
+if (desk && desk.onOpenFile) {
+  desk.onOpenFile(openPath);
+  setTimeout(async () => { for (const p of await desk.pendingOpen()) await openPath(p); }, 1500);
+}
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const m = [...document.querySelectorAll('.modal-bg')].pop(); if (m) m.remove(); } });
 window.__addFiles = addFiles; window.__S = S; window.__recompute = () => recompute();
 render();

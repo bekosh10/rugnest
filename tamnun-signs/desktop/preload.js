@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('desk', {
   bankRead: (dir, rel) => ipcRenderer.invoke('bank:read', { dir, rel }),
   bankWrite: (dir, rel, data) => ipcRenderer.invoke('bank:write', { dir, rel, data }),
   bankDelete: (dir, rel) => ipcRenderer.invoke('bank:delete', { dir, rel }),
+  pendingOpen: () => ipcRenderer.invoke('pending-open'),
+  onOpenFile: cb => ipcRenderer.on('open-file', (e, p) => cb(p)),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   applyUpdate: () => ipcRenderer.invoke('update:apply'),
 });

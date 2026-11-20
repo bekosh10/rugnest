@@ -36,6 +36,22 @@ function setupProtocol() {
   });
 }
 
+/* ---------- opening a .tamnun / .tamnunbank by double-click ---------- */
+let pendingOpen = [];
+const isJobFile = p => /\.(tamnun|tamnunbank)$/i.test(p || '');
+function sendOpen(paths) {
+  paths = paths.filter(isJobFile);
+  if (!paths.length) return;
+  if (win && win.webContents && !win.webContents.isLoading()) paths.forEach(p => win.webContents.send('open-file', p));
+  else pendingOpen.push(...paths);
+  if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+}
+app.on('open-file', (e, p) => { e.preventDefault(); sendOpen([p]); });          // Mac
+pendingOpen.push(...process.argv.slice(1).filter(isJobFile));                  // Windows: first start
+if (!app.requestSingleInstanceLock()) app.quit();
+app.on('second-instance', (e, argv) => sendOpen(argv.slice(1)));                // Windows: app already open
+ipcMain.handle('pending-open', () => { const p = pendingOpen; pendingOpen = []; return p; });
+
 let win = null;
 function createWindow() {
   win = new BrowserWindow({
@@ -51,7 +67,8 @@ function createWindow() {
 }
 
 /* ---------- bridge ---------- */
-const SHELL_VERSION = 3;   // 2 = export into sub-folders (machine / type); 3 = graphics bank in a shared (network) folder
+const SHELL_VERSION = 4;   // 4 = double-click .tamnun / .tamnunbank opens in the app
+//   // 2 = export into sub-folders (machine / type); 3 = graphics bank in a shared (network) folder
 ipcMain.handle('cfg:get', () => ({ ...readCfg(), version: currentVersion(), shellVersion: SHELL_VERSION }));
 ipcMain.handle('cfg:set', (e, patch) => { const c = { ...readCfg(), ...patch }; writeCfg(c); return c; });
 

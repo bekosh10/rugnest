@@ -28,6 +28,16 @@ Section "install"
   CreateShortCut "$DESKTOP\Tamnun Signs.lnk" "$INSTDIR\Tamnun Signs.exe"
   CreateDirectory "$SMPROGRAMS\Tamnun Signs"
   CreateShortCut "$SMPROGRAMS\Tamnun Signs\Tamnun Signs.lnk" "$INSTDIR\Tamnun Signs.exe"
+  ; double-click .tamnun / .tamnunbank → open in Tamnun Signs
+  WriteRegStr HKCU "Software\Classes\.tamnun" "" "TamnunSigns.Job"
+  WriteRegStr HKCU "Software\Classes\TamnunSigns.Job" "" "Tamnun Signs – עבודה"
+  WriteRegStr HKCU "Software\Classes\TamnunSigns.Job\DefaultIcon" "" "$INSTDIR\Tamnun Signs.exe,0"
+  WriteRegStr HKCU "Software\Classes\TamnunSigns.Job\shell\open\command" "" '"$INSTDIR\Tamnun Signs.exe" "%1"'
+  WriteRegStr HKCU "Software\Classes\.tamnunbank" "" "TamnunSigns.Bank"
+  WriteRegStr HKCU "Software\Classes\TamnunSigns.Bank" "" "Tamnun Signs – בנק גרפיקות"
+  WriteRegStr HKCU "Software\Classes\TamnunSigns.Bank\DefaultIcon" "" "$INSTDIR\Tamnun Signs.exe,0"
+  WriteRegStr HKCU "Software\Classes\TamnunSigns.Bank\shell\open\command" "" '"$INSTDIR\Tamnun Signs.exe" "%1"'
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TamnunSigns" "DisplayName" "Tamnun Signs"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TamnunSigns" "DisplayIcon" "$INSTDIR\Tamnun Signs.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TamnunSigns" "Publisher" "Campus"
@@ -44,4 +54,8 @@ Section "Uninstall"
   RMDir /r "$SMPROGRAMS\Tamnun Signs"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TamnunSigns"
+  DeleteRegKey HKCU "Software\Classes\.tamnun"
+  DeleteRegKey HKCU "Software\Classes\TamnunSigns.Job"
+  DeleteRegKey HKCU "Software\Classes\.tamnunbank"
+  DeleteRegKey HKCU "Software\Classes\TamnunSigns.Bank"
 SectionEnd
