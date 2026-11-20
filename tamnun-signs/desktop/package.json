@@ -1,0 +1,38 @@
+{
+  "name": "tamnun-signs",
+  "productName": "Tamnun Signs",
+  "description": "תמנון – סידור קבצי שילוט לפי טבלה",
+  "author": "Campus",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "version": "1.0.0",
+  "scripts": { "start": "electron ." },
+  "build": {
+    "appId": "il.campus.tamnunsigns",
+    "productName": "Tamnun Signs",
+    "files": ["main.js", "preload.js", "app/**/*", "build/icon.png"],
+    "asar": true,
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "shortcutName": "Tamnun Signs",
+      "artifactName": "tamnun-signs-setup.${ext}"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [{ "target": "zip", "arch": ["arm64"] }],
+      "identity": null,
+      "icon": "build/icon.png",
+      "artifactName": "tamnun-signs-mac-${arch}.${ext}"
+    },
+    "directories": { "output": "dist" },
+    "publish": null
+  },
+  "devDependencies": { "electron": "33.2.1", "electron-builder": "25.1.8" }
+}

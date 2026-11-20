@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>תמנון – שילוט</title>
+<!-- TAMNUN_APP -->
+<script src="lib/exceljs.min.js"></script>
+<script src="lib/pdf-lib.min.js"></script>
+<script src="core.js"></script>
+<style>
+  @font-face { font-family:Heebo; src:url(lib/fonts/heebo-hebrew-400-normal.woff2) format('woff2'); }
+  :root { --bg:#f4f6f8; --card:#fff; --line:#e2e6ea; --text:#1d2733; --muted:#6b7785; --blue:#1f6feb; --blue2:#e8f0fe; --red:#d93025; --redbg:#fdecea; --yel:#fff6d6; --green:#1e8e3e; --greenbg:#e6f4ea; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Segoe UI",Heebo,-apple-system,Arial,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:16px; padding:12px 20px; background:var(--card); border-bottom:1px solid var(--line); }
+  header h1 { font-size:18px; margin:0; white-space:nowrap; }
+  .so { font-size:18px; font-weight:700; direction:ltr; color:var(--blue); }
+  .spacer { flex:1; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  button:hover { background:#f0f3f6; }
+  button.primary { background:var(--blue); color:#fff; border-color:var(--blue); font-weight:600; }
+  button.primary:hover { background:#1a5fd0; }
+  button.small { padding:3px 9px; font-size:12px; }
+  button:disabled { opacity:.45; cursor:default; }
+  main { padding:16px 20px 70px; }
+  .layout { display:flex; gap:14px; align-items:flex-start; }
+  .mainCol { flex:1; min-width:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .muted { color:var(--muted); font-size:13px; font-weight:400; }
+  #drop { border:2px dashed #b8c2cc; border-radius:14px; padding:34px 20px; text-align:center; background:#fafbfc; }
+  body.over #drop { border-color:var(--blue); background:var(--blue2); }
+  #drop .big { font-size:19px; font-weight:600; margin-bottom:8px; }
+  .inputs { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; justify-content:center; }
+  .chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:16px; background:#eef1f4; font-size:12.5px; }
+  .chip.ok { background:var(--greenbg); color:var(--green); }
+  .chip.no { background:var(--redbg); color:var(--red); }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:5px 8px; border-bottom:1px solid var(--line); text-align:right; vertical-align:middle; }
+  th { font-size:12px; color:var(--muted); font-weight:600; background:#fafbfc; }
+  td.n, th.n { text-align:center; }
+  td.fname { font-size:13px; }
+  tr.miss td { background:var(--redbg); }
+  tr.fix td { background:var(--yel); }
+  tr.zero td { color:#aab3bd; }
+  img.th { height:34px; max-width:120px; border:1px solid #d5dbe1; border-radius:3px; display:block; background:#fff; }
+  .sw { display:inline-block; width:12px; height:12px; border-radius:3px; border:1px solid #c5ccd3; vertical-align:middle; margin-inline-end:4px; }
+  .sw.red { background:#e11d2a; } .sw.white { background:#fff; } .sw.blue { background:#1d4fe1; } .sw.color { background:linear-gradient(135deg,#ec2a8a,#f5e50a); }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px; background:#eef1f4; font-size:12px; white-space:nowrap; }
+  .badge.red { background:var(--redbg); color:var(--red); }
+  .badge.green { background:var(--greenbg); color:var(--green); }
+  .badge.yel { background:#fde9a8; color:#7a5800; }
+  select { font:inherit; font-size:12px; padding:2px 4px; width:120px; }
+  .fn { unicode-bidi:plaintext; direction:rtl; display:inline-block; }
+  .sum td.n { white-space:nowrap; }
+  aside#side { width:330px; flex:none; position:sticky; top:70px; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - 70px - 50px); }
+  .tabs { display:flex; border-bottom:1px solid var(--line); flex:none; }
+  .tabs button { flex:1; border:none; border-radius:0; padding:10px 6px; background:#fafbfc; color:var(--muted); font-weight:600; }
+  .tabs button.on { background:#fff; color:var(--blue); box-shadow:inset 0 -2px 0 var(--blue); }
+  .tabs .cnt { display:inline-block; min-width:18px; padding:0 5px; border-radius:9px; font-size:11px; background:#e1e6eb; color:var(--text); margin-inline-start:4px; }
+  .tabs .cnt.red { background:var(--red); color:#fff; }
+  .tabs .cnt.yel { background:#e8a200; color:#fff; }
+  .pane { overflow-y:auto; min-height:0; padding:10px 14px 14px; }
+  .pane .it { padding:7px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .pane .it b { font-weight:600; }
+  .pane .it .muted { font-size:12px; }
+  .pane .empty { color:var(--green); padding:16px 0; text-align:center; }
+  .grp { margin:10px 0 2px; font-size:12px; color:var(--muted); font-weight:700; }
+  .sum table td { padding:5px 4px; font-size:13px; }
+  .sum tr.mrow td { background:#eef3fd; cursor:pointer; font-weight:700; font-size:14px; border-top:6px solid #fff; }
+  .sum tr.trow td { font-weight:600; cursor:pointer; }
+  .sum tr.trow td:first-child { padding-inline-start:20px; }
+  .sum tr.frow td { font-size:12px; color:var(--muted); }
+  .sum tr.frow td:first-child { padding-inline-start:36px; }
+  .sum .arr { display:inline-block; width:14px; color:var(--blue); }
+  .sum tr.tot td { font-weight:700; border-top:2px solid var(--line); }
+  footer { position:fixed; bottom:0; left:0; right:0; display:flex; align-items:center; gap:12px; padding:8px 20px; background:var(--card); border-top:1px solid var(--line); font-size:12px; color:var(--muted); }
+  .toast { position:fixed; bottom:50px; left:20px; background:#1d2733; color:#fff; padding:12px 16px; border-radius:10px; z-index:30; max-width:560px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
+  .modal-bg { position:fixed; inset:0; background:rgba(20,30,40,.35); display:flex; align-items:flex-start; justify-content:center; padding-top:60px; z-index:20; }
+  .modal { background:#fff; border-radius:14px; width:min(640px,94vw); max-height:80vh; overflow:auto; padding:18px 22px; box-shadow:0 10px 40px rgba(0,0,0,.2); }
+  .modal h3 { margin:0 0 12px; font-size:18px; }
+  .modal .foot { display:flex; gap:8px; margin-top:16px; }
+  .busy { position:fixed; inset:0; background:rgba(255,255,255,.7); display:flex; align-items:center; justify-content:center; z-index:40; font-size:18px; font-weight:600; }
+  .tabhead { display:flex; align-items:center; gap:10px; }
+  .tabhead .r { margin-inline-start:auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>תמנון – שילוט</h1>
+  <span class="so" id="soLbl"></span>
+  <div class="spacer"></div>
+  <button id="bClear">ניקוי</button>
+  <button id="bExport" class="primary" disabled>ייצוא</button>
+</header>
+<main>
+  <div class="layout">
+    <div class="mainCol">
+      <div class="card" id="drop">
+        <div class="big">גררי לכאן את כל הקבצים של ההזמנה</div>
+        <div class="muted">הטבלה (אקסל), הזמנת העבודה (PDF), וקבצי העיצוב (PDF) – אפשר הכל ביחד, או תיקייה</div>
+        <div class="inputs" id="inputs"></div>
+      </div>
+      <div id="tabsOut"></div>
+    </div>
+    <aside class="card" id="side">
+      <div class="tabs">
+        <button data-p="miss" class="on">חוסרים<span class="cnt" id="cMiss">0</span></button>
+        <button data-p="fix">מתוקנים<span class="cnt" id="cFix">0</span></button>
+        <button data-p="sum">סיכומים</button>
+      </div>
+      <div class="pane" id="pane"></div>
+    </aside>
+  </div>
+</main>
+<footer><span id="ver"></span><span class="spacer"></span><span id="upd"></span></footer>
+
+<script type="module">
+import * as pdfjs from './lib/pdf.min.mjs';
+pdfjs.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.mjs';
+const C = window.TamnunCore, PDFLib = window.PDFLib, ExcelJS = window.ExcelJS;
+const deps = { pdfjs, PDFLib, ExcelJS, makeCanvas: (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; } };
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const desk = window.desk || null;
+
+const S = { table: null, tableName: '', so: null, soName: '', arts: [], plan: null, pane: 'miss', open: {}, override: {} };
+
+/* ---------------- loading ---------------- */
+async function busy(msg, fn) {
+  const d = document.createElement('div'); d.className = 'busy'; d.textContent = msg; document.body.appendChild(d);
+  try { return await fn(); } finally { d.remove(); }
+}
+function toast(html, ms = 5000) { const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = html; document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
+
+async function isSO(buf) {
+  try {
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(buf).slice() }).promise;
+    if (doc.numPages > 3) { await doc.destroy(); return false; }
+    const tc = await (await doc.getPage(1)).getTextContent();
+    const t = tc.items.map(i => i.str).join(' ');
+    await doc.destroy();
+    return /הזמנת עבודה/.test(t) || (/SO/.test(t) && /יח'/.test(t));
+  } catch (e) { return false; }
+}
+
+async function addFiles(list) {   // list of {name, buf}
+  await busy('קורא קבצים…', async () => {
+    for (const f of list) {
+      const n = f.name.toLowerCase();
+      try {
+        if (/\.xlsx$/.test(n)) {
+          S.table = await C.readTableXlsx(f.buf, ExcelJS); S.tableName = f.name;
+          if (!S.table.length) toast('לא מצאתי לשוניות עם טבלת שילוט באקסל ' + esc(f.name));
+        } else if (/\.pdf$/.test(n)) {
+          if (await isSO(f.buf)) { S.so = await C.readSO(f.buf, pdfjs); S.soName = f.name; }
+          else {
+            S.arts = S.arts.filter(a => a.name !== f.name);
+            S.arts.push(await C.analyzeArtwork(f.buf, f.name, deps, { thumb: 160, keepThumb: true }));
+          }
+        }
+      } catch (e) { console.error(e); toast('שגיאה בקריאת ' + esc(f.name) + ': ' + esc(e.message || e)); }
+    }
+  });
+  recompute();
+}
+
+document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('over'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('over'); });
+document.addEventListener('drop', async e => {
+  e.preventDefault(); document.body.classList.remove('over');
+  const files = [...e.dataTransfer.files];
+  const out = [];
+  if (desk) {
+    const paths = files.map(f => desk.pathOf(f)).filter(Boolean);
+    const all = await desk.scan(paths);
+    for (const it of all) if (/\.(pdf|xlsx)$/i.test(it.path)) out.push({ name: it.path.split(/[\\/]/).pop(), buf: await desk.readFile(it.path) });
+  } else {
+    for (const f of files) out.push({ name: f.name, buf: await f.arrayBuffer() });
+  }
+  addFiles(out);
+});
+$('#bClear').onclick = () => { Object.assign(S, { table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
+
+/* ---------------- plan ---------------- */
+function recompute() {
+  S.plan = S.table ? C.buildPlan(S.table, S.arts, S.so) : null;
+  if (S.plan) applyOverrides();
+  render();
+}
+// manual page choice per row: key = tabIndex:rowIndex → page index (or -1 = none)
+function applyOverrides() {
+  const P = S.plan;
+  for (const [k, pg] of Object.entries(S.override)) {
+    const [ti, ri] = k.split(':').map(Number);
+    const tab = S.table[ti], row = tab.rows[ri];
+    if (!row.qty) continue;
+    const ai = P.tabArt[ti]; if (ai < 0) continue;
+    P.items = P.items.filter(i => i.row !== row);
+    P.fixed = P.fixed.filter(i => i.row !== row);
+    P.missing = P.missing.filter(m => m.row !== row);
+    if (pg < 0) { P.missing.push({ tab: tab.name, ti, row, reason: 'סומן ידנית – בלי עמוד' }); continue; }
+    const page = S.arts[ai].pages[pg];
+    const base = C.fileSafe(`${C.fileSafe(String(row.format || tab.format).replace(/ס"?מ/g, '').replace(/[*×]/g, 'x'))} - ${[row.colorText && !/צבעוני/.test(row.colorText) ? row.colorText : '', row.text || page.text].filter(Boolean).join(' ')}${tab.duplex ? ' - דו צדדי' : ''} x${row.qty}`);
+    P.items.push({ ti, tab: tab.name, machine: tab.machine, row, art: ai, page: pg, kind: 'ok', m: { kind: 'ok', page: pg, manual: true }, name: base + '.pdf', qty: row.qty, manual: true });
+    P.fixed.push(P.items[P.items.length - 1]);
+  }
+}
+const itemOf = row => S.plan && S.plan.items.find(i => i.row === row);
+const missOf = row => S.plan && S.plan.missing.find(m => m.row === row);
+
+/* ---------------- render ---------------- */
+function inputsChips() {
+  const chips = [];
+  chips.push(S.table ? `<span class="chip ok">טבלה: ${esc(S.tableName)} (${S.table.length} לשוניות)</span>` : `<span class="chip no">חסרה טבלה (אקסל)</span>`);
+  chips.push(S.so ? `<span class="chip ok">הזמנה: ${esc(S.so.soNumber || S.soName)}</span>` : `<span class="chip">אין הזמנת עבודה</span>`);
+  S.arts.forEach(a => chips.push(`<span class="chip ${S.plan && S.plan.unusedArts.includes(S.arts.indexOf(a)) ? 'no' : 'ok'}">${esc(a.name)} · ${a.pages.length} עמ' · ${a.size.map(x => x.toFixed(1)).join('×')}</span>`));
+  return chips.join('');
+}
+const swatch = c => c ? `<span class="sw ${c}"></span>` : '';
+const MKIND = { swap: 'צבע הוחלף', number: 'מספר שונה', ok: 'שיוך ידני' };
+
+function render() {
+  $('#inputs').innerHTML = inputsChips();
+  $('#soLbl').textContent = S.so && S.so.soNumber || '';
+  const P = S.plan;
+  $('#bExport').disabled = !P || !P.items.length;
+  const out = [];
+  if (P) S.table.forEach((tab, ti) => {
+    const ai = P.tabArt[ti], art = ai >= 0 ? S.arts[ai] : null;
+    const ck = P.checks[ti];
+    const sumBadge = ck.so != null ? (ck.so === ck.sum ? `<span class="badge green">סה"כ ${ck.sum} = הזמנה ✓</span>` : `<span class="badge red">סה"כ ${ck.sum} ≠ הזמנה ${ck.so}</span>`) : `<span class="badge">סה"כ ${ck.sum}</span>`;
+    out.push(`<div class="card"><h2 class="tabhead">${esc(tab.name)} <span class="badge">${esc(tab.machine)}</span>${tab.duplex ? '<span class="badge">דו צדדי</span>' : ''} ${sumBadge}
+      <span class="muted r">${art ? esc(art.name) + ' · ' + art.pages.length + ' עמ\'' : '<span class="badge red">אין קובץ בגודל ' + (tab.size ? tab.size.join('×') : '?') + '</span>'}</span></h2>
+      <table><tr><th>#</th><th>צבע</th><th>שילוט</th><th class="n">כמות</th><th>עמוד</th><th></th><th>שם קובץ</th></tr>`);
+    tab.rows.forEach((row, ri) => {
+      const it = itemOf(row), ms = missOf(row);
+      const cls = !row.qty ? 'zero' : ms ? 'miss' : (it && it.kind !== 'ok') || (it && it.manual) ? 'fix' : '';
+      const page = it ? art.pages[it.page] : null;
+      let sel = '';
+      if (art && row.qty) {
+        const cur = it ? it.page : -1;
+        sel = `<select data-k="${ti}:${ri}"><option value="auto">אוטומטי</option><option value="-1"${S.override[ti + ':' + ri] === -1 ? ' selected' : ''}>— בלי —</option>` +
+          art.pages.map((p, pi) => `<option value="${pi}"${S.override[ti + ':' + ri] === pi ? ' selected' : ''}>עמ' ${pi + 1}: ${esc(C.COLOR_HE[p.color])} ${esc(p.text.slice(0, 22)) || '(ללא טקסט)'}</option>`).join('') + '</select>';
+      }
+      const status = !row.qty ? '<span class="muted">כמות 0 – לא יוצא</span>'
+        : ms ? `<span class="badge red">חסר</span> <span class="muted">${esc(ms.reason)}</span>`
+        : it.kind !== 'ok' ? `<span class="badge yel">${MKIND[it.kind]} – לבדוק</span>`
+        : it.manual ? '<span class="badge yel">שיוך ידני</span>' : '';
+      out.push(`<tr class="${cls}"><td class="muted">${row.sheetRow}</td><td>${swatch(row.color)}${esc(row.colorText)}</td><td>${esc(row.text)}</td><td class="n"><b>${row.qty || ''}</b></td>
+        <td>${page && page.thumb ? `<img class="th" src="${page.thumb}" title="עמוד ${it.page + 1}">` : ''}</td><td>${sel}</td>
+        <td class="fname">${it ? `<span class="fn" dir="rtl">${esc(it.name)}</span>` : ''} ${status}</td></tr>`);
+    });
+    out.push('</table></div>');
+  });
+  $('#tabsOut').innerHTML = out.join('');
+  document.querySelectorAll('select[data-k]').forEach(s => s.onchange = () => {
+    if (s.value === 'auto') delete S.override[s.dataset.k]; else S.override[s.dataset.k] = +s.value;
+    recompute();
+  });
+  renderSide();
+}
+
+function renderSide() {
+  const P = S.plan;
+  const nMiss = P ? P.missing.length + P.extras.length + P.checks.filter(c => c.so != null && c.so !== c.sum).length + P.unusedArts.length : 0;
+  const nFix = P ? P.fixed.length : 0;
+  $('#cMiss').textContent = nMiss; $('#cMiss').className = 'cnt' + (nMiss ? ' red' : '');
+  $('#cFix').textContent = nFix; $('#cFix').className = 'cnt' + (nFix ? ' yel' : '');
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.p === S.pane));
+  const el = $('#pane');
+  if (!P) { el.innerHTML = '<div class="muted" style="padding:14px 0">גררי טבלה וקבצים כדי להתחיל</div>'; return; }
+  if (S.pane === 'miss') {
+    const h = [];
+    const bad = P.checks.filter(c => c.so != null && c.so !== c.sum);
+    if (bad.length) { h.push('<div class="grp">סה"כ לא תואם להזמנה</div>'); bad.forEach(c => h.push(`<div class="it"><b>${esc(c.tab)}</b><br><span class="muted">בטבלה ${c.sum} · בהזמנה ${c.so}</span></div>`)); }
+    if (P.missing.length) { h.push('<div class="grp">שורות בטבלה בלי קובץ</div>'); P.missing.forEach(m => h.push(`<div class="it"><b>${swatch(m.row.color)}${esc(m.row.colorText)} ${esc(m.row.text)}</b> · ${m.row.qty} יח'<br><span class="muted">${esc(m.tab)} · שורה ${m.row.sheetRow} · ${esc(m.reason)}</span></div>`)); }
+    if (P.extras.length) { h.push('<div class="grp">עמודים בקבצים שלא בהזמנה (לא יוצאים)</div>'); P.extras.forEach(e => h.push(`<div class="it">${swatch(e.color)}<b>${esc(e.text) || '(ללא טקסט)'}</b>${e.twin != null ? ' <span class="badge">כפול</span>' : ''}<br><span class="muted">${esc(e.tab)} · עמוד ${e.page + 1}</span></div>`)); }
+    if (P.unusedArts.length) { h.push('<div class="grp">קבצים שלא התאימו לאף לשונית</div>'); P.unusedArts.forEach(i => h.push(`<div class="it"><b>${esc(S.arts[i].name)}</b><br><span class="muted">גודל ${S.arts[i].size.map(x => x.toFixed(1)).join('×')} ס"מ</span></div>`)); }
+    if (!S.so) h.push('<div class="grp">אין הזמנת עבודה – הסה"כים לא נבדקו</div>');
+    el.innerHTML = h.length ? h.join('') : '<div class="empty">אין חוסרים ✓</div>';
+  } else if (S.pane === 'fix') {
+    el.innerHTML = P.fixed.length ? P.fixed.map(i => {
+      const art = S.arts[i.art], p = art.pages[i.page];
+      const what = i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
+      return `<div class="it"><b class="fn" dir="rtl">${esc(i.name)}</b><br><span class="muted">${esc(i.tab)} · ${what}</span>${p.thumb ? `<img class="th" style="margin-top:4px" src="${p.thumb}">` : ''}</div>`;
+    }).join('') + '<div class="muted" style="padding-top:8px">קבצים שנוצרו מתחילים ב-!!!!!!!!!! – לבדוק בעין לפני הדפסה.</div>' : '<div class="empty">לא תוקן כלום – הכל הגיע תקין ✓</div>';
+  } else {
+    const h = ['<table class="sum">'];
+    let gf = 0, gu = 0;
+    C.MACHINES.forEach(mc => {
+      const its = P.items.filter(i => i.machine === mc); if (!its.length) return;
+      const u = its.reduce((a, i) => a + i.qty, 0); gf += its.length; gu += u;
+      const mo = S.open[mc] !== false;
+      h.push(`<tr class="mrow" data-o="${esc(mc)}"><td><span class="arr">${mo ? '▾' : '◂'}</span>${esc(mc)}</td><td class="n">${its.length} קבצים</td><td class="n">${u} יח'</td></tr>`);
+      if (!mo) return;
+      [...new Set(its.map(i => i.tab))].forEach(t => {
+        const ti = its.filter(i => i.tab === t), key = mc + '|' + t, to = !!S.open[key];
+        h.push(`<tr class="trow" data-o="${esc(key)}"><td><span class="arr">${to ? '▾' : '◂'}</span>${esc(t)}</td><td class="n">${ti.length}</td><td class="n">${ti.reduce((a, i) => a + i.qty, 0)}</td></tr>`);
+        if (to) ti.forEach(i => h.push(`<tr class="frow"><td colspan="2"><span class="fn" dir="rtl">${esc(i.name.replace(/\.pdf$/, ''))}</span></td><td class="n">${i.qty}</td></tr>`));
+      });
+    });
+    h.push(`<tr class="tot"><td>סה"כ</td><td class="n">${gf} קבצים</td><td class="n">${gu} יח'</td></tr></table>`);
+    el.innerHTML = h.join('');
+    el.querySelectorAll('tr[data-o]').forEach(tr => tr.onclick = () => { const k = tr.dataset.o; S.open[k] = tr.classList.contains('mrow') ? S.open[k] === false : !S.open[k]; renderSide(); });
+  }
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { S.pane = b.dataset.p; renderSide(); });
+
+/* ---------------- export ---------------- */
+function confirmBox(html) {
+  return new Promise(res => {
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal"><h3>לפני הייצוא</h3>${html}<div class="foot"><button class="primary" id="yes">להמשיך בכל זאת</button><button id="no">ביטול</button></div></div>`;
+    document.body.appendChild(bg);
+    bg.querySelector('#yes').onclick = () => { bg.remove(); res(true); };
+    bg.querySelector('#no').onclick = () => { bg.remove(); res(false); };
+  });
+}
+$('#bExport').onclick = async () => {
+  const P = S.plan; if (!P) return;
+  const bad = P.checks.filter(c => c.so != null && c.so !== c.sum);
+  if (P.missing.length || bad.length) {
+    const ok = await confirmBox(`<p>יש ${P.missing.length} שורות בלי קובץ${bad.length ? ` ו-${bad.length} סוגים שהסה"כ שלהם לא תואם להזמנה` : ''}. הן יופיעו בדוח החוסרים.</p>`);
+    if (!ok) return;
+  }
+  if (!desk) { toast('הייצוא עובד רק בתוכנה המותקנת'); return; }
+  const parent = await desk.pickFolder({ title: 'איפה ליצור את תיקיית ההזמנה?' });
+  if (!parent) return;
+  await busy('מכין קבצים…', async () => {
+    const files = [], failed = [], cache = {};
+    for (const it of P.items) {
+      const bytes = await C.buildItemPdf(it, S.arts, PDFLib, cache);
+      if (!bytes) { failed.push(it); continue; }
+      files.push({ sub: it.machine, name: it.name, data: bytes });
+    }
+    failed.forEach(it => P.missing.push({ tab: it.tab, row: it.row, reason: 'לא הצלחתי ליצור את הקובץ – צריך קובץ מהלקוח' }));
+    const report = await C.buildReport(P, S.table, S.so, ExcelJS);
+    const folderName = ((S.so && S.so.soNumber) || 'הזמנה') + ' תמנון';
+    const r = await desk.exportFiles({ parent, folderName, files, report });
+    if (r.ok) toast(`נוצרו ${files.length} קבצים ב-<b>${esc(r.dir)}</b>${failed.length ? `<br>${failed.length} קבצים לא נוצרו – ראי חוסרים` : ''}`, 9000);
+    else toast('שגיאה בייצוא: ' + esc(r.error), 9000);
+    if (failed.length) renderSide();
+  });
+};
+
+/* ---------------- version / update ---------------- */
+(async () => {
+  if (!desk) { $('#ver').textContent = 'גרסת דפדפן'; return; }
+  const cfg = await desk.getCfg();
+  $('#ver').textContent = 'גרסה ' + cfg.version;
+  const u = await desk.checkUpdate();
+  if (u.ok && u.available) {
+    $('#upd').innerHTML = `<button class="small primary" id="bUpd">יש גרסה חדשה – לעדכן</button> <span>${esc(u.notes)}</span>`;
+    $('#bUpd').onclick = async () => { $('#bUpd').disabled = true; const r = await desk.applyUpdate(); if (!r.ok) toast('העדכון נכשל: ' + esc(r.error)); };
+  }
+})();
+window.__addFiles = addFiles;
+render();
+</script>
+</body>
+</html>
