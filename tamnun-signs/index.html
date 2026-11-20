@@ -1022,7 +1022,7 @@ async function orderPdf(mc, rows, sheetsInfo, detail) {
   // light-blue box: department + material first
   const info = [['מחלקה', mc], ['חומר', DEPT_MAT[mc] || mc], ['לקוח', meta['לקוח'] || 'תמנון טקסטיל בע"מ'], ['תאריך הזמנה', meta['תאריך הזמנה'] || '-'],
     ['תאריך סיום נדרש', meta['תאריך סיום נדרש'] || '-'], ['איש קשר', meta['איש קשר'] || '-']];
-  if (sheetsInfo) sheetsInfo.forEach(si => info.push([`גיליונות הדפסה – ${si.label}`, `${si.prints} הדפסות` + (si.unique !== si.prints ? ` · ${si.unique} גיליונות שונים` : '')]));
+  if (sheetsInfo) sheetsInfo.forEach(si => info.push([`גיליונות הדפסה – ${si.label}`, `${si.prints} גיליונות`]));
   const boxH = 18 + Math.ceil(info.length / 2) * 32;
   c.fillStyle = light; c.strokeStyle = line; c.lineWidth = 0.7;
   c.beginPath(); c.roundRect(40, 100, W - 80, boxH, 8); c.fill(); c.stroke();
