@@ -922,7 +922,7 @@ $('#bLayout').onclick = async () => {
       <span class="muted" id="lInfo"></span>
     </div>
     <div class="lay-sheets" id="laySh"></div>
-    <div class="foot"><button class="primary" id="lExp">ייצוא פריסה (פרינט + קאט)</button><button id="lClose">סגירה</button></div></div>`;
+    <div class="foot"><button class="primary" id="lExp">ייצוא…</button><button id="lClose">סגירה</button></div></div>`;
   document.body.appendChild(bg);
   const close = () => bg.remove();
   bg.querySelector('.mx').onclick = close; bg.querySelector('#lClose').onclick = close;
@@ -961,21 +961,52 @@ $('#bLayout').onclick = async () => {
     laySave(cfg); draw();
   };
   ['#lW', '#lL', '#lG', '#lB'].forEach(id => bg.querySelector(id).onchange = upd);
-  bg.querySelector('#lExp').onclick = async () => {
-    if (!desk) { toast('הייצוא עובד רק בתוכנה המותקנת'); return; }
-    const parent = await desk.pickFolder({ title: 'איפה לשמור את הפריסה?' });
-    if (!parent) return;
-    await busy('מייצא פריסה…', async () => {
-      const files = [];
-      for (const t of tabs) {
-        const gs = groupsOf[t]; if (!gs.length) continue;
-        const r = await C.buildLayoutPdfs(gs, optsFor(t), `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
-        const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
-        files.push({ sub: [], name: `${base} print.pdf`, data: r.print }, { sub: [], name: `${base} cut.pdf`, data: r.cut }, { sub: [], name: `${base} proof - לבדיקה.pdf`, data: r.proof });
-      }
-      const res = await desk.exportFiles({ parent, folderName: `${soNo() || 'הזמנה'} פריסת מגנטי`, files });
-      toast(res.ok ? `הפריסה נשמרה ב-<b>${esc(res.dir)}</b>` : 'שגיאה: ' + esc(res.error), 9000);
-    });
+  bg.querySelector('#lExp').onclick = () => exportDialog();
+  const isWin = /win/i.test(navigator.platform || navigator.userAgent);
+  const exportDialog = () => {
+    const d = document.createElement('div'); d.className = 'modal-bg';
+    const pick = async (key, title) => {
+      if (!desk) { toast('עובד רק בתוכנה המותקנת'); return; }
+      const f = await desk.pickFolder({ title, start: cfg[key] }); if (!f) return;
+      cfg[key] = f; laySave(cfg); fill();
+    };
+    const fill = () => {
+      const so = soNo() || 'order', t = layJob(cur).toLowerCase(), star = isWin ? 'x' : '*';
+      d.innerHTML = `<div class="modal"><button class="mx" title="סגירה">✕</button><h3>הגדרות ייצוא פריסה</h3>
+        <h4 style="margin:10px 0 4px">פרינט</h4>
+        <div>תיקייה: <b dir="ltr" style="unicode-bidi:isolate">${esc(cfg.printDir || '— לא נבחרה —')}</b> <button class="small" id="pP">בחירה…</button></div>
+        <div class="muted" style="margin-top:4px">קובץ לכל גיליון: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnoon ${esc(t)} 001${star}6.pdf</span> (מספר גיליון ${star} כמות הדפסות). גרפיקה + נקודות + טקסט, בלי קווים.</div>
+        <label style="display:block;margin-top:6px"><input type="checkbox" id="pProof" ${cfg.proof ? 'checked' : ''}> גם קובץ proof לבדיקה (גרפיקה + חיתוך) בתיקיית הפרינט</label>
+        <h4 style="margin:14px 0 4px">קאט</h4>
+        <div>תיקייה: <b dir="ltr" style="unicode-bidi:isolate">${esc(cfg.cutDir || '— לא נבחרה —')}</b> <button class="small" id="pC">בחירה…</button></div>
+        <div class="muted" style="margin-top:4px">קובץ אחד עם כל הגיליונות: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnoon ${esc(t)} cut.pdf</span>. קווי חיתוך (Thru-cut) + נקודות, בלי טקסט.</div>
+        <p class="muted" style="margin-top:12px">ייוצאו כל הסוגים: ${tabs.map(esc).join(' · ')}. התיקיות נשמרות לפעם הבאה.</p>
+        <div class="foot"><button class="primary" id="pGo" ${cfg.printDir && cfg.cutDir ? '' : 'disabled'}>ייצוא</button><button id="pX">ביטול</button></div></div>`;
+      d.querySelector('.mx').onclick = () => d.remove(); d.querySelector('#pX').onclick = () => d.remove();
+      d.querySelector('#pP').onclick = () => pick('printDir', 'תיקייה לקבצי פרינט');
+      d.querySelector('#pC').onclick = () => pick('cutDir', 'תיקייה לקבצי קאט');
+      d.querySelector('#pProof').onchange = e => { cfg.proof = e.target.checked; laySave(cfg); };
+      d.querySelector('#pGo').onclick = go;
+    };
+    const go = async () => {
+      d.remove();
+      await busy('מייצא פריסה…', async () => {
+        const star = isWin ? 'x' : '*'; let n = 0;
+        try {
+          for (const t of tabs) {
+            const gs = groupsOf[t]; if (!gs.length) continue;
+            const r = await C.buildLayoutPdfs(gs, { ...optsFor(t), splitPrint: true }, `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
+            const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
+            for (const ps of r.printSheets) { await desk.bankWrite(cfg.printDir, `${base} ${String(ps.no).padStart(3, '0')}${star}${ps.copies}.pdf`, ps.bytes); n++; }
+            await desk.bankWrite(cfg.cutDir, `${base} cut.pdf`, r.cut); n++;
+            if (cfg.proof) { await desk.bankWrite(cfg.printDir, `${base} proof.pdf`, r.proof); n++; }
+          }
+          toast(`יוצאו ${n} קבצים<br>פרינט: <b>${esc(cfg.printDir)}</b><br>קאט: <b>${esc(cfg.cutDir)}</b>`, 9000);
+          desk.reveal(cfg.printDir);
+        } catch (e) { toast('שגיאה בייצוא: ' + esc(e.message || e), 9000); }
+      });
+    };
+    fill(); document.body.appendChild(d);
   };
   draw();
 };

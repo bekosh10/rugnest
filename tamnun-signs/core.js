@@ -929,7 +929,19 @@ async function buildLayoutPdfs(groups, o, label, PDFLib) {
     // proof: graphics + cut lines on top – for checking only, not for the machine
     pfL(f, `${marks}q /OC /Pr2 BDC /CScut CS 1 SCN 2 w 0 J 0 j\n${rects}\nEMC Q\n`);
   }
-  return { print: await pr.save(), cut: await cu.save(), proof: await pf.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies })) };
+  // one print file per sheet (for the RIP): same page, its own layers
+  const printSheets = [];
+  if (o.splitPrint) for (let i = 0; i < sheets.length; i++) {
+    const d = await PDFLib.PDFDocument.create();
+    const [pg] = await d.copyPages(pr, [i]); d.addPage(pg);
+    const props = pg.node.normalizedEntries().Resources.lookup(PDFLib.PDFName.of('Properties'));
+    if (props) {
+      const reg = props.get(PDFLib.PDFName.of('Pr1')), cut = props.get(PDFLib.PDFName.of('Pr2'));
+      d.catalog.set(PDFLib.PDFName.of('OCProperties'), d.context.obj({ OCGs: [cut, reg], D: { Order: [cut, reg], ON: [cut, reg] } }));
+    }
+    printSheets.push({ bytes: await d.save(), copies: sheets[i].copies, no: i + 1 });
+  }
+  return { print: await pr.save(), printSheets, cut: await cu.save(), proof: await pf.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies })) };
 }
 
 /* ================================================================ REPORT (xlsx) */
