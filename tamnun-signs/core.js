@@ -863,22 +863,34 @@ function planLayout(groups, o) {
     place(sh, gi, left, cols, cw, ch, rot);
   }
   if (collected.length) {
-    const ctop = o.collectTop * CM, cav = maxH - ctop - bot;
-    let sh = null, cy = 0, col = 0, rowH = 0, lastColor = null, lastCols = 0;
-    const newSheet = () => { sh = { cells: [], used: 0, collect: true }; sheets.push(sh); cy = 0; col = 0; rowH = 0; lastColor = null; };
+    // completion sheets: one tight layout – colours one after the other (red, white…), no empty rows;
+    // where the colour changes inside a row a small gap (= bleed) is added if the row still fits
+    const ctop = o.collectTop * CM, cav = maxH - ctop - bot, cg = (o.bleed != null ? o.bleed : LAYOUT_DEF.bleed) * CM;
+    let sh = null, cy = 0, row = [], rowH = 0, rowCols = 0;
+    const newSheet = () => { sh = { cells: [], used: 0, collect: true }; sheets.push(sh); cy = 0; };
+    const flush = () => {
+      if (!row.length) return;
+      if (!sh || cy + rowH > cav + 0.5) newSheet();
+      const breaks = row.filter((c, i) => i && c.color !== row[i - 1].color).length;
+      const base = row.reduce((a, c) => a + c.cw, 0), useGap = breaks && base + breaks * cg <= aw;
+      const full = rowCols * row[0].cw;           // keep rows aligned with the full-row grid
+      let x = (W - Math.max(full, base + (useGap ? breaks * cg : 0))) / 2;
+      row.forEach((c, i) => {
+        if (i && useGap && c.color !== row[i - 1].color) x += cg;
+        sh.cells.push({ g: c.gi, x, top: cy, w: c.cw, h: c.ch, rot: c.rot }); x += c.cw;
+      });
+      cy += rowH; sh.used = cy; row = []; rowH = 0;
+    };
     for (const { gi, n } of collected) {
       const g = groups[gi], { rot, cw, ch, cols } = geo(g);
-      if (!sh) newSheet();
-      if (lastColor !== null && (g.color !== lastColor || cols !== lastCols)) { if (col) { cy += rowH; col = 0; rowH = 0; } cy += gap; }
-      lastColor = g.color; lastCols = cols;
+      if (row.length && (cols !== rowCols || Math.abs(ch - rowH) > 0.5)) flush();   // other sign size → new row
+      rowCols = cols;
       for (let k = 0; k < n; k++) {
-        if (col === 0 && cy + ch > cav + 0.5) { newSheet(); lastColor = g.color; lastCols = cols; }
-        const x0 = (W - cols * cw) / 2;
-        sh.cells.push({ g: gi, x: x0 + col * cw, top: cy, w: cw, h: ch, rot });
-        rowH = Math.max(rowH, ch); sh.used = cy + rowH;
-        if (++col === cols) { col = 0; cy += rowH; rowH = 0; }
+        row.push({ gi, cw, ch, rot, color: g.color }); rowH = Math.max(rowH, ch);
+        if (row.length === cols) flush();
       }
     }
+    flush();
   }
   for (const s of sheets) {
     const tp = s.collect ? o.collectTop * CM : top;
@@ -939,12 +951,18 @@ async function buildLayoutPdfs(groups, o, label, PDFLib) {
     // bleed: on every side that has no neighbour, a slightly enlarged copy under the sign, clipped to b
     const b = (o.bleed != null ? o.bleed : LAYOUT_DEF.bleed) * CM;
     if (b > 0) {
-      const near = (a, z) => Math.abs(a - z) < 0.5;
-      const has = (c, dx, dy) => s.cells.some(z => z !== c &&
-        (dx ? near(dx > 0 ? c.x + c.w : c.x - z.w, z.x) && z.y < c.y + c.h - 0.5 && z.y + z.h > c.y + 0.5
-            : near(dy > 0 ? c.y + c.h : c.y - z.h, z.y) && z.x < c.x + c.w - 0.5 && z.x + z.w > c.x + 0.5));
+      // free room on a side = distance to the nearest sign there; bleed = min(b, half of it)
+      const room = (c, dx, dy) => {
+        let m = Infinity;
+        for (const z of s.cells) {
+          if (z === c) continue;
+          if (dx && z.y < c.y + c.h - 0.5 && z.y + z.h > c.y + 0.5) { const dd = dx > 0 ? z.x - (c.x + c.w) : c.x - (z.x + z.w); if (dd > -0.5) m = Math.min(m, Math.max(0, dd)); }
+          if (dy && z.x < c.x + c.w - 0.5 && z.x + z.w > c.x + 0.5) { const dd = dy > 0 ? z.y - (c.y + c.h) : c.y - (z.y + z.h); if (dd > -0.5) m = Math.min(m, Math.max(0, dd)); }
+        }
+        return m < 0.5 ? 0 : Math.min(b, m / 2);
+      };
       for (const c of s.cells) {
-        const l = has(c, -1, 0) ? 0 : b, r = has(c, 1, 0) ? 0 : b, d = has(c, 0, -1) ? 0 : b, u = has(c, 0, 1) ? 0 : b;
+        const l = room(c, -1, 0), r = room(c, 1, 0), d = room(c, 0, -1), u = room(c, 0, 1);
         if (!l && !r && !d && !u) continue;
         const big = { ...c, x: c.x - b, y: c.y - b, w: c.w + 2 * b, h: c.h + 2 * b };
         for (const [pg, e] of [[p, emb[c.g]], [f, embP[c.g]]]) {
