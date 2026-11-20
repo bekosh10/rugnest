@@ -807,7 +807,7 @@ async function buildItemPdf(item, arts, PDFLib, cache) {
 
 /* ================================================================ EFI LAYOUT (print + cut, like Griffin) */
 const CM = 72 / 2.54;
-const LAYOUT_DEF = { width: 124, maxLen: 295, gap: 2.5, top: 1, bottom: 2, side: 0.8 };
+const LAYOUT_DEF = { width: 124, maxLen: 295, gap: 2.5, top: 1.3, bottom: 2, side: 0.8, bleed: 0.3 };
 function layoutWidthFor(tabName) { return /a3/i.test(tabName || '') ? 122 : 124; }
 const COLOR_ORDER = ['red', 'white', 'blue', 'black'];
 // groups: [{w,h (pt), qty, color}] in table order → sheets [{W,H, cells:[{g,x,y}]}] (pt, origin bottom-left)
@@ -885,14 +885,32 @@ async function buildLayoutPdfs(groups, o, label, PDFLib) {
   for (let si = 0; si < sheets.length; si++) {
     const s = sheets[si];
     const p = pr.addPage([s.W, s.H]), c = cu.addPage([s.W, s.H]), f = pf.addPage([s.W, s.H]);
+    const put = (pg, e, c) => c.rot
+      ? pg.drawPage(e, { x: c.x + c.w, y: c.y, width: c.h, height: c.w, rotate: PDFLib.degrees(90) })
+      : pg.drawPage(e, { x: c.x, y: c.y, width: c.w, height: c.h });
     for (const cell of s.cells) {
       if (!emb[cell.g]) [emb[cell.g]] = await pr.embedPdf(groups[cell.g].bytes, [0]);
       if (!embP[cell.g]) [embP[cell.g]] = await pf.embedPdf(groups[cell.g].bytes, [0]);
-      for (const [pg, e] of [[p, emb[cell.g]], [f, embP[cell.g]]]) {
-        if (cell.rot) pg.drawPage(e, { x: cell.x + cell.w, y: cell.y, width: cell.h, height: cell.w, rotate: PDFLib.degrees(90) });
-        else pg.drawPage(e, { x: cell.x, y: cell.y, width: cell.w, height: cell.h });
+    }
+    // bleed: on every side that has no neighbour, a slightly enlarged copy under the sign, clipped to b
+    const b = (o.bleed != null ? o.bleed : LAYOUT_DEF.bleed) * CM;
+    if (b > 0) {
+      const near = (a, z) => Math.abs(a - z) < 0.5;
+      const has = (c, dx, dy) => s.cells.some(z => z !== c &&
+        (dx ? near(dx > 0 ? c.x + c.w : c.x - z.w, z.x) && z.y < c.y + c.h - 0.5 && z.y + z.h > c.y + 0.5
+            : near(dy > 0 ? c.y + c.h : c.y - z.h, z.y) && z.x < c.x + c.w - 0.5 && z.x + z.w > c.x + 0.5));
+      for (const c of s.cells) {
+        const l = has(c, -1, 0) ? 0 : b, r = has(c, 1, 0) ? 0 : b, d = has(c, 0, -1) ? 0 : b, u = has(c, 0, 1) ? 0 : b;
+        if (!l && !r && !d && !u) continue;
+        const big = { ...c, x: c.x - b, y: c.y - b, w: c.w + 2 * b, h: c.h + 2 * b };
+        for (const [pg, e] of [[p, emb[c.g]], [f, embP[c.g]]]) {
+          pg.pushOperators(PDFLib.pushGraphicsState(), PDFLib.rectangle(c.x - l, c.y - d, c.w + l + r, c.h + d + u), PDFLib.clip(), PDFLib.endPath());
+          put(pg, e, big);
+          pg.pushOperators(PDFLib.popGraphicsState());
+        }
       }
     }
+    for (const cell of s.cells) { put(p, emb[cell.g], cell); put(f, embP[cell.g], cell); }
     const txt = `${String(label).replace(/[^\x20-\x7e]+/g, ' ').replace(/\s+/g, ' ').trim()}   sheet ${si + 1}/${sheets.length} x ${s.copies}`;
     const size = 16, tw = font.widthOfTextAtSize(txt, size);
     const dot2 = s.W - 0.2 * CM - 0.6 * CM - 5.08 * CM;           // left edge of the 2nd bottom dot

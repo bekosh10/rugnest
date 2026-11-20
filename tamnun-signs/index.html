@@ -909,7 +909,7 @@ $('#bLayout').onclick = async () => {
     }
   });
   let cfg = layCfg(), cur = tabs[0];
-  const optsFor = t => ({ ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen });
+  const optsFor = t => ({ ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed });
   const soNo = () => ((S.so && S.so.soNumber) || '').replace(/\D/g, '');
   const bg = document.createElement('div'); bg.className = 'modal-bg';
   bg.innerHTML = `<div class="modal wide"><button class="mx" title="סגירה">✕</button><h3>פריסת מגנטי – תצוגה לפני ייצוא</h3>
@@ -918,6 +918,7 @@ $('#bLayout').onclick = async () => {
       <label>רוחב גיליון <input type="number" step="0.1" id="lW"> ס"מ</label>
       <label>אורך מקסימלי <input type="number" step="1" id="lL"> ס"מ</label>
       <label>רווח בין סוגים <input type="number" step="0.1" id="lG"> ס"מ</label>
+      <label>גלישה <input type="number" step="0.05" id="lB"> ס"מ</label>
       <span class="muted" id="lInfo"></span>
     </div>
     <div class="lay-sheets" id="laySh"></div>
@@ -929,7 +930,7 @@ $('#bLayout').onclick = async () => {
     const o = optsFor(cur);
     bg.querySelector('#layTabs').innerHTML = tabs.map(t => `<button class="${t === cur ? 'on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('');
     bg.querySelectorAll('#layTabs button').forEach(b => b.onclick = () => { cur = b.dataset.t; draw(); });
-    bg.querySelector('#lW').value = o.width; bg.querySelector('#lL').value = o.maxLen; bg.querySelector('#lG').value = o.gap;
+    bg.querySelector('#lW').value = o.width; bg.querySelector('#lL').value = o.maxLen; bg.querySelector('#lG').value = o.gap; bg.querySelector('#lB').value = o.bleed;
     const gs = groupsOf[cur] || [];
     const sheets = C.planLayout(gs, o), CMP = 72 / 2.54, sc = 0.9;   // px per cm
     const prints = sheets.reduce((a, s) => a + s.copies, 0), units = sheets.reduce((a, s) => a + s.copies * s.cells.length, 0);
@@ -955,10 +956,11 @@ $('#bLayout').onclick = async () => {
   const upd = () => {
     const w = +bg.querySelector('#lW').value, L = +bg.querySelector('#lL').value, G = +bg.querySelector('#lG').value;
     cfg.width = { ...(cfg.width || {}) }; if (w > 10) cfg.width[cur] = w;
-    if (L > 20) cfg.maxLen = L; if (G >= 0) cfg.gap = G;
+    const B = +bg.querySelector('#lB').value;
+    if (L > 20) cfg.maxLen = L; if (G >= 0) cfg.gap = G; if (B >= 0 && B <= 1) cfg.bleed = B;
     laySave(cfg); draw();
   };
-  ['#lW', '#lL', '#lG'].forEach(id => bg.querySelector(id).onchange = upd);
+  ['#lW', '#lL', '#lG', '#lB'].forEach(id => bg.querySelector(id).onchange = upd);
   bg.querySelector('#lExp').onclick = async () => {
     if (!desk) { toast('הייצוא עובד רק בתוכנה המותקנת'); return; }
     const parent = await desk.pickFolder({ title: 'איפה לשמור את הפריסה?' });
