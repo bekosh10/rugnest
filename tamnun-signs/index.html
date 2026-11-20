@@ -156,6 +156,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const desk = window.desk || null;
 
+const MLABEL = m => m === 'אפי מגנטי' ? 'מגנטי' : m;   // tab label (the export folder keeps its name)
 const S = { removed: {}, cur: 0, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, pane: 'miss', open: {}, override: {} };
 
 /* ---------------- loading ---------------- */
@@ -353,7 +354,7 @@ function render() {
     out.push('<div class="mtabs">' + ms.map(m => {
       const tis = S.table.map((t, i) => i).filter(i => S.table[i].machine === m);
       const sum = tis.map(st).reduce((a, x) => ({ bad: a.bad + x.bad, fix: a.fix + x.fix }), { bad: 0, fix: 0 });
-      return `<button data-m="${esc(m)}" class="${m === curM ? 'on' : ''}">${esc(m)} ${dot(sum)}</button>`;
+      return `<button data-m="${esc(m)}" class="${m === curM ? 'on' : ''}">${esc(MLABEL(m))} ${dot(sum)}</button>`;
     }).join('') + '</div>');
     // inner tabs: the types of that machine
     out.push('<div class="ttabs">' + S.table.map((tab, ti) => tab.machine !== curM ? '' :
@@ -364,7 +365,7 @@ function render() {
     const ai = P.tabArt[ti], art = ai >= 0 ? S.arts[ai] : null;
     const ck = P.checks[ti];
     const sumBadge = ck.so != null ? (ck.so === ck.sum ? `<span class="badge green">סה"כ ${ck.sum} = הזמנה ✓</span>` : `<span class="badge red">סה"כ ${ck.sum} ≠ הזמנה ${ck.so}</span>`) : `<span class="badge">סה"כ ${ck.sum}</span>`;
-    out.push(`<div class="card"><h2 class="tabhead">${esc(tab.name)} <span class="badge">${esc(tab.machine)}</span>${tab.duplex ? '<span class="badge">דו צדדי</span>' : ''} ${sumBadge}
+    out.push(`<div class="card"><h2 class="tabhead">${esc(tab.name)} <span class="badge">${esc(MLABEL(tab.machine))}</span>${tab.duplex ? '<span class="badge">דו צדדי</span>' : ''} ${sumBadge}
       <span class="muted" title="העמודות שנספרו לכמות">כמות = ${tab.qtyHeaders.map(esc).join(' + ') || '—'}</span>
       <span class="muted r">${art ? esc(art.name) + ' · ' + art.pages.length + ' עמ\'' : '<span class="badge red">אין קובץ בגודל ' + (tab.size ? tab.size.join('×') : '?') + '</span>'}</span></h2>
       <table><tr><th></th><th>#</th><th>צבע</th><th>שילוט</th><th class="n">כמות</th><th>עמוד</th><th></th><th class="fname">שם קובץ</th></tr>`);
@@ -456,7 +457,7 @@ function renderSide() {
       const its = P.items.filter(i => i.machine === mc); if (!its.length) return;
       const u = its.reduce((a, i) => a + i.qty, 0); gf += its.length; gu += u;
       const mo = S.open[mc] !== false;
-      h.push(`<tr class="mrow" data-o="${esc(mc)}"><td><span class="arr">${mo ? '▾' : '◂'}</span>${esc(mc)}</td><td class="n">${its.length} קבצים</td><td class="n">${u} יח'</td></tr>`);
+      h.push(`<tr class="mrow" data-o="${esc(mc)}"><td><span class="arr">${mo ? '▾' : '◂'}</span>${esc(MLABEL(mc))}</td><td class="n">${its.length} קבצים</td><td class="n">${u} יח'</td></tr>`);
       if (!mo) return;
       [...new Set(its.map(i => i.tab))].forEach(t => {
         const ti = its.filter(i => i.tab === t), key = mc + '|' + t, to = !!S.open[key];
