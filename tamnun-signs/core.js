@@ -384,11 +384,11 @@ const EN_PHRASES = {
   "חולצות טי שרוול קצר": 't-shirts short sleeve', 'חולצות שרוול ארוך': 'shirts long sleeve', 'חולצות מכופתרות': 'button shirts',
   'מכנס פוטר': 'sweatpants', 'מכנסי פוטר': 'sweatpants', 'טופ פוטר': 'sweat top', 'בגד ים שלם': 'swimsuit one-piece',
   'טופ תחתון ביקיני': 'bikini top-bottom', "פיג'מות ילדים": 'pajamas kids', "פיג'מות מבוגרים": 'pajamas adults',
-  'סוף עונה על אמת': 'end of season', 'פס מתכתי': 'metal strip', 'דו צדדי': '2-sided', 'מבצע כמותי': 'deal',
+  'סוף עונה על אמת': 'end of season', 'פס מתכתי': 'magnetic strip', 'דו צדדי': '2-sided', 'מבצע כמותי': 'deal',
   'הזדמנות אחרונה': 'last chance',
 };
 const EN_WORDS = {
-  'לבן': 'white', 'אדום': 'red', 'כחול': 'blue', 'שחור': 'black', 'צבעוני': '', 'מתכתי': 'metal', 'פס': 'strip',
+  'לבן': 'white', 'אדום': 'red', 'כחול': 'blue', 'שחור': 'black', 'צבעוני': '', 'מתכתי': 'magnetic', 'פס': 'strip',
   "ג'ינסים": 'jeans', 'חולצות': 'shirts', 'סריגים': 'knitwear', 'מכנסיים': 'pants', 'גופיות': 'tank tops', 'שמלות': 'dresses',
   "פיג'מות": 'pajamas', "ג'קטים": 'jackets', 'מעילים': 'coats', 'נעליים': 'shoes', 'אקטיב': 'active', 'בייבי': 'baby',
   'פריטים': 'items', 'ב': 'for', 'ילדים': 'kids', 'מבוגרים': 'adults', 'נייר': 'paper', 'כרום': 'chrome', 'גרם': 'g',
@@ -431,10 +431,10 @@ function makeName(tab, row, page, gen, user) {
   const fmt = formatLabel(row.format || tab.format, user);
   miss.push(...toEnglish(clean(row.format || tab.format).replace(/ס"?מ/g, ''), user).missing);
   let label = tr(rowLabel(tab, row, page));
-  label = label.replace(/\bnew collection\b/, 'NEW COLLECTION').replace(/\blast call\b/, 'LAST CALL').replace(/\bsale\b/, 'SALE');
+
   const color = row.colorText && !/צבעוני/.test(row.colorText) ? tr(row.colorText) : '';
   let name = `${fmt} - ${[color, label].filter(Boolean).join(' ')}${tab.duplex ? ' - 2-sided' : ''} x${row.qty}`;
-  name = `${row.no} - ${gen ? '!!!!!!!!!! ' : ''}${fileSafe(name)}`;
+  name = `${row.no} - ${gen ? '!!!!!!!!!! ' : ''}${fileSafe(name)}`.toLowerCase();   // file names: small letters only
   return { name: name + '.pdf', missing: [...new Set(miss)] };
 }
 
