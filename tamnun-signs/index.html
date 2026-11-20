@@ -870,10 +870,20 @@ $('#bExport').onclick = async () => {
       const bytes = await C.buildItemPdf(it, S.allArts, PDFLib, cache);
       if (!bytes) { failed.push(it); continue; }
       // machine / type (tab) – needs the newer installer; older shells get one level
-      files.push({ sub: S.shellVersion >= 2 ? [it.machine, it.tab] : it.machine, name: it.name, data: bytes });
+      files.push({ sub: S.shellVersion >= 2 ? [it.machine, it.tab] : it.machine, name: it.name, data: bytes, it });
       if (it.kind === 'ok' && !it.m.guess && !it.m.bank) bankAdd.push({ it, bytes });
     }
     try { await bankSaveItems(bankAdd); } catch (e) { console.error(e); }
+    // work order per department
+    try {
+      const magBytes = {};
+      for (const f of files) { const it = f.it; if (it && it.machine === 'מגנטי') { const d = await PDFLib.PDFDocument.load(f.data); const z = d.getPage(0).getSize(); (magBytes[it.tab] = magBytes[it.tab] || []).push({ w: z.width, h: z.height, qty: it.qty, color: it.row.color }); } }
+      for (const mc of C.MACHINES) {
+        const b = await orderFor(mc, P, magBytes); if (!b) continue;
+        files.push({ sub: S.shellVersion >= 2 ? [mc] : mc, name: `${(S.so && S.so.soNumber) || 'הזמנה'} הזמנת עבודה ${mc}.pdf`, data: b });
+      }
+    } catch (e) { console.error(e); }
+    files.forEach(f => delete f.it);
     failed.forEach(it => P.missing.push({ tab: it.tab, row: it.row, reason: 'לא הצלחתי ליצור את הקובץ – צריך קובץ מהלקוח' }));
     const report = await C.buildReport(P, S.table, S.so, ExcelJS);
     const folderName = ((S.so && S.so.soNumber) || 'הזמנה') + ' תמנון';
@@ -884,6 +894,103 @@ $('#bExport').onclick = async () => {
   });
 };
 
+
+
+/* ---------------- work order per department (looks like the Campus SO) ---------------- */
+const DEPT_MAT = { 'דיגיטל': 'דיגיטל', 'מגנטי': 'מגנטי', 'דורסט': 'דורסט (PVC)' };
+// rows: [{type, files, qty, note, sheets}] ; returns pdf bytes (A4, drawn on a canvas so Hebrew is exact)
+async function orderPdf(mc, rows, sheetsInfo) {
+  try { await document.fonts.load('16px Heebo'); } catch (e) {}
+  const S3 = 3, W = 595, H = 842, F = '"Heebo","Segoe UI",Arial,sans-serif';
+  const blue = '#2563eb', light = '#eef4ff', line = '#d6deea', txt = '#1a1a1a', mute = '#6b7280';
+  const so = (S.so && S.so.soNumber) || '', meta = (S.so && S.so.meta) || {};
+  const now = new Date(), stamp = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}, ${now.toTimeString().slice(0, 8)}`;
+  const pages = [];
+  const newPage = () => {
+    const cv = document.createElement('canvas'); cv.width = W * S3; cv.height = H * S3;
+    const c = cv.getContext('2d'); c.scale(S3, S3); c.fillStyle = '#fff'; c.fillRect(0, 0, W, H); c.direction = 'rtl';
+    pages.push(cv); return c;
+  };
+  const T = (c, str, x, y, { size = 10, bold = false, color = txt, align = 'right', dir = 'rtl' } = {}) => {
+    c.font = `${bold ? 'bold ' : ''}${size}px ${F}`; c.fillStyle = color; c.textAlign = align; c.direction = dir; c.fillText(String(str), x, y);
+  };
+  const header = c => {
+    T(c, 'קמפוס לדפוס דיגיטלי', W - 40, 58, { size: 17, bold: true, color: blue });
+    T(c, `הזמנת עבודה לייצור – ${mc}`, W - 40, 74, { size: 9, color: mute });
+    T(c, so, 40, 58, { size: 17, bold: true, align: 'left', dir: 'ltr' });
+    T(c, `הופק: ${stamp}`, 40, 74, { size: 8, color: mute, align: 'left' });
+    c.fillStyle = blue; c.fillRect(40, 86, W - 80, 2);
+  };
+  const footer = (c, i, n) => {
+    c.fillStyle = line; c.fillRect(40, H - 46, W - 80, 0.7);
+    T(c, 'קמפוס לדפוס דיגיטלי — מסמך פנימי לרצפת הייצור', W - 40, H - 32, { size: 7.5, color: mute });
+    T(c, `${so}${n > 1 ? `   ${i}/${n}` : ''}`, 40, H - 32, { size: 7.5, color: mute, align: 'left', dir: 'ltr' });
+  };
+  let c = newPage(); header(c);
+  // light-blue box: department + material first
+  const info = [['מחלקה', mc], ['חומר', DEPT_MAT[mc] || mc], ['לקוח', meta['לקוח'] || 'תמנון טקסטיל בע"מ'], ['תאריך הזמנה', meta['תאריך הזמנה'] || '-'],
+    ['תאריך סיום נדרש', meta['תאריך סיום נדרש'] || '-'], ['איש קשר', meta['איש קשר'] || '-']];
+  if (sheetsInfo) sheetsInfo.forEach(si => info.push([`גיליונות הדפסה – ${si.label}`, `${si.prints} הדפסות` + (si.unique !== si.prints ? ` · ${si.unique} גיליונות שונים` : '')]));
+  const boxH = 18 + Math.ceil(info.length / 2) * 32;
+  c.fillStyle = light; c.strokeStyle = line; c.lineWidth = 0.7;
+  c.beginPath(); c.roundRect(40, 100, W - 80, boxH, 8); c.fill(); c.stroke();
+  info.forEach(([k, v], i) => {
+    const col = i % 2, row = Math.floor(i / 2), x = col ? W / 2 - 10 : W - 58, y = 120 + row * 32;
+    T(c, k, x, y, { size: 7.5, color: mute });
+    T(c, v, x, y + 14, { size: i < 2 ? 12 : 10.5, bold: true, color: i < 2 ? blue : txt });
+  });
+  // table
+  const cols = [{ k: '#', w: 26 }, { k: 'סוג', w: sheetsInfo ? 185 : 235 }, { k: 'קבצים', w: 55 }, { k: 'כמות', w: 70 }];
+  if (sheetsInfo) cols.push({ k: 'גיליונות הדפסה', w: 85 });
+  cols.push({ k: 'הערות', w: W - 80 - cols.reduce((a, x) => a + x.w, 0) });
+  let y = 100 + boxH + 22;
+  const head = () => {
+    c.fillStyle = blue; c.fillRect(40, y, W - 80, 24);
+    let x = W - 40; cols.forEach(cl => { T(c, cl.k, x - 8, y + 16, { size: 9, bold: true, color: '#fff' }); x -= cl.w; }); y += 24;
+  };
+  head();
+  const all = [...rows, { type: 'סה"כ', files: rows.reduce((a, r) => a + r.files, 0), qty: rows.reduce((a, r) => a + r.qty, 0), sheets: sheetsInfo ? sheetsInfo.reduce((a, s) => a + s.prints, 0) : '', total: true }];
+  all.forEach((r, i) => {
+    if (y > H - 80) { c = newPage(); header(c); y = 104; head(); }
+    if (i % 2 && !r.total) { c.fillStyle = '#f7f9fc'; c.fillRect(40, y, W - 80, 26); }
+    if (r.total) { c.fillStyle = light; c.fillRect(40, y, W - 80, 26); }
+    const vals = [r.total ? '' : i + 1, r.type, r.files, `${r.qty} יח'`];
+    if (sheetsInfo) vals.push(r.sheets !== '' && r.sheets != null ? r.sheets : '');
+    vals.push(r.note || '');
+    let x = W - 40;
+    vals.forEach((v, j) => { T(c, v, x - 8, y + 17, { size: j === 1 ? 10 : 9.5, bold: !!r.total || j === 1 }); x -= cols[j].w; });
+    c.fillStyle = line; c.fillRect(40, y + 26, W - 80, 0.6); y += 26;
+  });
+  const doc = await PDFLib.PDFDocument.create();
+  for (let i = 0; i < pages.length; i++) {
+    const pc = pages[i].getContext('2d'); pc.setTransform(S3, 0, 0, S3, 0, 0); footer(pc, i + 1, pages.length);
+    const png = await doc.embedPng(pages[i].toDataURL('image/png'));
+    doc.addPage([W, H]).drawImage(png, { x: 0, y: 0, width: W, height: H });
+  }
+  return doc.save();
+}
+// rows of one department from the plan; magnet: sheets from the layout settings
+async function orderFor(mc, P, magBytes) {
+  const its = P.items.filter(i => i.machine === mc); if (!its.length) return null;
+  const tabs = [...new Set(its.map(i => i.tab))];
+  let sheetsInfo = null; const sheetsOf = {};
+  if (mc === 'מגנטי' && magBytes) {
+    const cfg = layCfg(); sheetsInfo = [];
+    for (const t of tabs) {
+      const gs = magBytes[t] || []; if (!gs.length) continue;
+      const o = { ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen };
+      const sh = C.planLayout(gs, o), prints = sh.reduce((a, x) => a + x.copies, 0);
+      sheetsOf[t] = prints; sheetsInfo.push({ label: /a3/i.test(t) ? 'A3' : 'פסים', prints, unique: sh.length });
+    }
+  }
+  const rows = tabs.map(t => {
+    const ti = its.filter(i => i.tab === t), tab = S.table.find(x => x.name === t) || {};
+    const miss = P.missing.filter(m => m.tab === t).length, gen = ti.filter(i => i.kind !== 'ok').length;
+    const note = [tab.duplex ? 'דו צדדי' : '', gen ? `${gen} קבצים שנוצרו – לבדוק` : '', miss ? `${miss} חסרים` : ''].filter(Boolean).join(' · ');
+    return { type: t, files: ti.length, qty: ti.reduce((a, i) => a + i.qty, 0), note, sheets: sheetsOf[t] };
+  });
+  return orderPdf(mc, rows, sheetsInfo);
+}
 
 /* ---------------- EFI layout (magnet): preview + export ---------------- */
 const LAYKEY = 'tamnunLayout';
@@ -1043,7 +1150,7 @@ if (desk && desk.onOpenFile) {
   setTimeout(async () => { for (const p of await desk.pendingOpen()) await openPath(p); }, 1500);
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const m = [...document.querySelectorAll('.modal-bg')].pop(); if (m) m.remove(); } });
-window.__addFiles = addFiles; window.__S = S; window.__recompute = () => recompute();
+window.__addFiles = addFiles; window.__orderFor = orderFor; window.__S = S; window.__recompute = () => recompute();
 render();
 </script>
 </body>

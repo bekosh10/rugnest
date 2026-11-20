@@ -247,7 +247,7 @@ async function pdfText(page, W, H) {
 /* ================================================================ WORK ORDER (SO) */
 async function readSO(buf, pdfjs) {
   const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), isEvalSupported: false }).promise;
-  const lines = [];
+  const lines = [], meta = {};
   let soNumber = '';
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
@@ -256,6 +256,12 @@ async function readSO(buf, pdfjs) {
     const all = items.map(i => i.s).join(' ');
     const so = all.match(/SO\s*(\d{6,})/) || (() => { const i = items.findIndex(t => t.s === 'SO'); return i >= 0 && items[i + 1] && /^\d{6,}$/.test(items[i + 1].s) ? [0, items[i + 1].s] : null; })();
     if (so && !soNumber) soNumber = 'SO' + so[1];
+    // header fields (label above value): customer, dates, contact…
+    if (p === 1) for (const lab of ['לקוח', 'תאריך הזמנה', 'תאריך סיום נדרש', 'איש קשר', 'סוג הובלה', 'נפתחה ע"י', 'טלפון איש קשר']) {
+      const L = items.find(i => i.s === lab); if (!L) continue;
+      const v = items.filter(i => i !== L && i.y < L.y && L.y - i.y < 30 && Math.abs(i.x - L.x) < 140).sort((a, b) => (L.y - a.y) - (L.y - b.y))[0];
+      if (v) meta[lab] = clean(items.filter(i => Math.abs(i.y - v.y) <= 2 && Math.abs(i.x - L.x) < 160).sort((a, b) => b.x - a.x).map(i => i.s).join(' '));
+    }
     // column positions from the header row
     const hDesc = items.find(i => /^תיאור$/.test(i.s)), hQty = items.find(i => /^כמות$/.test(i.s)), hSku = items.find(i => /מק"ט/.test(i.s));
     if (!hDesc || !hQty) continue;
@@ -278,7 +284,7 @@ async function readSO(buf, pdfjs) {
     }
   }
   await doc.destroy();
-  return { soNumber, lines };
+  return { soNumber, lines, meta };
 }
 
 /* ================================================================ ARTWORK */
