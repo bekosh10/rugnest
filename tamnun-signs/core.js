@@ -332,7 +332,7 @@ function pairScore(row, page, ri, pi) {
 }
 
 // one tab ↔ one artwork file
-function matchTab(tab, art) {
+function matchTab(tab, art, mo = {}) {
   const rows = tab.rows, pages = art ? art.pages : [];
   const res = rows.map(() => null);
   const pageUse = pages.map(() => null);
@@ -353,7 +353,7 @@ function matchTab(tab, art) {
     res[x.ri] = { kind: 'ok', page: x.pi }; pageUse[x.pi] = x.ri;
   });
   // pass 1b – artwork written as outlines (no readable text): same position, colour fits
-  rows.forEach((r, ri) => {
+  if (!mo.noGuess) rows.forEach((r, ri) => {
     if (res[ri] || ri >= pages.length || pageUse[ri] != null) return;
     const p = pages[ri];
     if (matchWords(p.text).length || p.nums.length) return;
@@ -362,7 +362,7 @@ function matchTab(tab, art) {
   });
   // pass 1c – what is left: rows with words ↔ pages without readable text (outlines), in order.
   // A guess – shown in yellow for checking.
-  {
+  if (!mo.noGuess) {
     const rLeft = rows.map((r, ri) => ri).filter(ri => !res[ri] && rows[ri].qty && matchWords(rows[ri].text).length && !numsOf(rows[ri].text).length);
     const pLeft = pages.map((p, pi) => pi).filter(pi => pageUse[pi] == null && !matchWords(pages[pi].text).length && !pages[pi].nums.length);
     rLeft.forEach(ri => {
@@ -506,14 +506,30 @@ function buildPlan(tabs, arts, so, opts = {}) {
   tabs.forEach((tab, ti) => {
     const ai = tabArt[ti], art = ai >= 0 ? arts[ai] : null;
     const { res, extras: ex } = matchTab(tab, art);
+    // still missing → the graphics bank (pages approved in earlier orders, same size)
+    // order of trust: client page as is > bank page as is > made from a client page > made from a bank page
+    (opts.bankArts || []).forEach((ba, bi) => {
+      const left = tab.rows.map((r, ri) => ri).filter(ri => tab.rows[ri].qty && (!res[ri] || res[ri].kind !== 'ok' || res[ri].guess || res[ri].bank));
+      if (!left.length || !sameSize(tab.size, ba.size, 1.5)) return;
+      const r2 = matchTab({ rows: left.map(ri => tab.rows[ri]) }, ba, { noGuess: true }).res;
+      r2.forEach((m, k) => {
+        if (!m) return;
+        const cur = res[left[k]];
+        if (!cur || (m.kind === 'ok' && !(cur.bank && cur.kind === 'ok'))) res[left[k]] = { ...m, bank: true, artIdx: arts.length + bi };
+      });
+    });
     tab.rows.forEach((row, ri) => {
       const m = res[ri];
       if (!row.qty) { zero.push({ tab: tab.name, row, match: m }); return; }
       if (!m) { missing.push({ tab: tab.name, ti, row, reason: art ? 'אין עמוד מתאים בקובץ' : 'אין קובץ בגודל ' + (tab.size ? tab.size.join('×') : '?') }); return; }
-      const page = art.pages[m.page];
-      const gen = m.kind !== 'ok';
+      const artI = m.artIdx != null ? m.artIdx : ai;
+      const srcArt = artI < arts.length ? arts[artI] : opts.bankArts[artI - arts.length];
+      const page = srcArt.pages[m.page];
+      const gen = m.kind !== 'ok' || !!m.bank;
       const nm = makeName(tab, row, page, gen, opts.en);
-      const it = { ti, tab: tab.name, machine: tab.machine, row, art: ai, page: m.page, kind: m.kind, m, name: nm.name, noEn: nm.missing, qty: row.qty };
+      const it = { ti, tab: tab.name, machine: tab.machine, row, art: artI, page: m.page, kind: m.bank && m.kind === 'ok' ? 'bank' : m.kind, m, name: nm.name, noEn: nm.missing, qty: row.qty };
+      // a bank page from another order may be a little bigger/smaller – fit it to this order's size
+      if (m.bank && art && art.pages[0]) it.target = [art.pages[0].w / 2.54 * 72, art.pages[0].h / 2.54 * 72];
       items.push(it);
       if (gen || m.guess) fixed.push(it);
     });
@@ -734,7 +750,19 @@ async function buildItemPdf(item, arts, PDFLib, cache) {
     const lean = await PDFLib.PDFDocument.create({ updateMetadata: false });
     const [p2] = await lean.copyPages(out, [0]);
     lean.addPage(p2);
-    return lean.save({ useObjectStreams: false });
+    const leanBytes = await lean.save({ useObjectStreams: false });
+    const t = item.target, cur = p2.getSize();
+    if (t && (Math.abs(t[0] - cur.width) > 2 || Math.abs(t[1] - cur.height) > 2)) {
+      // fill the target page (background reaches the edges), centred; at most a few mm are cut
+      const fit = await PDFLib.PDFDocument.create({ updateMetadata: false });
+      const [ep] = await fit.embedPdf(leanBytes, [0]);
+      const sc = Math.max(t[0] / cur.width, t[1] / cur.height);
+      const w = cur.width * sc, h = cur.height * sc;
+      const np = fit.addPage([t[0], t[1]]);
+      np.drawPage(ep, { x: (t[0] - w) / 2, y: (t[1] - h) / 2, width: w, height: h });
+      return fit.save({ useObjectStreams: false });
+    }
+    return leanBytes;
   } catch (e) {
     return out.save({ useObjectStreams: false });
   }
@@ -771,6 +799,6 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 }
 
 const api = { CORE_VERSION, norm, numsOf, wordsOf, textScore, classifyPixels, sizeFromText, machineOf, MACHINES, COLOR_HE,
-  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, buildItemPdf, buildReport, fileSafe };
+  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, sameSize, matchWords, buildItemPdf, buildReport, fileSafe };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TamnunCore = api;
 })(typeof self !== 'undefined' ? self : this);

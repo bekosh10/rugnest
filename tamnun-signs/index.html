@@ -122,6 +122,7 @@
   <h1>תמנון – שילוט</h1>
   <span class="so" id="soLbl"></span>
   <div class="spacer"></div>
+  <button id="bBank">בנק גרפיקות</button>
   <button id="bDict">מילון שמות</button>
   <button id="bOpen">פתיחת עבודה</button>
   <button id="bSave" disabled>שמירת עבודה</button>
@@ -238,6 +239,92 @@ document.addEventListener('drop', async e => {
 });
 $('#bClear').onclick = () => { S.genThumb = {}; Object.assign(S, { removed: {}, cur: 0, tablePdf: '', tableBuf: null, soBuf: null, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
 
+/* ---------------- graphics bank (IndexedDB, stays on this computer) ---------------- */
+// every page that went out as-is is kept, so a sign missing next time can come from here
+function bankDb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('tamnun', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('bank', { keyPath: 'id' });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function bankAll() {
+  const db = await bankDb();
+  return new Promise((res, rej) => { const q = db.transaction('bank').objectStore('bank').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => rej(q.error); });
+}
+async function bankPut(list) {
+  const db = await bankDb();
+  return new Promise((res, rej) => { const tx = db.transaction('bank', 'readwrite'); list.forEach(e => tx.objectStore('bank').put(e)); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+}
+async function bankDel(id) {
+  const db = await bankDb();
+  return new Promise((res, rej) => { const tx = db.transaction('bank', 'readwrite'); tx.objectStore('bank').delete(id); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+}
+const sizeKey = z => z.map(x => (Math.round(x * 2) / 2).toFixed(1)).join('x');
+async function bankSaveItems(list) {
+  const out = [];
+  for (const { it, bytes } of list) {
+    const art = S.allArts[it.art], p = art.pages[it.page];
+    // text: what the page says; if the page has no readable text (outlines) – the table's words
+    const text = p.text && (C.matchWords(p.text).length || p.nums.length) ? p.text : (it.row.text || p.text);
+    const key = [sizeKey(p.size), p.color, C.norm(text)].join('|');
+    out.push({ id: key, size: p.size, color: p.color, text, nums: p.nums, thumb: p.thumb, bytes: bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes),
+      tab: it.tab, so: (S.so && S.so.soNumber) || '', date: new Date().toISOString() });
+  }
+  if (out.length) { await bankPut(out); await bankLoad(); }
+  return out.length;
+}
+// bank → one "artwork" per size, so the normal matching can use it
+async function bankLoad() {
+  let all = [];
+  try { all = await bankAll(); } catch (e) { console.error(e); }
+  S.bankCount = all.length;
+  const groups = {};
+  all.forEach(e => (groups[sizeKey(e.size)] = groups[sizeKey(e.size)] || []).push(e));
+  const arts = [];
+  for (const [k, list] of Object.entries(groups)) {
+    const doc = await PDFLib.PDFDocument.create();
+    const pages = [];
+    for (const e of list) {
+      try {
+        const src = await PDFLib.PDFDocument.load(e.bytes);
+        const [pg] = await doc.copyPages(src, [0]); doc.addPage(pg);
+        pages.push({ index: pages.length, size: e.size, w: e.size[0], h: e.size[1], text: e.text, nums: e.nums || C.numsOf(e.text), color: e.color, thumb: e.thumb, bankId: e.id });
+      } catch (err) { console.error(err); }
+    }
+    if (pages.length) arts.push({ name: 'בנק גרפיקות ' + k, isBank: true, bytes: await doc.save(), pages, size: pages[0].size, hasText: true });
+  }
+  S.bankArts = arts;
+}
+$('#bBank').onclick = async () => {
+  const all = (await bankAll()).sort((a, b) => sizeKey(a.size).localeCompare(sizeKey(b.size)) || a.color.localeCompare(b.color) || a.text.localeCompare(b.text, 'he'));
+  const bg = document.createElement('div'); bg.className = 'modal-bg';
+  const groups = {};
+  all.forEach(e => (groups[sizeKey(e.size)] = groups[sizeKey(e.size)] || []).push(e));
+  bg.innerHTML = `<div class="modal" style="width:min(860px,94vw)"><h3>בנק גרפיקות <span class="muted">(${all.length})</span></h3>
+    <div class="muted" style="margin-bottom:10px">כל עמוד שיוצא בייצוא כמו שהוא נשמר כאן. כשבהזמנה הבאה חסר שלט באותו גודל – התוכנה לוקחת אותו מכאן (או צובעת / משנה מספר), ומסמנת לבדיקה.</div>
+    <div style="margin-bottom:10px"><button class="small" id="bkAdd">הוספה לבנק מהעבודה הפתוחה</button></div>
+    <div style="max-height:56vh;overflow:auto">${Object.entries(groups).map(([k, list]) => `<div class="grp" style="font-size:13px">${k.replace('x', ' × ')} ס"מ · ${list.length}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">${list.map(e => `<div style="border:1px solid var(--line);border-radius:8px;padding:6px;width:150px;text-align:center;font-size:12px">
+        ${e.thumb ? `<img src="${e.thumb}" style="max-width:136px;max-height:70px;display:block;margin:0 auto 4px">` : ''}<div>${swatch(e.color)}${esc(e.text) || '(ללא טקסט)'}</div>
+        <div class="muted" style="font-size:11px">${esc(e.so || '')}</div><button class="small" data-del="${esc(e.id)}">מחיקה</button></div>`).join('')}</div>`).join('') || '<div class="muted">הבנק ריק. הוא מתמלא בכל ייצוא, או בכפתור "הוספה לבנק".</div>'}</div>
+    <div class="foot"><button id="bkClose">סגירה</button></div></div>`;
+  document.body.appendChild(bg);
+  bg.querySelector('#bkClose').onclick = () => bg.remove();
+  bg.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => { await bankDel(b.dataset.del); await bankLoad(); bg.remove(); recompute(); $('#bBank').click(); });
+  bg.querySelector('#bkAdd').onclick = async () => {
+    if (!S.plan) return;
+    const list = [];
+    await busy('שומר לבנק…', async () => {
+      const cache = {};
+      for (const it of S.plan.items) if (it.kind === 'ok' && !it.m.guess && !it.m.bank) { const b = await C.buildItemPdf(it, S.allArts, PDFLib, cache); if (b) list.push({ it, bytes: b }); }
+      await bankSaveItems(list);
+    });
+    bg.remove(); recompute(); toast(`נוספו/עודכנו ${list.length} גרפיקות בבנק`); $('#bBank').click();
+  };
+};
+bankLoad().then(() => { if (S.table) recompute(); });
+
 /* ---------------- dictionary (Hebrew → English for file names) ---------------- */
 $('#bDict').onclick = () => {
   const base = { ...C.EN_PHRASES, ...C.EN_WORDS };
@@ -305,7 +392,8 @@ async function openJob(buf) {
 
 /* ---------------- plan ---------------- */
 function recompute() {
-  S.plan = S.table ? C.buildPlan(S.table, S.arts, S.so, { en: S.en || {} }) : null;
+  S.allArts = S.arts.concat(S.bankArts || []);
+  S.plan = S.table ? C.buildPlan(S.table, S.arts, S.so, { en: S.en || {}, bankArts: S.bankArts || [] }) : null;
   if (S.plan) { applyOverrides(); applyRemoved(); labelExtras(); }
   render();
   makeGenThumbs();
@@ -373,7 +461,7 @@ async function makeGenThumbs() {
     const k = genKey(it); if (k in S.genThumb) continue;
     S.genThumb[k] = null;
     try {
-      const bytes = await C.buildItemPdf(it, S.arts, PDFLib, {});
+      const bytes = await C.buildItemPdf(it, S.allArts, PDFLib, {});
       if (!bytes) { S.genThumb[k] = 'fail'; changed = true; continue; }
       const doc = await pdfjs.getDocument({ data: bytes }).promise;
       const pg = await doc.getPage(1);
@@ -403,7 +491,7 @@ function inputsChips() {
   return chips.join('');
 }
 const swatch = c => c ? `<span class="sw ${c}"></span>` : '';
-const MKIND = { swap: 'נוצר – צבע הוחלף', number: 'נוצר – מספר שונה', ok: 'שיוך ידני' };
+const MKIND = { swap: 'נוצר – צבע הוחלף', number: 'נוצר – מספר שונה', ok: 'שיוך ידני', bank: 'מבנק הגרפיקות' };
 
 function render() {
   $('#inputs').innerHTML = inputsChips();
@@ -456,7 +544,7 @@ function render() {
       const off = isRemoved(ti, ri);
       const it = itemOf(row), ms = missOf(row);
       const cls = off ? 'off' : !row.qty ? 'zero' : ms ? 'miss' : (it && it.kind !== 'ok') || (it && it.manual) || (it && it.m && it.m.guess) ? 'fix' : '';
-      const page = it ? art.pages[it.page] : null;
+      const page = it ? S.allArts[it.art].pages[it.page] : null;
       let sel = '';
       if (art && row.qty && !off) {
         const cur = it ? it.page : -1;
@@ -465,7 +553,7 @@ function render() {
       }
       const status = off ? '<span class="badge">בוטל – לא יוצא</span>' : !row.qty ? '<span class="muted">כמות 0 – לא יוצא</span>'
         : ms ? `<span class="badge red">חסר</span> <span class="muted">${esc(ms.reason)}</span>`
-        : it.kind !== 'ok' ? `<span class="badge yel">${MKIND[it.kind]} – לבדוק</span>`
+        : it.kind !== 'ok' ? `<span class="badge yel">${MKIND[it.kind]}${it.m.bank && it.kind !== 'bank' ? ' (מהבנק)' : ''} – לבדוק</span>`
         : it.m && it.m.guess ? '<span class="badge yel">שויך לפי סדר (עמוד בלי טקסט) – לבדוק</span>'
         : it.manual ? '<span class="badge yel">שיוך ידני</span>' : '';
       const rmBtn = row.qty ? `<button class="rm" data-rm="${ti}:${ri}" title="${off ? 'להחזיר' : 'לבטל את השורה – לא ייצא קובץ'}">${off ? '↺' : '✕'}</button>` : '';
@@ -536,8 +624,8 @@ function renderSide() {
   } else if (S.pane === 'fix') {
     const rem = (P.removed || []).length ? '<div class="grp">בוטלו ידנית – לא יוצאים</div>' + P.removed.map(r => `<div class="it" style="color:#8a949e"><s>${esc(r.row.colorText)} ${esc(r.row.text)}</s> · ${r.row.qty} יח'<br><span class="muted">${esc(r.tab)} · שורה ${r.row.no}</span></div>`).join('') : '';
     el.innerHTML = rem + (P.fixed.length ? P.fixed.map(i => {
-      const art = S.arts[i.art], p = art.pages[i.page];
-      const what = i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.m && i.m.guess ? `שויך לפי סדר לעמוד ${i.page + 1} (אין בו טקסט קריא)` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
+      const art = S.allArts[i.art], p = art.pages[i.page];
+      const what = i.kind === 'bank' ? 'נלקח מבנק הגרפיקות' : i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.m && i.m.guess ? `שויך לפי סדר לעמוד ${i.page + 1} (אין בו טקסט קריא)` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
       return `<div class="it"><b class="fn" dir="ltr">${esc(i.name)}</b><br><span class="muted">${esc(i.tab)} · ${what}</span>${thumbOf(i, p) ? `<img class="th" style="margin-top:4px" src="${thumbOf(i, p)}">` : ''}</div>`;
     }).join('') + '<div class="muted" style="padding-top:8px">קבצים שנוצרו מתחילים ב-!!!!!!!!!! – לבדוק בעין לפני הדפסה.</div>' : (rem ? '' : '<div class="empty">לא תוקן כלום – הכל הגיע תקין ✓</div>'));
   } else {
@@ -583,13 +671,15 @@ $('#bExport').onclick = async () => {
   const parent = await desk.pickFolder({ title: 'איפה ליצור את תיקיית ההזמנה?' });
   if (!parent) return;
   await busy('מכין קבצים…', async () => {
-    const files = [], failed = [], cache = {};
+    const files = [], failed = [], cache = {}, bankAdd = [];
     for (const it of P.items) {
-      const bytes = await C.buildItemPdf(it, S.arts, PDFLib, cache);
+      const bytes = await C.buildItemPdf(it, S.allArts, PDFLib, cache);
       if (!bytes) { failed.push(it); continue; }
       // machine / type (tab) – needs the newer installer; older shells get one level
       files.push({ sub: S.shellVersion >= 2 ? [it.machine, it.tab] : it.machine, name: it.name, data: bytes });
+      if (it.kind === 'ok' && !it.m.guess && !it.m.bank) bankAdd.push({ it, bytes });
     }
+    try { await bankSaveItems(bankAdd); } catch (e) { console.error(e); }
     failed.forEach(it => P.missing.push({ tab: it.tab, row: it.row, reason: 'לא הצלחתי ליצור את הקובץ – צריך קובץ מהלקוח' }));
     const report = await C.buildReport(P, S.table, S.so, ExcelJS);
     const folderName = ((S.so && S.so.soNumber) || 'הזמנה') + ' תמנון';
