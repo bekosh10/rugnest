@@ -8,6 +8,13 @@ contextBridge.exposeInMainWorld('desk', {
   readFile: p => ipcRenderer.invoke('read-file', p),
   exportFiles: job => ipcRenderer.invoke('export', job),
   reveal: p => ipcRenderer.invoke('reveal', p),
+  bankDir: () => ipcRenderer.invoke('bank:dir'),
+  bankChoose: () => ipcRenderer.invoke('bank:choose'),
+  bankReset: () => ipcRenderer.invoke('bank:reset'),
+  bankList: dir => ipcRenderer.invoke('bank:list', dir),
+  bankRead: (dir, rel) => ipcRenderer.invoke('bank:read', { dir, rel }),
+  bankWrite: (dir, rel, data) => ipcRenderer.invoke('bank:write', { dir, rel, data }),
+  bankDelete: (dir, rel) => ipcRenderer.invoke('bank:delete', { dir, rel }),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   applyUpdate: () => ipcRenderer.invoke('update:apply'),
 });

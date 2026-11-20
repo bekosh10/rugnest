@@ -250,17 +250,91 @@ function bankDb() {
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
 }
-async function bankAll() {
+async function idbAll() {
   const db = await bankDb();
   return new Promise((res, rej) => { const q = db.transaction('bank').objectStore('bank').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => rej(q.error); });
 }
-async function bankPut(list) {
+async function idbPut(list) {
   const db = await bankDb();
   return new Promise((res, rej) => { const tx = db.transaction('bank', 'readwrite'); list.forEach(e => tx.objectStore('bank').put(e)); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
 }
-async function bankDel(id) {
+async function idbDel(id) {
   const db = await bankDb();
   return new Promise((res, rej) => { const tx = db.transaction('bank', 'readwrite'); tx.objectStore('bank').delete(id); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+}
+/* --- the bank in a shared network folder (installer 3+): plain PDFs + bank-index.json --- */
+S.bankDir = null;               // { dir, ok, chosen }
+const IDX = 'bank-index.json';
+async function bankDirInfo() {
+  if (!desk || !desk.bankDir) return null;
+  try { S.bankDir = await desk.bankDir(); } catch (e) { S.bankDir = null; }
+  return S.bankDir;
+}
+const useFolder = () => !!(S.bankDir && S.bankDir.ok);
+async function folderIndex() {
+  try { return JSON.parse(new TextDecoder().decode(await desk.bankRead(S.bankDir.dir, IDX))); } catch (e) { return { v: 1, entries: {} }; }
+}
+async function folderAll() {
+  const dir = S.bankDir.dir;
+  const files = (await desk.bankList(dir)).filter(f => /\.pdf$/i.test(f.rel));
+  const idx = await folderIndex();
+  const out = []; let changed = false;
+  for (const f of files) {
+    let meta = idx.entries[f.rel];
+    let bytes;
+    try { bytes = await desk.bankRead(dir, f.rel); } catch (e) { continue; }
+    if (!meta || meta.fsize !== f.size) {
+      // a PDF someone put in the folder by hand – read it
+      try {
+        const a = await C.analyzeArtwork(bytes.slice(), f.rel, deps, { thumb: 160, keepThumb: true });
+        const p = a.pages[0];
+        const text = p.text || f.rel.split('/').pop().replace(/\.pdf$/i, '');
+        meta = { id: [sizeKey(p.size), p.color, C.norm(text)].join('|'), size: p.size, color: p.color, text, nums: p.nums, thumb: p.thumb, so: 'הוסף ידנית', date: new Date().toISOString() };
+      } catch (e) { continue; }
+      meta.fsize = f.size; idx.entries[f.rel] = meta; changed = true;
+    }
+    out.push({ ...meta, rel: f.rel, bytes });
+  }
+  // forget files that were deleted by hand
+  for (const rel of Object.keys(idx.entries)) if (!files.some(f => f.rel === rel)) { delete idx.entries[rel]; changed = true; }
+  if (changed) { try { await desk.bankWrite(dir, IDX, new TextEncoder().encode(JSON.stringify(idx))); } catch (e) {} }
+  return out;
+}
+const fileLabel = e => C.fileSafe([C.toEnglish(C.COLOR_HE[e.color] || '', S.en).text, C.toEnglish(e.text, S.en).text].filter(Boolean).join(' ').toLowerCase()) || 'graphic';
+async function folderPut(list) {
+  const dir = S.bankDir.dir;
+  const idx = await folderIndex();
+  for (const e of list) {
+    const old = Object.keys(idx.entries).find(r => idx.entries[r].id === e.id);
+    let rel = old || `${sizeKey(e.size)}/${fileLabel(e)}.pdf`;
+    let n = 2; while (!old && idx.entries[rel]) rel = `${sizeKey(e.size)}/${fileLabel(e)} (${n++}).pdf`;
+    await desk.bankWrite(dir, rel, e.bytes);
+    const { bytes, rel: _r, ...meta } = e;
+    idx.entries[rel] = { ...meta, shared: undefined, fsize: e.bytes.length };
+  }
+  await desk.bankWrite(dir, IDX, new TextEncoder().encode(JSON.stringify(idx)));
+}
+async function folderDel(id) {
+  const dir = S.bankDir.dir, idx = await folderIndex();
+  for (const rel of Object.keys(idx.entries)) if (idx.entries[rel].id === id) { await desk.bankDelete(dir, rel); delete idx.entries[rel]; }
+  await desk.bankWrite(dir, IDX, new TextEncoder().encode(JSON.stringify(idx)));
+}
+const bankAll = () => useFolder() ? folderAll() : idbAll();
+const bankPut = list => useFolder() ? folderPut(list) : idbPut(list);
+const bankDel = id => useFolder() ? folderDel(id) : idbDel(id);
+// first time the folder is used and it is empty: fill it from the shared bank and this computer's own graphics
+async function folderSeed() {
+  if (!useFolder()) return 0;
+  const files = (await desk.bankList(S.bankDir.dir)).filter(f => /\.pdf$/i.test(f.rel));
+  if (files.length) return 0;
+  let list = [];
+  try { list = await idbAll(); } catch (e) {}
+  try {
+    const r = await fetch('https://raw.githubusercontent.com/bekosh10/rugnest/main/tamnun-signs/bank/bank.json?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) { const d = await r.json(); const have = new Set(list.map(e => e.id)); d.entries.forEach(e => { if (!have.has(e.id)) list.push({ ...e, bytes: unb64(e.bytes) }); }); }
+  } catch (e) {}
+  if (list.length) await folderPut(list.map(e => ({ ...e, shared: undefined })));
+  return list.length;
 }
 const sizeKey = z => z.map(x => (Math.round(x * 2) / 2).toFixed(1)).join('x');
 async function bankSaveItems(list) {
@@ -299,22 +373,29 @@ async function bankLoad() {
   S.bankArts = arts;
 }
 $('#bBank').onclick = async () => {
-  const all = (await bankAll()).sort((a, b) => sizeKey(a.size).localeCompare(sizeKey(b.size)) || a.color.localeCompare(b.color) || a.text.localeCompare(b.text, 'he'));
+  const all = (await busy('טוען את הבנק…', () => bankAll())).sort((a, b) => sizeKey(a.size).localeCompare(sizeKey(b.size)) || a.color.localeCompare(b.color) || a.text.localeCompare(b.text, 'he'));
   const bg = document.createElement('div'); bg.className = 'modal-bg';
   const groups = {};
   all.forEach(e => (groups[sizeKey(e.size)] = groups[sizeKey(e.size)] || []).push(e));
   bg.innerHTML = `<div class="modal" style="width:min(860px,94vw)"><h3>בנק גרפיקות <span class="muted">(${all.length})</span></h3>
     <div class="muted" style="margin-bottom:10px">כל עמוד שיוצא בייצוא כמו שהוא נשמר כאן. כשבהזמנה הבאה חסר שלט באותו גודל – התוכנה לוקחת אותו מכאן (או צובעת / משנה מספר), ומסמנת לבדיקה.</div>
+    <div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:${useFolder() ? 'var(--greenbg)' : 'var(--yel)'};font-size:13px">
+      ${useFolder() ? `תיקיית הבנק: <b style="direction:ltr;unicode-bidi:isolate">${esc(S.bankDir.dir)}</b>` : (S.bankDir ? `תיקיית הבנק ברשת לא נמצאה${S.bankDir.dir ? ` (<span style="direction:ltr;unicode-bidi:isolate">${esc(S.bankDir.dir)}</span>)` : ''} – הבנק נשמר זמנית רק במחשב הזה.` : 'הבנק נשמר במחשב הזה. לתיקייה משותפת ברשת צריך את קובץ ההתקנה החדש.')}
+      ${desk && desk.bankChoose ? ` <button class="small" id="bkDir">בחירת תיקייה…</button>${S.bankDir && S.bankDir.chosen ? ' <button class="small" id="bkDirReset">חזרה לברירת מחדל</button>' : ''}` : ''}
+    </div>
     <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button class="small" id="bkAdd">הוספה לבנק מהעבודה הפתוחה</button>
       <button class="small" id="bkExp">שמירת הבנק לקובץ</button><button class="small" id="bkImp">טעינת בנק מקובץ</button><button class="small" id="bkSync">עדכון מהבנק המשותף</button>
       <input type="file" id="bkFile" accept=".tamnunbank" style="display:none"></div>
     <div style="max-height:56vh;overflow:auto">${Object.entries(groups).map(([k, list]) => `<div class="grp" style="font-size:13px">${k.replace('x', ' × ')} ס"מ · ${list.length}</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">${list.map(e => `<div style="border:1px solid var(--line);border-radius:8px;padding:6px;width:150px;text-align:center;font-size:12px">
         ${e.thumb ? `<img src="${e.thumb}" style="max-width:136px;max-height:70px;display:block;margin:0 auto 4px">` : ''}<div>${swatch(e.color)}${esc(e.text) || '(ללא טקסט)'}</div>
-        <div class="muted" style="font-size:11px">${esc(e.so || '')}${e.shared ? ' · משותף' : ''}</div><button class="small" data-del="${esc(e.id)}">מחיקה</button></div>`).join('')}</div>`).join('') || '<div class="muted">הבנק ריק. הוא מתמלא בכל ייצוא, או בכפתור "הוספה לבנק".</div>'}</div>
+        <div class="muted" style="font-size:11px">${esc(e.so || '')}${e.shared ? ' · משותף' : ''}</div>${e.rel ? `<div class="muted" style="font-size:10px;direction:ltr">${esc(e.rel)}</div>` : ''}<button class="small" data-del="${esc(e.id)}">מחיקה</button></div>`).join('')}</div>`).join('') || '<div class="muted">הבנק ריק. הוא מתמלא בכל ייצוא, או בכפתור "הוספה לבנק".</div>'}</div>
     <div class="foot"><button id="bkClose">סגירה</button></div></div>`;
   document.body.appendChild(bg);
   bg.querySelector('#bkClose').onclick = () => bg.remove();
+  const reconnect = async () => { await bankDirInfo(); if (useFolder()) await busy('מחבר לתיקיית הבנק…', () => folderSeed()); await bankLoad(); bg.remove(); recompute(); $('#bBank').click(); };
+  if (bg.querySelector('#bkDir')) bg.querySelector('#bkDir').onclick = async () => { const d = await desk.bankChoose(); if (d) reconnect(); };
+  if (bg.querySelector('#bkDirReset')) bg.querySelector('#bkDirReset').onclick = async () => { await desk.bankReset(); reconnect(); };
   bg.querySelector('#bkExp').onclick = () => bankExport();
   bg.querySelector('#bkImp').onclick = () => bg.querySelector('#bkFile').click();
   bg.querySelector('#bkFile').onchange = async () => { const f = bg.querySelector('#bkFile').files[0]; if (!f) return; bg.remove(); await bankImport(await f.arrayBuffer()); $('#bBank').click(); };
@@ -333,6 +414,7 @@ $('#bBank').onclick = async () => {
 };
 // shared bank – comes with the program (GitHub), merged under the user's own graphics
 async function bankSyncShared(force) {
+  if (useFolder()) { return 0; }
   const urls = ['https://raw.githubusercontent.com/bekosh10/rugnest/main/tamnun-signs/bank/bank.json', 'https://cdn.jsdelivr.net/gh/bekosh10/rugnest@main/tamnun-signs/bank/bank.json'];
   let data = null;
   for (const u of urls) { try { const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { data = await r.json(); break; } } catch (e) {} }
@@ -360,7 +442,13 @@ async function bankImport(buf) {
   await bankLoad(); recompute();
   toast(`נוספו/עודכנו ${data.entries.length} גרפיקות בבנק`);
 }
-bankSyncShared().catch(() => 0).then(() => bankLoad()).then(() => { if (S.table) recompute(); });
+(async () => {
+  await bankDirInfo();
+  if (useFolder()) { try { await folderSeed(); } catch (e) { console.error(e); } }
+  else { try { await bankSyncShared(); } catch (e) {} }
+  await bankLoad();
+  if (S.table) recompute();
+})();
 
 /* ---------------- dictionary (Hebrew → English for file names) ---------------- */
 $('#bDict').onclick = () => {

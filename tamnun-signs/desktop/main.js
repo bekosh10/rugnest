@@ -51,7 +51,7 @@ function createWindow() {
 }
 
 /* ---------- bridge ---------- */
-const SHELL_VERSION = 2;   // 2 = export into sub-folders (machine / type)
+const SHELL_VERSION = 3;   // 2 = export into sub-folders (machine / type); 3 = graphics bank in a shared (network) folder
 ipcMain.handle('cfg:get', () => ({ ...readCfg(), version: currentVersion(), shellVersion: SHELL_VERSION }));
 ipcMain.handle('cfg:set', (e, patch) => { const c = { ...readCfg(), ...patch }; writeCfg(c); return c; });
 
@@ -99,6 +99,56 @@ ipcMain.handle('export', async (e, { parent, folderName, files, report }) => {
   } catch (err) { return { ok: false, error: String(err.message || err) }; }
 });
 ipcMain.handle('reveal', (e, p) => { if (p && fs.existsSync(p)) { shell.openPath(p); return true; } return false; });
+
+/* ---------- graphics bank in a shared folder ---------- */
+// default: the same folder on the DATA drive for every computer. On Windows the drive letter is found by itself.
+const BANK_REL = ['במה - לא למחוק', 'תמנון קבצי גרפיקה קבועים - לא למחוק'];
+function bankCandidates() {
+  const out = [];
+  if (process.platform === 'darwin') out.push(path.join('/Volumes/DATA', ...BANK_REL));
+  if (process.platform === 'win32') {
+    for (let c = 67; c <= 90; c++) {                 // C: … Z:
+      const d = String.fromCharCode(c) + ':\\';
+      out.push(path.join(d, ...BANK_REL), path.join(d, 'DATA', ...BANK_REL));
+    }
+  }
+  return out;
+}
+ipcMain.handle('bank:dir', async () => {
+  const cfg = readCfg();
+  if (cfg.bankDir) return { dir: cfg.bankDir, ok: fs.existsSync(cfg.bankDir), chosen: true };
+  for (const c of bankCandidates()) { try { if (fs.existsSync(c)) return { dir: c, ok: true, chosen: false }; } catch (e) {} }
+  return { dir: process.platform === 'darwin' ? bankCandidates()[0] : '', ok: false, chosen: false, hint: BANK_REL.join(path.sep) };
+});
+ipcMain.handle('bank:choose', async () => {
+  const cfg = readCfg();
+  const r = await dialog.showOpenDialog(win, { title: 'תיקיית בנק הגרפיקות', defaultPath: cfg.bankDir, properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  writeCfg({ ...readCfg(), bankDir: r.filePaths[0] });
+  return r.filePaths[0];
+});
+ipcMain.handle('bank:reset', async () => { const c = readCfg(); delete c.bankDir; writeCfg(c); return true; });
+const inBank = (dir, rel) => { const f = path.resolve(dir, rel); if (!f.startsWith(path.resolve(dir))) throw new Error('bad path'); return f; };
+ipcMain.handle('bank:list', async (e, dir) => {
+  const out = [];
+  async function walk(d, rel) {
+    let ents = []; try { ents = await fsp.readdir(d, { withFileTypes: true }); } catch (err) { return; }
+    for (const en of ents) {
+      if (en.name.startsWith('.') || en.name.startsWith('~')) continue;
+      const full = path.join(d, en.name), r = rel ? rel + '/' + en.name : en.name;
+      if (en.isDirectory()) await walk(full, r);
+      else if (/\.(pdf|json)$/i.test(en.name)) { try { const st = await fsp.stat(full); out.push({ rel: r.normalize('NFC'), size: st.size, mtime: st.mtimeMs }); } catch (err) {} }
+    }
+  }
+  await walk(dir, '');
+  return out;
+});
+ipcMain.handle('bank:read', async (e, { dir, rel }) => { const b = await fsp.readFile(inBank(dir, rel)); return new Uint8Array(b.buffer, b.byteOffset, b.byteLength); });
+ipcMain.handle('bank:write', async (e, { dir, rel, data }) => {
+  const f = inBank(dir, rel); await fsp.mkdir(path.dirname(f), { recursive: true });
+  const tmp = f + '.tmp-' + process.pid; await fsp.writeFile(tmp, Buffer.from(data)); await fsp.rename(tmp, f); return true;
+});
+ipcMain.handle('bank:delete', async (e, { dir, rel }) => { await fsp.rm(inBank(dir, rel), { force: true }); return true; });
 
 /* ---------- updates ---------- */
 // GitHub raw first; if it is blocked or down, the same files through jsDelivr
