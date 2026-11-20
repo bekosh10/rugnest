@@ -136,7 +136,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 10;
+const APP_VERSION = 11;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -455,7 +455,7 @@ let S = JSON.parse(JSON.stringify(DEFAULTS));
 let files = [], srcPaths = [], ovs = {}, qty = {}, allQty = {}, C = null, cfg = {};
 let askedFor = new Set();
 let sideTab = 'div', showExc = false;
-const openDivs = new Set(), openPromos = new Set();
+const closedDivs = new Set(), openPromos = new Set();
 let sizes = {}, dismissed = new Set(), sizeRun = 0, sizeProg = null, sizeNoApi = false;
 
 async function saveSettings() { if (D) await D.setCfg({ settings: S }); else localStorage.setItem('shemot-settings', JSON.stringify(S)); }
@@ -570,6 +570,7 @@ function renderSide() {
   const uTxt = x => x.u ? x.u.toLocaleString('he-IL') + (x.missing ? '<span class="issue">*</span>' : '') : (x.missing ? '<span class="issue">חסר</span>' : '–');
   const withCol = C.recs.filter(r => r.col);
   let body = '';
+  const allPk = [...new Set(C.recs.filter(r => r.col).map(r => r.col + '|' + r.promoHe))];
   const openMiss = C.missing.filter(m => !m.dismissed).length + C.sizeBad.length;
   if (sideTab === 'miss') {
     const lbl = m => `${m.g.genderHe} · ${m.g.promoHe}${m.g.subHe ? ' · ' + m.g.subHe : ''}`;
@@ -593,11 +594,11 @@ function renderSide() {
       `<tr class="tot"><td>סה״כ</td><td class="n big">${C.recs.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
   } else {
     // division → its promos (click a division to open / close it)
-    body = `<div style="text-align:left;margin-bottom:4px"><button class="small x" id="openAll" style="font-size:12px">${C.colOrder.every(c => openDivs.has(c)) ? 'סגירת הכול' : 'פתיחת הכול'}</button></div>
+    body = `<div style="text-align:left;margin-bottom:4px"><button class="small x" id="openAll" style="font-size:12px">${allPk.length && allPk.every(k => openPromos.has(k)) ? 'סגירת כל הפירוט' : 'פתיחת כל הפירוט'}</button></div>
       <table><thead><tr><th>חלוקה / מבצע</th><th class="n">קבצים</th><th class="n">יח׳</th></tr></thead><tbody>`;
     for (const c of C.colOrder) {
       const rs = withCol.filter(r => r.col === c); if (!rs.length) continue;
-      const open = openDivs.has(c);
+      const open = !closedDivs.has(c);
       body += `<tr class="divrow" data-div="${esc(c)}"><td><span class="arr">${open ? '▾' : '◂'}</span> ${esc(colHe(c))}</td><td class="n big">${rs.length}</td><td class="n"><b>${uTxt(units(rs))}</b></td></tr>`;
       if (!open) continue;
       const promos = [...new Set(rs.map(r => r.promoHe))];
@@ -614,8 +615,8 @@ function renderSide() {
     <div class="sum">${body}${sideTab !== 'miss' ? '<div class="muted" style="margin-top:8px">יח׳ = סכום הכמויות. <span class="issue">*</span> = עוד חסרות כמויות.</div>' : ''}</div>`;
   el.querySelectorAll('[data-t]').forEach(b => b.onmousedown = () => { sideTab = b.dataset.t; renderSide(); });
   el.querySelectorAll('[data-pk]').forEach(tr => tr.onmousedown = () => { const k = tr.dataset.pk; openPromos.has(k) ? openPromos.delete(k) : openPromos.add(k); renderSide(); });
-  el.querySelectorAll('[data-div]').forEach(tr => tr.onmousedown = () => { const c = tr.dataset.div; openDivs.has(c) ? openDivs.delete(c) : openDivs.add(c); renderSide(); });
-  if (el.querySelector('#openAll')) el.querySelector('#openAll').onmousedown = () => { const all = C.colOrder.every(c => openDivs.has(c)); C.colOrder.forEach(c => all ? openDivs.delete(c) : openDivs.add(c)); renderSide(); };
+  el.querySelectorAll('[data-div]').forEach(tr => tr.onmousedown = () => { const c = tr.dataset.div; closedDivs.has(c) ? closedDivs.delete(c) : closedDivs.add(c); renderSide(); });
+  if (el.querySelector('#openAll')) el.querySelector('#openAll').onmousedown = () => { const all = allPk.every(k => openPromos.has(k)); allPk.forEach(k => all ? openPromos.delete(k) : openPromos.add(k)); if (!all) closedDivs.clear(); renderSide(); };
   el.querySelectorAll('[data-dis]').forEach(b => b.onmousedown = () => { dismissed.add(b.dataset.dis); render(true); });
   el.querySelectorAll('[data-undis]').forEach(b => b.onmousedown = () => { dismissed.delete(b.dataset.undis); render(true); });
 }
