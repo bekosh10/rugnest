@@ -165,6 +165,7 @@ async function readTableXlsx(buf, ExcelJS) {
     const qtyCols = [];
     for (let c = after + 1; c < hdr.length; c++) {
       if (!hdr[c]) continue;
+      if (/סה"?כ|סך הכל|total|sum/i.test(hdr[c])) continue;     // a total column must not be added again
       let nums = 0, texts = 0;
       for (let r = h + 1; r < grid.length; r++) {
         const v = grid[r] && grid[r][c];
