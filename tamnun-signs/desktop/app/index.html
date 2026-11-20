@@ -110,7 +110,10 @@
   .toast { position:fixed; bottom:50px; left:20px; background:#1d2733; color:#fff; padding:12px 16px; border-radius:10px; z-index:30; max-width:560px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
   .modal-bg { position:fixed; inset:0; background:rgba(20,30,40,.35); display:flex; align-items:flex-start; justify-content:center; padding-top:60px; z-index:20; }
   .modal { background:#fff; border-radius:14px; width:min(640px,94vw); max-height:80vh; overflow:auto; padding:18px 22px; box-shadow:0 10px 40px rgba(0,0,0,.2); }
-  .modal h3 { margin:0 0 12px; font-size:18px; }
+  .modal h3 { margin:0 0 12px; font-size:18px; padding-left:40px; }
+  .modal { position:relative; }
+  .modal .mx { position:sticky; top:0; float:left; margin:-6px -8px 0 0; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:18px; line-height:1; padding:0; color:var(--muted); z-index:2; }
+  .modal .mx:hover { background:var(--redbg); color:var(--red); }
   .modal .foot { display:flex; gap:8px; margin-top:16px; }
   .busy { position:fixed; inset:0; background:rgba(255,255,255,.7); display:flex; align-items:center; justify-content:center; z-index:40; font-size:18px; font-weight:600; }
   .tabhead { display:flex; align-items:center; gap:10px; }
@@ -304,13 +307,25 @@ const fileLabel = e => C.fileSafe([C.toEnglish(C.COLOR_HE[e.color] || '', S.en).
 async function folderPut(list) {
   const dir = S.bankDir.dir;
   const idx = await folderIndex();
+  // folder per type: an existing folder with graphics of a close size, otherwise the type's name
+  const existing = Object.entries(idx.entries).map(([rel, m]) => ({ folder: rel.split('/')[0], size: m.size }));
+  const close = (a, b) => Math.abs(a[0] - b[0]) <= 1.5 && Math.abs(a[1] - b[1]) <= 1.5;
+  const newTypes = bankTypes(list.filter(e => !existing.some(x => close(x.size, e.size))));
+  const folderOf = e => {
+    const ex = existing.find(x => close(x.size, e.size)); if (ex) return ex.folder;
+    const g = newTypes.find(g => g.list.includes(e)); return C.fileSafe(g ? g.name : typeLabel(e.tab));
+  };
   for (const e of list) {
     const old = Object.keys(idx.entries).find(r => idx.entries[r].id === e.id);
-    let rel = old || `${sizeKey(e.size)}/${fileLabel(e)}.pdf`;
-    let n = 2; while (!old && idx.entries[rel]) rel = `${sizeKey(e.size)}/${fileLabel(e)} (${n++}).pdf`;
+    const folder = folderOf(e);
+    let rel = old || `${folder}/${fileLabel(e)}.pdf`;
+    // same sign in another size (another order) → the size goes into the name
+    if (!old && idx.entries[rel]) rel = `${folder}/${fileLabel(e)} ${sizeKey(e.size)}.pdf`;
+    let n = 2; while (!old && idx.entries[rel]) rel = `${folder}/${fileLabel(e)} ${sizeKey(e.size)} (${n++}).pdf`;
     await desk.bankWrite(dir, rel, e.bytes);
     const { bytes, rel: _r, ...meta } = e;
     idx.entries[rel] = { ...meta, shared: undefined, fsize: e.bytes.length };
+    existing.push({ folder: rel.split('/')[0], size: e.size });
   }
   await desk.bankWrite(dir, IDX, new TextEncoder().encode(JSON.stringify(idx)));
 }
@@ -335,6 +350,25 @@ async function folderSeed() {
   } catch (e) {}
   if (list.length) await folderPut(list.map(e => ({ ...e, shared: undefined })));
   return list.length;
+}
+// "שילוט A3 מתכתי" → "A3 מתכתי", "שילוטי A5 נייר דו"צ" → "A5"
+const typeLabel = t => String(t || '').replace(/שילוטי?\s*/g, '').replace(/נייר\s*דו"?צ'?'?|דו"צ/g, '').replace(/\s+/g, ' ').trim() || 'אחר';
+// group bank entries into types: sizes that are close (≤1.5 ס"מ) are one type, named by the most common label
+function bankTypes(all) {
+  const groups = [];
+  all.forEach(e => {
+    let g = groups.find(g => Math.abs(g.size[0] - e.size[0]) <= 1.5 && Math.abs(g.size[1] - e.size[1]) <= 1.5);
+    if (!g) { g = { size: e.size, list: [] }; groups.push(g); }
+    g.list.push(e);
+  });
+  groups.forEach(g => {
+    const cnt = {};
+    g.list.forEach(e => { const l = typeLabel(e.tab); cnt[l] = (cnt[l] || 0) + 1; });
+    g.name = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
+  });
+  // same name twice (e.g. two "A5" sizes) → add the size
+  groups.forEach(g => { if (groups.filter(x => x.name === g.name).length > 1) g.name += ' ' + g.size.map(x => +x.toFixed(1)).join('×'); });
+  return groups.sort((a, b) => a.name.localeCompare(b.name, 'he'));
 }
 const sizeKey = z => z.map(x => (Math.round(x * 2) / 2).toFixed(1)).join('x');
 async function bankSaveItems(list) {
@@ -375,9 +409,9 @@ async function bankLoad() {
 $('#bBank').onclick = async () => {
   const all = (await busy('טוען את הבנק…', () => bankAll())).sort((a, b) => sizeKey(a.size).localeCompare(sizeKey(b.size)) || a.color.localeCompare(b.color) || a.text.localeCompare(b.text, 'he'));
   const bg = document.createElement('div'); bg.className = 'modal-bg';
-  const groups = {};
-  all.forEach(e => (groups[sizeKey(e.size)] = groups[sizeKey(e.size)] || []).push(e));
-  bg.innerHTML = `<div class="modal" style="width:min(860px,94vw)"><h3>בנק גרפיקות <span class="muted">(${all.length})</span></h3>
+  const types = bankTypes(all);
+  if (!(S.bankTab < types.length)) S.bankTab = 0;
+  bg.innerHTML = `<div class="modal" style="width:min(900px,94vw)"><button class="mx" id="bkClose" title="סגירה">✕</button><h3>בנק גרפיקות <span class="muted">(${all.length})</span></h3>
     <div class="muted" style="margin-bottom:10px">כל עמוד שיוצא בייצוא כמו שהוא נשמר כאן. כשבהזמנה הבאה חסר שלט באותו גודל – התוכנה לוקחת אותו מכאן (או צובעת / משנה מספר), ומסמנת לבדיקה.</div>
     <div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:${useFolder() ? 'var(--greenbg)' : 'var(--yel)'};font-size:13px">
       ${useFolder() ? `תיקיית הבנק: <b style="direction:ltr;unicode-bidi:isolate">${esc(S.bankDir.dir)}</b>` : (S.bankDir ? `תיקיית הבנק ברשת לא נמצאה${S.bankDir.dir ? ` (<span style="direction:ltr;unicode-bidi:isolate">${esc(S.bankDir.dir)}</span>)` : ''} – הבנק נשמר זמנית רק במחשב הזה.` : 'הבנק נשמר במחשב הזה. לתיקייה משותפת ברשת צריך את קובץ ההתקנה החדש.')}
@@ -386,12 +420,27 @@ $('#bBank').onclick = async () => {
     <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button class="small" id="bkAdd">הוספה לבנק מהעבודה הפתוחה</button>
       <button class="small" id="bkExp">שמירת הבנק לקובץ</button><button class="small" id="bkImp">טעינת בנק מקובץ</button><button class="small" id="bkSync">עדכון מהבנק המשותף</button>
       <input type="file" id="bkFile" accept=".tamnunbank" style="display:none"></div>
-    <div style="max-height:56vh;overflow:auto">${Object.entries(groups).map(([k, list]) => `<div class="grp" style="font-size:13px">${k.replace('x', ' × ')} ס"מ · ${list.length}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">${list.map(e => `<div style="border:1px solid var(--line);border-radius:8px;padding:6px;width:150px;text-align:center;font-size:12px">
-        ${e.thumb ? `<img src="${e.thumb}" style="max-width:136px;max-height:70px;display:block;margin:0 auto 4px">` : ''}<div>${swatch(e.color)}${esc(e.text) || '(ללא טקסט)'}</div>
-        <div class="muted" style="font-size:11px">${esc(e.so || '')}${e.shared ? ' · משותף' : ''}</div>${e.rel ? `<div class="muted" style="font-size:10px;direction:ltr">${esc(e.rel)}</div>` : ''}<button class="small" data-del="${esc(e.id)}">מחיקה</button></div>`).join('')}</div>`).join('') || '<div class="muted">הבנק ריק. הוא מתמלא בכל ייצוא, או בכפתור "הוספה לבנק".</div>'}</div>
-    <div class="foot"><button id="bkClose">סגירה</button></div></div>`;
+    <div class="ttabs" id="bkTabs" style="padding-top:0">${types.map((g, i) => `<button data-bt="${i}" class="${i === S.bankTab ? 'on' : ''}">${esc(g.name)} <span class="dot">${g.list.length}</span></button>`).join('')}</div>
+    <div style="max-height:52vh;overflow:auto;margin-top:8px" id="bkBody"></div>
+    </div>`;
   document.body.appendChild(bg);
+  const COLS = [['white', 'לבן'], ['red', 'אדום'], ['blue', 'כחול'], ['color', 'צבעוני / אחר']];
+  const card = e => `<div style="border:1px solid var(--line);border-radius:8px;padding:6px;width:150px;text-align:center;font-size:12px">
+        ${e.thumb ? `<img src="${e.thumb}" style="max-width:136px;max-height:70px;display:block;margin:0 auto 4px">` : ''}<div>${esc(e.text) || '(ללא טקסט)'}</div>
+        <div class="muted" style="font-size:11px">${esc(e.so || '')}${e.shared ? ' · משותף' : ''}</div><button class="small" data-del="${esc(e.id)}">מחיקה</button></div>`;
+  const drawBody = () => {
+    const g = types[S.bankTab];
+    const body = bg.querySelector('#bkBody');
+    if (!g) { body.innerHTML = '<div class="muted">הבנק ריק. הוא מתמלא בכל ייצוא, או בכפתור "הוספה לבנק".</div>'; return; }
+    const num = e => (e.nums && e.nums[0]) || 0;
+    body.innerHTML = `<div class="muted" style="margin-bottom:6px">${g.size.map(x => +x.toFixed(1)).join(' × ')} ס"מ</div>` + COLS.map(([c, he]) => {
+      const list = g.list.filter(e => (COLS.some(x => x[0] === e.color) ? e.color : 'color') === c).sort((a, b) => (C.matchWords(a.text).length - C.matchWords(b.text).length) || num(a) - num(b) || a.text.localeCompare(b.text, 'he'));
+      return list.length ? `<div class="grp" style="font-size:13px">${swatch(c)}${he} · ${list.length}</div><div style="display:flex;flex-wrap:wrap;gap:8px">${list.map(card).join('')}</div>` : '';
+    }).join('');
+    body.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => { await bankDel(b.dataset.del); await bankLoad(); bg.remove(); recompute(); $('#bBank').click(); });
+  };
+  bg.querySelectorAll('#bkTabs button').forEach(b => b.onclick = () => { S.bankTab = +b.dataset.bt; bg.querySelectorAll('#bkTabs button').forEach(x => x.classList.toggle('on', x === b)); drawBody(); });
+  drawBody();
   bg.querySelector('#bkClose').onclick = () => bg.remove();
   const reconnect = async () => { await bankDirInfo(); if (useFolder()) await busy('מחבר לתיקיית הבנק…', () => folderSeed()); await bankLoad(); bg.remove(); recompute(); $('#bBank').click(); };
   if (bg.querySelector('#bkDir')) bg.querySelector('#bkDir').onclick = async () => { const d = await desk.bankChoose(); if (d) reconnect(); };
@@ -400,7 +449,6 @@ $('#bBank').onclick = async () => {
   bg.querySelector('#bkImp').onclick = () => bg.querySelector('#bkFile').click();
   bg.querySelector('#bkFile').onchange = async () => { const f = bg.querySelector('#bkFile').files[0]; if (!f) return; bg.remove(); await bankImport(await f.arrayBuffer()); $('#bBank').click(); };
   bg.querySelector('#bkSync').onclick = async () => { const n = await busy('מעדכן…', () => bankSyncShared(true)); await bankLoad(); bg.remove(); recompute(); toast(n ? `עודכנו ${n} גרפיקות מהבנק המשותף` : 'לא נמצאו גרפיקות חדשות'); $('#bBank').click(); };
-  bg.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => { await bankDel(b.dataset.del); await bankLoad(); bg.remove(); recompute(); $('#bBank').click(); });
   bg.querySelector('#bkAdd').onclick = async () => {
     if (!S.plan) return;
     const list = [];
@@ -464,7 +512,7 @@ $('#bDict').onclick = () => {
     }).join('');
   };
   const draw = () => {
-    bg.innerHTML = `<div class="modal" style="width:min(640px,94vw)"><h3>מילון שמות – עברית ← אנגלית</h3>
+    bg.innerHTML = `<div class="modal" style="width:min(640px,94vw)"><button class="mx" id="dX" title="סגירה">✕</button><h3>מילון שמות – עברית ← אנגלית</h3>
       <div class="muted" style="margin-bottom:8px">משמש לשמות הקבצים. שורה צהובה = שונתה אצלך. ביטויים ארוכים קודמים למילים בודדות.</div>
       <div style="display:flex;gap:6px;margin-bottom:10px"><input id="nk" placeholder="מילה / ביטוי בעברית" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;width:200px">
         <input id="nv" placeholder="באנגלית" style="direction:ltr;font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;width:180px"><button class="small" id="nadd">הוספה</button></div>
@@ -474,6 +522,7 @@ $('#bDict').onclick = () => {
     bg.querySelectorAll('button[data-reset]').forEach(b => b.onclick = () => { delete user[b.dataset.reset]; draw(); });
     bg.querySelector('#nadd').onclick = () => { const k = bg.querySelector('#nk').value.trim(), v = bg.querySelector('#nv').value.trim(); if (k && v) { user[k] = v; draw(); } };
     bg.querySelector('#dcancel').onclick = () => bg.remove();
+    bg.querySelector('#dX').onclick = () => bg.remove();
     bg.querySelector('#dsave').onclick = async () => { S.en = user; if (desk) await desk.setCfg({ en: user }); bg.remove(); recompute(); toast('המילון נשמר'); };
   };
   draw(); document.body.appendChild(bg);
@@ -835,6 +884,7 @@ $('#bExport').onclick = async () => {
   }
   check();
 })();
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { const m = [...document.querySelectorAll('.modal-bg')].pop(); if (m) m.remove(); } });
 window.__addFiles = addFiles; window.__S = S; window.__recompute = () => recompute();
 render();
 </script>
