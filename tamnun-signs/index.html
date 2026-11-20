@@ -970,9 +970,22 @@ $('#bExport').onclick = async () => {
 
 
 // magnet: how many print sheets a type will take, with the saved layout settings (cached per plan)
+// layout kind of a tab = by the size of its signs (A3 / A4 / A5 / strip / WxH); name only as a fallback
+function tabKind(t) {
+  const it = S.plan && S.plan.items.find(i => i.tab === t && i.machine === 'מגנטי');
+  if (it) {
+    const art = S.allArts[it.art], pg = art && art.pages[it.vpage != null ? it.vpage : it.page];
+    const CMp = 72 / 2.54, [w, h] = it.target ? [it.target[0] / CMp, it.target[1] / CMp] : pg ? [pg.w, pg.h] : [0, 0];
+    if (w > 0) return C.layoutKindOfSize(w, h);
+  }
+  return C.layoutKind(t);
+}
+const kindLabel = k => ({ a3: 'A3', a4: 'A4', a5: 'A5', strip: 'פסים' })[k] || k;
+const kindDefWidth = k => k === 'strip' ? 124 : 122;
+const kindDefCollect = k => k !== 'strip';
 function layOpts(t) {
-  const cfg = layCfg(), k = C.layoutKind(t), kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
-  return { ...C.LAYOUT_DEF, width: kv(cfg.width) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect) != null ? kv(cfg.collect) : C.layoutCollectFor(t) };
+  const cfg = layCfg(), k = tabKind(t), kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
+  return { ...C.LAYOUT_DEF, width: kv(cfg.width) || kindDefWidth(k), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect) != null ? kv(cfg.collect) : kindDefCollect(k) };
 }
 function magSheets(t, its) {
   try {
@@ -1107,10 +1120,9 @@ async function orderFor(mc, P, magBytes) {
     const cfg = layCfg(); sheetsInfo = [];
     for (const t of tabs) {
       const gs = magBytes[t] || []; if (!gs.length) continue;
-      const k = C.layoutKind(t), kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
-      const o = { ...C.LAYOUT_DEF, width: kv(cfg.width) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect) != null ? kv(cfg.collect) : C.layoutCollectFor(t) };
+      const o = layOpts(t);
       const sh = C.planLayout(gs, o), prints = sh.reduce((a, x) => a + x.copies, 0);
-      sheetsOf[t] = prints; sheetsInfo.push({ label: C.layoutKind(t) === 'a3' ? 'A3' : 'פסים', prints, unique: sh.length });
+      sheetsOf[t] = prints; sheetsInfo.push({ label: kindLabel(tabKind(t)), prints, unique: sh.length });
     }
   }
   const rows = tabs.map(t => {
@@ -1131,7 +1143,7 @@ async function orderFor(mc, P, magBytes) {
 const LAYKEY = 'tamnunLayout';
 function layCfg() { try { return JSON.parse(localStorage.getItem(LAYKEY)) || {}; } catch (e) { return {}; } }
 function laySave(c) { try { localStorage.setItem(LAYKEY, JSON.stringify(c)); } catch (e) {} }
-const layJob = tab => C.layoutKind(tab) === 'a3' ? 'magneti A3' : 'pass magneti';
+const layJob = tab => { const k = tabKind(tab); return k === 'strip' ? 'pass magneti' : 'magneti ' + kindLabel(k); };
 $('#bLayout').onclick = async () => {
   const P = S.plan; if (!P) return;
   const mag = P.items.filter(i => i.machine === 'מגנטי');
@@ -1152,10 +1164,8 @@ $('#bLayout').onclick = async () => {
   });
   let cfg = layCfg(), cur = tabs[0];
   // settings are kept per kind (A3 / strip), not per tab name – tab names change between orders
-  const kindOf = t => C.layoutKind(t);
-  const KIND_HE = { a3: 'A3 מתכתי', strip: 'פס מתכתי' };
-  const kv = (obj, t) => obj && (obj[kindOf(t)] != null ? obj[kindOf(t)] : obj[t]);
-  const optsFor = t => ({ ...C.LAYOUT_DEF, width: kv(cfg.width, t) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect, t) != null ? kv(cfg.collect, t) : C.layoutCollectFor(t) });
+  const KIND_HE = k => ({ a3: 'A3', a4: 'A4', a5: 'A5', strip: 'פס' })[k] || k;
+  const optsFor = t => layOpts(t);
   const soNo = () => ((S.so && S.so.soNumber) || '').replace(/\D/g, '');
   const isWin = /win/i.test(navigator.platform || navigator.userAgent);
   const bg = document.createElement('div'); bg.className = 'modal-bg';
@@ -1199,16 +1209,16 @@ $('#bLayout').onclick = async () => {
   // ---- settings window: layout + export folders; nothing changes until "שמירה"
   const settings = () => new Promise(res => {
     const t = JSON.parse(JSON.stringify(cfg)); t.width = t.width || {}; t.collect = t.collect || {};
-    const kinds = ['a3', 'strip'];
+    const kinds = [...new Set([...tabs.map(tabKind), 'a3', 'strip', ...Object.keys(cfg.width || {}).filter(k => /^(a\d|strip|[\d.]+x[\d.]+)$/.test(k))])];
     const d = document.createElement('div'); d.className = 'modal-bg';
     const fill = () => {
       const so = soNo() || 'order', star = isWin ? 'x' : '*';
-      const kw = k => t.width[k] != null ? t.width[k] : C.layoutWidthFor(k === 'a3' ? 'a3' : ''), kc = k => t.collect[k] != null ? t.collect[k] : k === 'a3';
+      const kw = k => t.width[k] != null ? t.width[k] : kindDefWidth(k), kc = k => t.collect[k] != null ? t.collect[k] : kindDefCollect(k);
       d.innerHTML = `<div class="modal"><button class="mx" title="סגירה">✕</button><h3>⚙ הגדרות פריסה וייצוא</h3>
         <h4 style="margin:6px 0 6px">פריסה</h4>
         <table class="cfgt" style="border-collapse:collapse;width:100%">
           <tr><th style="text-align:right">סוג</th><th>רוחב גיליון (ס"מ)</th><th>גיליון השלמות</th></tr>
-          ${kinds.map(k => `<tr><td>${KIND_HE[k]}</td><td style="text-align:center"><input type="number" step="0.1" data-w="${k}" value="${kw(k)}" style="width:80px"></td>
+          ${kinds.map(k => `<tr><td>${KIND_HE(k)}${tabs.some(x => tabKind(x) === k) ? ' <span class="muted">(בהזמנה הזו)</span>' : ''}</td><td style="text-align:center"><input type="number" step="0.1" data-w="${k}" value="${kw(k)}" style="width:80px"></td>
             <td style="text-align:center"><input type="checkbox" data-c="${k}" ${kc(k) ? 'checked' : ''}></td></tr>`).join('')}
         </table>
         <div class="lay-set" style="margin-top:10px">

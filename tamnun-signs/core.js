@@ -946,6 +946,15 @@ const CM = 72 / 2.54;
 const LAYOUT_DEF = { width: 124, maxLen: 295, gap: 2.5, top: 1.3, bottom: 2, side: 0.8, bleed: 0.3, collect: false, collectTop: 3.2 };
 // A3 or strip – by the tab name; "פס"/"פסים"/"פסי מדף" wins ("שילוט A3 פסים" is strips)
 function layoutKind(tabName) { const t = tabName || ''; return /פס|strip/i.test(t) ? 'strip' : /a3/i.test(t) ? 'a3' : 'strip'; }
+// kind by the sign's size (cm) – strips are long and narrow, A-sizes by their paper size
+function layoutKindOfSize(w, h) {
+  const a = Math.min(w, h), b = Math.max(w, h), near = (x, y) => Math.abs(a - x) < 1.2 && Math.abs(b - y) < 1.2;
+  if (b / a >= 3) return 'strip';
+  if (near(29.7, 42)) return 'a3';
+  if (near(21, 29.7)) return 'a4';
+  if (near(14.8, 21)) return 'a5';
+  return `${Math.round(a * 10) / 10}x${Math.round(b * 10) / 10}`;
+}
 function layoutCollectFor(tabName) { return layoutKind(tabName) === 'a3'; }
 function layoutWidthFor(tabName) { return layoutKind(tabName) === 'a3' ? 122 : 124; }
 const COLOR_ORDER = ['red', 'white', 'blue', 'black'];
@@ -1167,6 +1176,6 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 }
 
 const api = { CORE_VERSION, norm, numsOf, wordsOf, textScore, classifyPixels, sizeFromText, machineOf, MACHINES, COLOR_HE,
-  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, sameSize, matchWords, buildItemPdf, buildReport, fileSafe, planLayout, buildLayoutPdfs, layoutWidthFor, layoutCollectFor, layoutKind, LAYOUT_DEF };
+  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, sameSize, matchWords, buildItemPdf, buildReport, fileSafe, planLayout, buildLayoutPdfs, layoutWidthFor, layoutCollectFor, layoutKind, layoutKindOfSize, LAYOUT_DEF };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TamnunCore = api;
 })(typeof self !== 'undefined' ? self : this);
