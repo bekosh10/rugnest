@@ -59,7 +59,7 @@
   .badge.green { background:var(--greenbg); color:var(--green); }
   .badge.yel { background:#fde9a8; color:#7a5800; }
   select { font:inherit; font-size:12px; padding:2px 4px; width:120px; }
-  .fn { unicode-bidi:isolate; direction:rtl; display:inline-block; }
+  .fn { unicode-bidi:isolate; direction:ltr; display:inline-block; }
   .mtabs { display:flex; gap:0; margin-bottom:0; border-bottom:2px solid var(--blue); }
   .mtabs button { padding:10px 22px; border-radius:10px 10px 0 0; border:1px solid var(--line); border-bottom:none; background:#eef1f4; font-size:15px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:8px; margin-inline-end:4px; }
   .mtabs button.on { background:var(--blue); color:#fff; border-color:var(--blue); }
@@ -229,7 +229,7 @@ $('#bClear').onclick = () => { S.genThumb = {}; Object.assign(S, { removed: {}, 
 
 /* ---------------- plan ---------------- */
 function recompute() {
-  S.plan = S.table ? C.buildPlan(S.table, S.arts, S.so) : null;
+  S.plan = S.table ? C.buildPlan(S.table, S.arts, S.so, { en: S.en || {} }) : null;
   if (S.plan) { applyOverrides(); applyRemoved(); labelExtras(); }
   render();
   makeGenThumbs();
@@ -247,8 +247,8 @@ function applyOverrides() {
     P.missing = P.missing.filter(m => m.row !== row);
     if (pg < 0) { P.missing.push({ tab: tab.name, ti, row, reason: 'סומן ידנית – בלי עמוד' }); continue; }
     const page = S.arts[ai].pages[pg];
-    const base = C.fileSafe(`${C.formatLabel(row.format || tab.format)} - ${[row.colorText && !/צבעוני/.test(row.colorText) ? row.colorText : '', row.text || page.text].filter(Boolean).join(' ')}${tab.duplex ? ' - דו צדדי' : ''} x${row.qty}`);
-    P.items.push({ ti, tab: tab.name, machine: tab.machine, row, art: ai, page: pg, kind: 'ok', m: { kind: 'ok', page: pg, manual: true }, name: base + '.pdf', qty: row.qty, manual: true });
+    const nm = C.makeName(tab, row, page, false, S.en || {});
+    P.items.push({ ti, tab: tab.name, machine: tab.machine, row, art: ai, page: pg, kind: 'ok', m: { kind: 'ok', page: pg, manual: true }, name: nm.name, noEn: nm.missing, qty: row.qty, manual: true });
     P.fixed.push(P.items[P.items.length - 1]);
   }
 }
@@ -342,7 +342,7 @@ function render() {
     if (S.cur >= S.table.length) S.cur = 0;
     const st = ti => {
       const tab = S.table[ti], ck = P.checks[ti];
-      const bad = tab.rows.filter(r => missOf(r)).length + (ck.so != null && ck.so !== ck.sum ? 1 : 0) + (P.tabArt[ti] < 0 ? 1 : 0) + P.extras.filter(e => e.tab === tab.name).length;
+      const bad = tab.rows.filter(r => missOf(r) || ((itemOf(r) || {}).noEn || []).length).length + (ck.so != null && ck.so !== ck.sum ? 1 : 0) + (P.tabArt[ti] < 0 ? 1 : 0) + P.extras.filter(e => e.tab === tab.name).length;
       const fix = tab.rows.filter((r, ri) => { const it = itemOf(r); return isRemoved(ti, ri) || (it && (it.kind !== 'ok' || it.manual)); }).length;
       return { bad, fix };
     };
@@ -392,7 +392,7 @@ function render() {
       const rmBtn = row.qty ? `<button class="rm" data-rm="${ti}:${ri}" title="${off ? 'להחזיר' : 'לבטל את השורה – לא ייצא קובץ'}">${off ? '↺' : '✕'}</button>` : '';
       out.push(`<tr class="${cls}"><td>${rmBtn}</td><td class="muted">${row.no}</td><td class="st">${swatch(row.color)}${esc(row.colorText)}</td><td class="st">${esc(row.text)}</td><td class="n st"><b>${row.qty || ''}</b></td>
         <td>${thumbOf(it, page) ? `<img class="th" src="${thumbOf(it, page)}" title="${it && it.kind !== 'ok' ? 'הקובץ שנוצר (מעמוד ' + (it.page + 1) + ')' : 'עמוד ' + (it ? it.page + 1 : '')}">` : ''}</td><td>${sel}</td>
-        <td class="fname">${it ? `<span class="fn" dir="rtl">${esc(it.name)}</span>` : ''} ${status}</td></tr>`);
+        <td class="fname">${it ? `<span class="fn" dir="ltr">${esc(it.name)}</span>` : ''} ${status}</td></tr>`);
       P.extras.filter(e => e.ti === ti && e.anchor === ri).forEach(extraRow);
     });
     out.push('</table></div>');
@@ -413,7 +413,7 @@ function render() {
 
 function renderSide() {
   const P = S.plan;
-  const nMiss = P ? P.missing.length + P.extras.length + P.checks.filter(c => c.so != null && c.so !== c.sum).length + P.unusedArts.length : 0;
+  const nMiss = P ? new Set(P.items.flatMap(i => i.noEn || [])).size + P.missing.length + P.extras.length + P.checks.filter(c => c.so != null && c.so !== c.sum).length + P.unusedArts.length : 0;
   const nFix = P ? P.fixed.length + (P.removed || []).length : 0;
   $('#cMiss').textContent = nMiss; $('#cMiss').className = 'cnt' + (nMiss ? ' red' : '');
   $('#cFix').textContent = nFix; $('#cFix').className = 'cnt' + (nFix ? ' yel' : '');
@@ -424,17 +424,29 @@ function renderSide() {
     const h = [];
     const bad = P.checks.filter(c => c.so != null && c.so !== c.sum);
     if (bad.length) { h.push('<div class="grp">סה"כ לא תואם להזמנה</div>'); bad.forEach(c => h.push(`<div class="it"><b>${esc(c.tab)}</b><br><span class="muted">בטבלה ${c.sum} · בהזמנה ${c.so}</span></div>`)); }
+    const noEn = [...new Set(P.items.flatMap(i => i.noEn || []))];
+    if (noEn.length) {
+      h.push('<div class="grp">מילים בלי תרגום לאנגלית (לשם הקובץ)</div>');
+      noEn.forEach(w => h.push(`<div class="it"><b>${esc(w)}</b> → <input class="en" data-w="${esc(w)}" placeholder="באנגלית" style="width:150px;direction:ltr;font:inherit;padding:3px 6px;border:1px solid var(--line);border-radius:6px"> <button class="small" data-sv="${esc(w)}">שמירה</button></div>`));
+    }
     if (P.missing.length) { h.push('<div class="grp">שורות בטבלה בלי קובץ</div>'); P.missing.forEach(m => h.push(`<div class="it"><b>${swatch(m.row.color)}${esc(m.row.colorText)} ${esc(m.row.text)}</b> · ${m.row.qty} יח'<br><span class="muted">${esc(m.tab)} · שורה ${m.row.no} · ${esc(m.reason)}</span></div>`)); }
     if (P.extras.length) { h.push('<div class="grp">עמודים בקבצים שלא בהזמנה (לא יוצאים)</div>'); P.extras.forEach(e => h.push(`<div class="it">${swatch(e.color)}<b>${esc(e.text) || '(ללא טקסט)'}</b>${e.twin != null ? ' <span class="badge">כפול</span>' : ''}<br><span class="muted">${esc(e.tab)} · שורה ${esc(e.label || '')} · עמוד ${e.page + 1} בקובץ${e.twinRow ? ` · כפול של שורה ${e.twinRow}` : ''}</span></div>`)); }
     if (P.unusedArts.length) { h.push('<div class="grp">קבצים שלא התאימו לאף לשונית</div>'); P.unusedArts.forEach(i => h.push(`<div class="it"><b>${esc(S.arts[i].name)}</b><br><span class="muted">גודל ${S.arts[i].size.map(x => x.toFixed(1)).join('×')} ס"מ</span></div>`)); }
     if (!S.so) h.push('<div class="grp">אין הזמנת עבודה – הסה"כים לא נבדקו</div>');
     el.innerHTML = h.length ? h.join('') : '<div class="empty">אין חוסרים ✓</div>';
+    el.querySelectorAll('button[data-sv]').forEach(b => b.onclick = async () => {
+      const w = b.dataset.sv, v = el.querySelector(`input[data-w="${CSS.escape(w)}"]`).value.trim();
+      if (!v) return;
+      S.en = { ...(S.en || {}), [w]: v };
+      if (desk) await desk.setCfg({ en: S.en });
+      recompute();
+    });
   } else if (S.pane === 'fix') {
     const rem = (P.removed || []).length ? '<div class="grp">בוטלו ידנית – לא יוצאים</div>' + P.removed.map(r => `<div class="it" style="color:#8a949e"><s>${esc(r.row.colorText)} ${esc(r.row.text)}</s> · ${r.row.qty} יח'<br><span class="muted">${esc(r.tab)} · שורה ${r.row.no}</span></div>`).join('') : '';
     el.innerHTML = rem + (P.fixed.length ? P.fixed.map(i => {
       const art = S.arts[i.art], p = art.pages[i.page];
       const what = i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
-      return `<div class="it"><b class="fn" dir="rtl">${esc(i.name)}</b><br><span class="muted">${esc(i.tab)} · ${what}</span>${thumbOf(i, p) ? `<img class="th" style="margin-top:4px" src="${thumbOf(i, p)}">` : ''}</div>`;
+      return `<div class="it"><b class="fn" dir="ltr">${esc(i.name)}</b><br><span class="muted">${esc(i.tab)} · ${what}</span>${thumbOf(i, p) ? `<img class="th" style="margin-top:4px" src="${thumbOf(i, p)}">` : ''}</div>`;
     }).join('') + '<div class="muted" style="padding-top:8px">קבצים שנוצרו מתחילים ב-!!!!!!!!!! – לבדוק בעין לפני הדפסה.</div>' : (rem ? '' : '<div class="empty">לא תוקן כלום – הכל הגיע תקין ✓</div>'));
   } else {
     const h = ['<table class="sum">'];
@@ -448,7 +460,7 @@ function renderSide() {
       [...new Set(its.map(i => i.tab))].forEach(t => {
         const ti = its.filter(i => i.tab === t), key = mc + '|' + t, to = !!S.open[key];
         h.push(`<tr class="trow" data-o="${esc(key)}"><td><span class="arr">${to ? '▾' : '◂'}</span>${esc(t)}</td><td class="n">${ti.length}</td><td class="n">${ti.reduce((a, i) => a + i.qty, 0)}</td></tr>`);
-        if (to) ti.forEach(i => h.push(`<tr class="frow"><td colspan="2"><span class="fn" dir="rtl">${esc(i.name.replace(/\.pdf$/, ''))}</span></td><td class="n">${i.qty}</td></tr>`));
+        if (to) ti.forEach(i => h.push(`<tr class="frow"><td colspan="2"><span class="fn" dir="ltr">${esc(i.name.replace(/\.pdf$/, ''))}</span></td><td class="n">${i.qty}</td></tr>`));
       });
     });
     h.push(`<tr class="tot"><td>סה"כ</td><td class="n">${gf} קבצים</td><td class="n">${gu} יח'</td></tr></table>`);
@@ -499,6 +511,7 @@ $('#bExport').onclick = async () => {
 (async () => {
   if (!desk) { $('#ver').textContent = 'גרסת דפדפן'; return; }
   const cfg = await desk.getCfg();
+  S.en = cfg.en || {};
   $('#ver').textContent = 'גרסה ' + cfg.version;
   async function check() {
     $('#upd').textContent = 'בודק עדכונים…';
@@ -513,7 +526,7 @@ $('#bExport').onclick = async () => {
   }
   check();
 })();
-window.__addFiles = addFiles;
+window.__addFiles = addFiles; window.__S = S; window.__recompute = () => recompute();
 render();
 </script>
 </body>

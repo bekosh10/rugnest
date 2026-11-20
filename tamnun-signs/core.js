@@ -377,21 +377,67 @@ const canSwap = (to, from) => ['white', 'red'].includes(to) && ['white', 'red'].
 function fileSafe(s) { return clean(s).replace(/[\\/:*?"<>|]/g, m => (m === '*' ? 'x' : m === '"' ? "''" : '-')).replace(/\s+/g, ' ').trim(); }
 
 // format for the file name: Hebrew first ("A3 מתכתי" → "מתכתי A3"), ס"מ dropped, * → x
-function formatLabel(f) {
-  let t = fileSafe(clean(f).replace(/ס"?מ/g, '').replace(/[*×]/g, 'x'));
-  const m = t.match(/^([A-Za-z0-9.x]+)\s+([\u0590-\u05FF].*)$/);
-  if (m) t = m[2] + ' ' + m[1];
-  return t;
+/* ---------------------------------------------------------------- English file names */
+// whole phrases first, then single words. The user can add/override in the app (saved in settings).
+const EN_PHRASES = {
+  "חולצות טי שרוול קצר": 't-shirts short sleeve', 'חולצות שרוול ארוך': 'shirts long sleeve', 'חולצות מכופתרות': 'button shirts',
+  'מכנס פוטר': 'sweatpants', 'מכנסי פוטר': 'sweatpants', 'טופ פוטר': 'sweat top', 'בגד ים שלם': 'swimsuit one-piece',
+  'טופ תחתון ביקיני': 'bikini top-bottom', "פיג'מות ילדים": 'pajamas kids', "פיג'מות מבוגרים": 'pajamas adults',
+  'סוף עונה על אמת': 'end of season', 'פס מתכתי': 'metal strip', 'דו צדדי': '2-sided', 'מבצע כמותי': 'deal',
+  'הזדמנות אחרונה': 'last chance',
+};
+const EN_WORDS = {
+  'לבן': 'white', 'אדום': 'red', 'כחול': 'blue', 'שחור': 'black', 'צבעוני': '', 'מתכתי': 'metal', 'פס': 'strip',
+  "ג'ינסים": 'jeans', 'חולצות': 'shirts', 'סריגים': 'knitwear', 'מכנסיים': 'pants', 'גופיות': 'tank tops', 'שמלות': 'dresses',
+  "פיג'מות": 'pajamas', "ג'קטים": 'jackets', 'מעילים': 'coats', 'נעליים': 'shoes', 'אקטיב': 'active', 'בייבי': 'baby',
+  'פריטים': 'items', 'ב': 'for', 'ילדים': 'kids', 'מבוגרים': 'adults', 'נייר': 'paper', 'כרום': 'chrome', 'גרם': 'g',
+};
+const HEB = /[֐-׿]/;
+// returns { text, missing:[hebrew words without a translation] }
+function toEnglish(str, user) {
+  user = user || {};
+  let t = norm(str);                                          // no ₪, no punctuation, lower case
+  t = t.replace(/(\d)\s*ב\s*(\d)/g, '$1 for $2').replace(/\bב(\d)/g, 'for $1');   // "2 ב-100" → "2 for 100"
+  const dict = { ...EN_PHRASES, ...EN_WORDS, ...user };
+  // longest phrases first
+  const keys = Object.keys(dict).map(k => norm(k)).filter(Boolean).sort((a, b) => b.length - a.length);
+  const nd = {}; for (const k of Object.keys(dict)) nd[norm(k)] = dict[k];
+  for (const k of keys) {
+    if (!HEB.test(k)) continue;
+    const re = new RegExp('(^|\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s|$)', 'g');
+    t = t.replace(re, (all, pre) => pre + nd[k]);
+  }
+  const missing = (t.match(/[֐-׿'"]+/g) || []).filter(w => HEB.test(w));
+  return { text: t.replace(/\s+/g, ' ').trim(), missing };
+}
+
+// format for the file name ("A3 מתכתי" → "A3 metal"), ס"מ dropped, * → x
+function formatLabel(f, user) {
+  let t = clean(f).replace(/ס"?מ/g, '').replace(/[*×]/g, 'x').replace(/[’`׳´‘]/g, "'");
+  const dict = { ...EN_PHRASES, ...EN_WORDS, ...(user || {}) };
+  for (const k of Object.keys(dict).sort((a, b) => b.length - a.length)) if (HEB.test(k) && t.includes(k)) t = t.split(k).join(dict[k]);
+  return fileSafe(t.replace(/\s+/g, ' ').trim());
 }
 function rowLabel(tab, row, page) {
   let t = row.text;
   if (!t && page) t = page.text;                         // 21X tabs have no text column
-  t = clean(t).replace(/\s*₪\s*/g, ' ₪').replace(/^₪\s*/, '').trim();
-  if (/^\d+$/.test(t) && tab.duplex === false) { /* metal price signs: plain number */ }
-  return t;
+  return clean(t);
+}
+// <no> - [!!!!!!!!!! ]<format> - <colour> <text>[ - 2-sided] x<qty>.pdf  – all English
+function makeName(tab, row, page, gen, user) {
+  const miss = [];
+  const tr = s => { const r = toEnglish(s, user); miss.push(...r.missing); return r.text; };
+  const fmt = formatLabel(row.format || tab.format, user);
+  miss.push(...toEnglish(clean(row.format || tab.format).replace(/ס"?מ/g, ''), user).missing);
+  let label = tr(rowLabel(tab, row, page));
+  label = label.replace(/\bnew collection\b/, 'NEW COLLECTION').replace(/\blast call\b/, 'LAST CALL').replace(/\bsale\b/, 'SALE');
+  const color = row.colorText && !/צבעוני/.test(row.colorText) ? tr(row.colorText) : '';
+  let name = `${fmt} - ${[color, label].filter(Boolean).join(' ')}${tab.duplex ? ' - 2-sided' : ''} x${row.qty}`;
+  name = `${row.no} - ${gen ? '!!!!!!!!!! ' : ''}${fileSafe(name)}`;
+  return { name: name + '.pdf', missing: [...new Set(miss)] };
 }
 
-function buildPlan(tabs, arts, so) {
+function buildPlan(tabs, arts, so, opts = {}) {
   // which artwork belongs to which tab – by page size (both orientations)
   const used = new Set();
   const tabArt = tabs.map(tab => {
@@ -411,14 +457,9 @@ function buildPlan(tabs, arts, so) {
       if (!row.qty) { zero.push({ tab: tab.name, row, match: m }); return; }
       if (!m) { missing.push({ tab: tab.name, ti, row, reason: art ? 'אין עמוד מתאים בקובץ' : 'אין קובץ בגודל ' + (tab.size ? tab.size.join('×') : '?') }); return; }
       const page = art.pages[m.page];
-      const label = rowLabel(tab, row, page);
-      const colorHe = row.colorText && !/צבעוני/.test(row.colorText) ? clean(row.colorText) : '';
-      let fmt = formatLabel(row.format || tab.format);
-      let name = `${fmt} - ${[colorHe, label].filter(Boolean).join(' ')}${tab.duplex ? ' - דו צדדי' : ''} x${row.qty}`;
-      name = fileSafe(name);
       const gen = m.kind !== 'ok';
-      if (gen) name = '!!!!!!!!!! ' + name;
-      const it = { ti, tab: tab.name, machine: tab.machine, row, art: ai, page: m.page, kind: m.kind, m, name: name + '.pdf', qty: row.qty };
+      const nm = makeName(tab, row, page, gen, opts.en);
+      const it = { ti, tab: tab.name, machine: tab.machine, row, art: ai, page: m.page, kind: m.kind, m, name: nm.name, noEn: nm.missing, qty: row.qty };
       items.push(it);
       if (gen) fixed.push(it);
     });
@@ -481,6 +522,43 @@ function learnColors(PDFLib, doc) {
   return { red: red || '0.072 0.996 0.93 0.008', black: black || '0.719 0.668 0.586 0.789' };
 }
 
+// how the client lays out a price: distance ₪→number and the centre of the group,
+// learned per background colour / font size / "starts with 1" (the 1 is narrow, so ₪ sits closer)
+const TM_RE = /([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+Tm/g;
+function priceParts(s, W) {
+  // number: (digits)Tj after a Tm ; shekel: <0154>Tj (or any hex glyph run) after a Tm
+  const toks = [];
+  const re = /([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+Tm\s*(\((\d+)\)\s*Tj|<[0-9A-Fa-f]+>\s*Tj)/g;
+  let m;
+  while ((m = re.exec(s))) {
+    const e = +m[5], a = +m[1];
+    if (e < -5 || e > W + 5) continue;           // stray text outside the artboard
+    toks.push({ idx: m.index, len: m[0].length, a, e, f: +m[6], num: m[8] || null, hex: !m[8] });
+  }
+  const num = toks.filter(t => t.num);
+  const sh = toks.filter(t => t.hex);
+  if (num.length !== 1 || sh.length !== 1) return null;
+  return { num: num[0], sh: sh[0] };
+}
+function learnPriceLayout(PDFLib, doc, pal) {
+  const L = {};
+  for (const pg of doc.getPages()) {
+    const W = pg.getSize().width;
+    const s = getContent(PDFLib, doc, pg);
+    const pp = priceParts(s, W); if (!pp) continue;
+    const bg = /re\s*\n?\s*f/.test(s.slice(0, 200)) && s.slice(0, 60).includes(pal.red.split(' ')[1]) ? 'red' : 'white';
+    const adv = 502 / 1000 * pp.num.a;   // refined below if widths known
+    const cls = pp.num.num[0] === '1' ? '1' : 'n';
+    const key = `${bg}|${Math.round(pp.num.a)}|${cls}`;
+    const off = pp.num.e - pp.sh.e;
+    const end = pp.num.e + pp.num.num.length * adv;
+    (L[key] = L[key] || []).push({ off, centre: (pp.sh.e + end) / 2 });
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(L)) out[k] = { off: v.reduce((a, x) => a + x.off, 0) / v.length, centre: v.reduce((a, x) => a + x.centre, 0) / v.length };
+  return out;
+}
+
 // recolour a simple sign (background + text). Returns false if the page is not simple enough.
 function swapColors(PDFLib, doc, page, from, to, pal) {
   let s = getContent(PDFLib, doc, page);
@@ -506,38 +584,56 @@ function swapColors(PDFLib, doc, page, from, to, pal) {
   return true;
 }
 
-// change a price number written as one literal string, e.g. (30)Tj → (25)Tj, keeping it centred
-function changeNumber(PDFLib, doc, page, fromNum, toNum) {
+// change a price number written as one literal string, e.g. (30)Tj → (25)Tj.
+// The ₪ and the number are placed like the client's own signs with the same colour and size.
+function changeNumber(PDFLib, doc, page, fromNum, toNum, lay, bg) {
   let s = getContent(PDFLib, doc, page);
   const from = String(fromNum), to = String(toNum);
-  const re = new RegExp(`\\(${from}\\)\\s*Tj`, 'g');
-  const hits = s.match(re);
-  if (!hits || hits.length !== 1) return false;
-  // font + size of that string, check digits exist
-  const idx = s.search(re);
-  const before = s.slice(0, idx);
+  const W = page.getSize().width;
+  const pp = priceParts(s, W);
+  if (!pp || pp.num.num !== from) return false;
+  // digits must exist in the font
+  const before = s.slice(0, pp.num.idx);
   const tf = [...before.matchAll(/\/(\S+)\s+([\d.]+)\s+Tf/g)].pop();
-  const tm = [...before.matchAll(/([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+Tm/g)].pop();
-  if (!tf || !tm) return false;
+  if (!tf) return false;
   const fontDict = page.node.Resources().lookup(PDFLib.PDFName.of('Font')).lookup(PDFLib.PDFName.of(tf[1]));
-  const widths = fontDict.lookup(PDFLib.PDFName.of('Widths'));
-  const first = fontDict.lookup(PDFLib.PDFName.of('FirstChar'));
+  const widths = fontDict && fontDict.lookup(PDFLib.PDFName.of('Widths'));
+  const first = fontDict && fontDict.lookup(PDFLib.PDFName.of('FirstChar'));
   if (!widths || !first) return false;
   const fc = first.asNumber();
-  const w = ch => { const i = ch.charCodeAt(0) - fc; const v = i >= 0 && i < widths.size() ? widths.lookup(i).asNumber() : 0; return v; };
-  for (const ch of to) if (!w(ch)) return false;            // digit not in the font
-  const fs = (+tf[2]) * Math.hypot(+tm[1], +tm[2]);
+  const w = ch => { const i = ch.charCodeAt(0) - fc; return i >= 0 && i < widths.size() ? widths.lookup(i).asNumber() : 0; };
+  for (const ch of to) if (!w(ch)) return false;
+  const fs = pp.num.a;
   const wid = str => [...str].reduce((a, ch) => a + w(ch), 0) / 1000 * fs;
-  const delta = wid(to) - wid(from);
-  s = s.replace(re, `(${to})Tj`);
-  // shift every Tm inside this text block by half the extra width, so the group stays centred
-  if (Math.abs(delta) > 0.01) {
-    const btStart = before.lastIndexOf('BT'), etEnd = s.indexOf('ET', idx);
-    if (btStart >= 0 && etEnd > 0) {
-      const block = s.slice(btStart, etEnd).replace(/([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+Tm/g,
-        (all, a, b, c, d, e, f) => `${a} ${b} ${c} ${d} ${(+e - delta / 2).toFixed(4)} ${f} Tm`);
-      s = s.slice(0, btStart) + block + s.slice(etEnd);
-    }
+  // where to put things
+  const key = c => `${bg}|${Math.round(fs)}|${c}`;
+  const cls = to[0] === '1' ? '1' : 'n';
+  const L = lay && (lay[key(cls)] || lay[`${bg === 'red' ? 'white' : 'red'}|${Math.round(fs)}|${cls}`]);
+  let numX, shX;
+  if (L) {
+    const groupW = L.off + wid(to);
+    shX = L.centre - groupW / 2;
+    numX = shX + L.off;
+  } else {
+    // no example of this kind: keep the old centre and the old ₪ distance
+    const oldEnd = pp.num.e + wid(from), centre = (pp.sh.e + oldEnd) / 2, off = pp.num.e - pp.sh.e;
+    shX = centre - (off + wid(to)) / 2; numX = shX + off;
+  }
+  const dNum = numX - pp.num.e, dSh = shX - pp.sh.e;
+  const setE = (str, d) => str.replace(/^([-\d.]+\s+[-\d.]+\s+[-\d.]+\s+[-\d.]+\s+)([-\d.]+)/, (all, head, e) => head + (+e + d).toFixed(4));
+  // rewrite from the end so indexes stay valid
+  const edits = [{ t: pp.num, d: dNum, rep: x => setE(x, dNum).replace(`(${from})`, `(${to})`) }, { t: pp.sh, d: dSh, rep: x => setE(x, dSh) }]
+    .sort((a, b) => b.t.idx - a.t.idx);
+  for (const ed of edits) {
+    const seg = s.slice(ed.t.idx, ed.t.idx + ed.t.len);
+    s = s.slice(0, ed.t.idx) + ed.rep(seg) + s.slice(ed.t.idx + ed.t.len);
+  }
+  // other Tm in the number's text block (e.g. the space after it) move with the number
+  const btStart = s.lastIndexOf('BT', pp.num.idx), etEnd = s.indexOf('ET', pp.num.idx);
+  if (btStart >= 0 && etEnd > 0) {
+    let block = s.slice(btStart, etEnd), seen = 0;
+    block = block.replace(/([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+Tm(\s*\(\s\)\s*Tj)/g, (all, a, b, c, d, e, f, rest) => `${a} ${b} ${c} ${d} ${(+e + dNum).toFixed(4)} ${f} Tm${rest}`);
+    s = s.slice(0, btStart) + block + s.slice(etEnd);
   }
   setContent(PDFLib, doc, page, s);
   return true;
@@ -550,6 +646,7 @@ async function buildItemPdf(item, arts, PDFLib, cache) {
   if (!cache[key]) cache[key] = { src: await PDFLib.PDFDocument.load(art.bytes, { updateMetadata: false }) };
   const src = cache[key].src;
   if (!cache[key].pal) cache[key].pal = learnColors(PDFLib, src);
+  if (!cache[key].lay) cache[key].lay = learnPriceLayout(PDFLib, src, cache[key].pal);
   const out = await PDFLib.PDFDocument.create({ updateMetadata: false });
   const [pg] = await out.copyPages(src, [item.page]);
   out.addPage(pg);
@@ -557,7 +654,7 @@ async function buildItemPdf(item, arts, PDFLib, cache) {
   let ok = true;
   if (m.kind === 'swap') ok = swapColors(PDFLib, out, pg, m.from, m.to, cache[key].pal);
   if (m.kind === 'number') {
-    ok = changeNumber(PDFLib, out, pg, m.fromNum, m.toNum);
+    ok = changeNumber(PDFLib, out, pg, m.fromNum, m.toNum, cache[key].lay, m.to || m.from);
     if (ok && m.to) ok = swapColors(PDFLib, out, pg, m.from, m.to, cache[key].pal);
   }
   if (!ok) return null;
@@ -615,6 +712,6 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 }
 
 const api = { CORE_VERSION, norm, numsOf, wordsOf, textScore, classifyPixels, sizeFromText, machineOf, MACHINES, COLOR_HE,
-  formatLabel, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, buildItemPdf, buildReport, fileSafe };
+  formatLabel, makeName, toEnglish, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, buildItemPdf, buildReport, fileSafe };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TamnunCore = api;
 })(typeof self !== 'undefined' ? self : this);
