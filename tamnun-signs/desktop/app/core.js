@@ -771,6 +771,6 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 }
 
 const api = { CORE_VERSION, norm, numsOf, wordsOf, textScore, classifyPixels, sizeFromText, machineOf, MACHINES, COLOR_HE,
-  formatLabel, makeName, toEnglish, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, buildItemPdf, buildReport, fileSafe };
+  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, buildItemPdf, buildReport, fileSafe };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TamnunCore = api;
 })(typeof self !== 'undefined' ? self : this);

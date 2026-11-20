@@ -122,6 +122,7 @@
   <h1>תמנון – שילוט</h1>
   <span class="so" id="soLbl"></span>
   <div class="spacer"></div>
+  <button id="bDict">מילון שמות</button>
   <button id="bOpen">פתיחת עבודה</button>
   <button id="bSave" disabled>שמירת עבודה</button>
   <input type="file" id="fOpen" accept=".tamnun" style="display:none">
@@ -236,6 +237,35 @@ document.addEventListener('drop', async e => {
   addFiles(out);
 });
 $('#bClear').onclick = () => { S.genThumb = {}; Object.assign(S, { removed: {}, cur: 0, tablePdf: '', tableBuf: null, soBuf: null, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
+
+/* ---------------- dictionary (Hebrew → English for file names) ---------------- */
+$('#bDict').onclick = () => {
+  const base = { ...C.EN_PHRASES, ...C.EN_WORDS };
+  const user = { ...(S.en || {}) };
+  const bg = document.createElement('div'); bg.className = 'modal-bg';
+  const rowsHtml = () => {
+    const keys = [...new Set([...Object.keys(base), ...Object.keys(user)])].sort((a, b) => a.localeCompare(b, 'he'));
+    return keys.map(k => {
+      const changed = k in user, val = changed ? user[k] : base[k];
+      return `<tr${changed ? ' style="background:#fff6d6"' : ''}><td>${esc(k)}</td><td><input class="dv" data-k="${esc(k)}" value="${esc(val)}" style="direction:ltr;width:220px;font:inherit;padding:3px 6px;border:1px solid var(--line);border-radius:6px"></td>
+        <td>${changed ? `<button class="small" data-reset="${esc(k)}" title="${k in base ? 'חזרה לברירת המחדל: ' + esc(base[k]) : 'מחיקה'}">${k in base ? 'ברירת מחדל' : 'מחיקה'}</button>` : ''}</td></tr>`;
+    }).join('');
+  };
+  const draw = () => {
+    bg.innerHTML = `<div class="modal" style="width:min(640px,94vw)"><h3>מילון שמות – עברית ← אנגלית</h3>
+      <div class="muted" style="margin-bottom:8px">משמש לשמות הקבצים. שורה צהובה = שונתה אצלך. ביטויים ארוכים קודמים למילים בודדות.</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px"><input id="nk" placeholder="מילה / ביטוי בעברית" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;width:200px">
+        <input id="nv" placeholder="באנגלית" style="direction:ltr;font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;width:180px"><button class="small" id="nadd">הוספה</button></div>
+      <div style="max-height:52vh;overflow:auto"><table>${rowsHtml()}</table></div>
+      <div class="foot"><button class="primary" id="dsave">שמירה</button><button id="dcancel">ביטול</button></div></div>`;
+    bg.querySelectorAll('input.dv').forEach(i => i.oninput = () => { const k = i.dataset.k; if (k in base && i.value === base[k]) delete user[k]; else user[k] = i.value; });
+    bg.querySelectorAll('button[data-reset]').forEach(b => b.onclick = () => { delete user[b.dataset.reset]; draw(); });
+    bg.querySelector('#nadd').onclick = () => { const k = bg.querySelector('#nk').value.trim(), v = bg.querySelector('#nv').value.trim(); if (k && v) { user[k] = v; draw(); } };
+    bg.querySelector('#dcancel').onclick = () => bg.remove();
+    bg.querySelector('#dsave').onclick = async () => { S.en = user; if (desk) await desk.setCfg({ en: user }); bg.remove(); recompute(); toast('המילון נשמר'); };
+  };
+  draw(); document.body.appendChild(bg);
+};
 
 /* ---------------- save / open a job ---------------- */
 const b64 = u8 => { let s = ''; const CH = 0x8000; for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); };
