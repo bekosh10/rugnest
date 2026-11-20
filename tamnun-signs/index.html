@@ -30,6 +30,9 @@
   .muted { color:var(--muted); font-size:13px; font-weight:400; }
   #drop { border:2px dashed #b8c2cc; border-radius:14px; padding:34px 20px; text-align:center; background:#fafbfc; }
   body.over #drop { border-color:var(--blue); background:var(--blue2); }
+  #drop.small { padding:10px 14px; }
+  #drop.small .big, #drop.small > .muted { display:none; }
+  #drop.small .inputs { margin-top:0; }
   #drop .big { font-size:19px; font-weight:600; margin-bottom:8px; }
   .inputs { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; justify-content:center; }
   .chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:16px; background:#eef1f4; font-size:12.5px; }
@@ -51,7 +54,14 @@
   .badge.green { background:var(--greenbg); color:var(--green); }
   .badge.yel { background:#fde9a8; color:#7a5800; }
   select { font:inherit; font-size:12px; padding:2px 4px; width:120px; }
-  .fn { unicode-bidi:plaintext; direction:rtl; display:inline-block; }
+  .fn { unicode-bidi:isolate; direction:rtl; display:inline-block; }
+  .ttabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .ttabs button { padding:7px 12px; border-radius:9px; background:#fff; font-weight:600; display:flex; align-items:center; gap:6px; }
+  .ttabs button.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .ttabs .dot { min-width:18px; padding:0 5px; border-radius:9px; font-size:11px; text-align:center; background:var(--greenbg); color:var(--green); }
+  .ttabs .dot.red { background:var(--red); color:#fff; }
+  .ttabs .dot.yel { background:#e8a200; color:#fff; }
+  .ttabs button.on .dot { box-shadow:0 0 0 1px #fff; }
   .sum td.n { white-space:nowrap; }
   aside#side { width:330px; flex:none; position:sticky; top:70px; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - 70px - 50px); }
   .tabs { display:flex; border-bottom:1px solid var(--line); flex:none; }
@@ -124,7 +134,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const desk = window.desk || null;
 
-const S = { table: null, tableName: '', so: null, soName: '', arts: [], plan: null, pane: 'miss', open: {}, override: {} };
+const S = { cur: 0, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, pane: 'miss', open: {}, override: {} };
 
 /* ---------------- loading ---------------- */
 async function busy(msg, fn) {
@@ -180,7 +190,7 @@ document.addEventListener('drop', async e => {
   }
   addFiles(out);
 });
-$('#bClear').onclick = () => { Object.assign(S, { table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
+$('#bClear').onclick = () => { Object.assign(S, { cur: 0, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
 
 /* ---------------- plan ---------------- */
 function recompute() {
@@ -222,11 +232,23 @@ const MKIND = { swap: 'צבע הוחלף', number: 'מספר שונה', ok: 'ש�
 
 function render() {
   $('#inputs').innerHTML = inputsChips();
+  $('#drop').classList.toggle('small', !!S.table);
   $('#soLbl').textContent = S.so && S.so.soNumber || '';
   const P = S.plan;
   $('#bExport').disabled = !P || !P.items.length;
   const out = [];
+  if (P) {
+    if (S.cur >= S.table.length) S.cur = 0;
+    out.push('<div class="ttabs">' + S.table.map((tab, ti) => {
+      const miss = tab.rows.filter(r => missOf(r)).length, ck = P.checks[ti];
+      const bad = miss + (ck.so != null && ck.so !== ck.sum ? 1 : 0) + (P.tabArt[ti] < 0 ? 1 : 0) + P.extras.filter(e => e.tab === tab.name).length;
+      const fix = tab.rows.filter(r => { const it = itemOf(r); return it && (it.kind !== 'ok' || it.manual); }).length;
+      const dot = bad ? `<span class="dot red">${bad}</span>` : fix ? `<span class="dot yel">${fix}</span>` : '<span class="dot">✓</span>';
+      return `<button data-t="${ti}" class="${ti === S.cur ? 'on' : ''}">${esc(tab.name)} ${dot}</button>`;
+    }).join('') + '</div>');
+  }
   if (P) S.table.forEach((tab, ti) => {
+    if (ti !== S.cur) return;
     const ai = P.tabArt[ti], art = ai >= 0 ? S.arts[ai] : null;
     const ck = P.checks[ti];
     const sumBadge = ck.so != null ? (ck.so === ck.sum ? `<span class="badge green">סה"כ ${ck.sum} = הזמנה ✓</span>` : `<span class="badge red">סה"כ ${ck.sum} ≠ הזמנה ${ck.so}</span>`) : `<span class="badge">סה"כ ${ck.sum}</span>`;
@@ -254,6 +276,7 @@ function render() {
     out.push('</table></div>');
   });
   $('#tabsOut').innerHTML = out.join('');
+  document.querySelectorAll('.ttabs button').forEach(b => b.onclick = () => { S.cur = +b.dataset.t; render(); });
   document.querySelectorAll('select[data-k]').forEach(s => s.onchange = () => {
     if (s.value === 'auto') delete S.override[s.dataset.k]; else S.override[s.dataset.k] = +s.value;
     recompute();
