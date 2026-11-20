@@ -899,29 +899,29 @@ $('#bExport').onclick = async () => {
 /* ---------------- work order per department (looks like the Campus SO) ---------------- */
 const DEPT_MAT = { 'דיגיטל': 'דיגיטל', 'מגנטי': 'מגנטי', 'דורסט': 'דורסט (PVC)' };
 // rows: [{type, files, qty, note, sheets}] ; returns pdf bytes (A4, drawn on a canvas so Hebrew is exact)
-async function orderPdf(mc, rows, sheetsInfo) {
+async function orderPdf(mc, rows, sheetsInfo, detail) {
   try { await document.fonts.load('16px Heebo'); } catch (e) {}
   const S3 = 3, W = 595, H = 842, F = '"Heebo","Segoe UI",Arial,sans-serif';
   const blue = '#2563eb', light = '#eef4ff', line = '#d6deea', txt = '#1a1a1a', mute = '#6b7280';
   const so = (S.so && S.so.soNumber) || '', meta = (S.so && S.so.meta) || {};
   const now = new Date(), stamp = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}, ${now.toTimeString().slice(0, 8)}`;
   const pages = [];
-  const newPage = () => {
-    const cv = document.createElement('canvas'); cv.width = W * S3; cv.height = H * S3;
-    const c = cv.getContext('2d'); c.scale(S3, S3); c.fillStyle = '#fff'; c.fillRect(0, 0, W, H); c.direction = 'rtl';
-    pages.push(cv); return c;
+  const newPage = (pw = W, ph = H) => {
+    const cv = document.createElement('canvas'); cv.width = pw * S3; cv.height = ph * S3;
+    const c = cv.getContext('2d'); c.scale(S3, S3); c.fillStyle = '#fff'; c.fillRect(0, 0, pw, ph); c.direction = 'rtl';
+    pages.push({ cv, w: pw, h: ph }); return c;
   };
   const T = (c, str, x, y, { size = 10, bold = false, color = txt, align = 'right', dir = 'rtl' } = {}) => {
     c.font = `${bold ? 'bold ' : ''}${size}px ${F}`; c.fillStyle = color; c.textAlign = align; c.direction = dir; c.fillText(String(str), x, y);
   };
-  const header = c => {
+  const header = (c, W = 595, sub = '') => {
     T(c, 'קמפוס לדפוס דיגיטלי', W - 40, 58, { size: 17, bold: true, color: blue });
-    T(c, `הזמנת עבודה לייצור – ${mc}`, W - 40, 74, { size: 9, color: mute });
+    T(c, `הזמנת עבודה לייצור – ${mc}${sub}`, W - 40, 74, { size: 9, color: mute });
     T(c, so, 40, 58, { size: 17, bold: true, align: 'left', dir: 'ltr' });
     T(c, `הופק: ${stamp}`, 40, 74, { size: 8, color: mute, align: 'left' });
     c.fillStyle = blue; c.fillRect(40, 86, W - 80, 2);
   };
-  const footer = (c, i, n) => {
+  const footer = (c, i, n, W, H) => {
     c.fillStyle = line; c.fillRect(40, H - 46, W - 80, 0.7);
     T(c, 'קמפוס לדפוס דיגיטלי — מסמך פנימי לרצפת הייצור', W - 40, H - 32, { size: 7.5, color: mute });
     T(c, `${so}${n > 1 ? `   ${i}/${n}` : ''}`, 40, H - 32, { size: 7.5, color: mute, align: 'left', dir: 'ltr' });
@@ -961,11 +961,48 @@ async function orderPdf(mc, rows, sheetsInfo) {
     vals.forEach((v, j) => { T(c, v, x - 8, y + 17, { size: j === 1 ? 10 : 9.5, bold: !!r.total || j === 1 }); x -= cols[j].w; });
     c.fillStyle = line; c.fillRect(40, y + 26, W - 80, 0.6); y += 26;
   });
+  // ---- detail: every sign by name, quantity per branch (new page, landscape when many branches)
+  if (detail && detail.length) {
+    const nb = Math.max(...detail.map(d => d.headers.length));
+    const need = 26 + 46 + 190 + 52 + nb * 58;
+    const PW = need > 515 ? 842 : 595, PH = need > 515 ? 595 : 842, UW = PW - 80;
+    const bw = Math.max(40, Math.min(70, (UW - 26 - 46 - 52 - 150) / Math.max(1, nb))), tw = UW - 26 - 46 - 52 - bw * nb;
+    c = newPage(PW, PH); header(c, PW, ' – פירוט לפי סניפים'); y = 104;
+    for (const d of detail) {
+      const dcols = [{ k: '#', w: 26 }, { k: 'צבע', w: 46 }, { k: 'שילוט', w: tw }, ...d.headers.map(h => ({ k: h.replace(/^הזמנה\s*|^להזמין\s*/, ''), w: bw })), { k: 'סה"כ', w: 52 }];
+      const sectionH = 22 + 22 + Math.min(3, d.rows.length) * 20;
+      if (y + sectionH > PH - 70) { c = newPage(PW, PH); header(c, PW, ' – פירוט לפי סניפים'); y = 104; }
+      T(c, d.tab, PW - 40, y + 14, { size: 12, bold: true, color: blue }); y += 22;
+      const dhead = () => {
+        c.fillStyle = blue; c.fillRect(40, y, UW, 22);
+        let x = PW - 40; dcols.forEach((cl, j) => { T(c, cl.k, j >= 3 ? x - cl.w / 2 : x - 6, y + 15, { size: 8.5, bold: true, color: '#fff', align: j >= 3 ? 'center' : 'right' }); x -= cl.w; }); y += 22;
+      };
+      dhead();
+      const tot = { q: {}, qty: 0 }; d.headers.forEach(h => tot.q[h] = 0);
+      const rr = [...d.rows, null];
+      rr.forEach((r, i) => {
+        if (y > PH - 70) { c = newPage(PW, PH); header(c, PW, ' – פירוט לפי סניפים'); y = 104; T(c, d.tab + ' (המשך)', PW - 40, y + 14, { size: 12, bold: true, color: blue }); y += 22; dhead(); }
+        const isT = !r;
+        if (isT) { r = { no: '', color: '', text: 'סה"כ', q: tot.q, qty: tot.qty }; c.fillStyle = light; c.fillRect(40, y, UW, 20); }
+        else { d.headers.forEach(h => tot.q[h] += r.q[h] || 0); tot.qty += r.qty; if (i % 2) { c.fillStyle = '#f7f9fc'; c.fillRect(40, y, UW, 20); } }
+        const vals = [r.no, r.color, r.text, ...d.headers.map(h => r.q[h] || ''), r.qty];
+        let x = PW - 40;
+        vals.forEach((v, j) => {
+          let str = String(v); c.font = `${isT || j === dcols.length - 1 ? 'bold ' : ''}9px ${F}`;
+          while (j === 2 && str.length > 3 && c.measureText(str).width > dcols[j].w - 10) str = str.slice(0, -2) + '…';
+          T(c, str, j >= 3 ? x - dcols[j].w / 2 : x - 6, y + 14, { size: 9, bold: isT || j === dcols.length - 1, align: j >= 3 ? 'center' : 'right' });
+          x -= dcols[j].w;
+        });
+        c.fillStyle = line; c.fillRect(40, y + 20, UW, 0.5); y += 20;
+      });
+      y += 16;
+    }
+  }
   const doc = await PDFLib.PDFDocument.create();
   for (let i = 0; i < pages.length; i++) {
-    const pc = pages[i].getContext('2d'); pc.setTransform(S3, 0, 0, S3, 0, 0); footer(pc, i + 1, pages.length);
-    const png = await doc.embedPng(pages[i].toDataURL('image/png'));
-    doc.addPage([W, H]).drawImage(png, { x: 0, y: 0, width: W, height: H });
+    const pg = pages[i], pc = pg.cv.getContext('2d'); pc.setTransform(S3, 0, 0, S3, 0, 0); footer(pc, i + 1, pages.length, pg.w, pg.h);
+    const png = await doc.embedPng(pg.cv.toDataURL('image/png'));
+    doc.addPage([pg.w, pg.h]).drawImage(png, { x: 0, y: 0, width: pg.w, height: pg.h });
   }
   return doc.save();
 }
@@ -989,7 +1026,12 @@ async function orderFor(mc, P, magBytes) {
     const note = [tab.duplex ? 'דו צדדי' : '', gen ? `${gen} קבצים שנוצרו – לבדוק` : '', miss ? `${miss} חסרים` : ''].filter(Boolean).join(' · ');
     return { type: t, files: ti.length, qty: ti.reduce((a, i) => a + i.qty, 0), note, sheets: sheetsOf[t] };
   });
-  return orderPdf(mc, rows, sheetsInfo);
+  const detail = tabs.map(t => {
+    const tab = S.table.find(x => x.name === t) || { qtyHeaders: [] };
+    const ti = its.filter(i => i.tab === t).sort((a, b) => a.row.no - b.row.no);
+    return { tab: t, headers: tab.qtyHeaders || [], rows: ti.map(i => ({ no: i.row.no, color: i.row.colorText || '', text: i.row.text || '', q: i.row.q || {}, qty: i.qty })) };
+  });
+  return orderPdf(mc, rows, sheetsInfo, detail);
 }
 
 /* ---------------- EFI layout (magnet): preview + export ---------------- */
