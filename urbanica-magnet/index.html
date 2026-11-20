@@ -91,7 +91,9 @@
   .sum tr.divrow td { background:#eef3fd; cursor:pointer; font-weight:700; font-size:14px; border-top:6px solid #fff; }
   .sum tr.divrow:hover td { background:#e2ebfb; }
   .sum tr.divrow .arr { display:inline-block; width:14px; color:var(--blue); }
-  .sum tr.prow td { font-weight:600; padding-inline-start:20px; }
+  .sum tr.prow td { font-weight:600; padding-inline-start:20px; cursor:pointer; }
+  .sum tr.prow:hover td { background:#f4f6f8; }
+  .sum tr.prow .arr2 { display:inline-block; width:12px; color:#9aa5b1; font-size:11px; }
   .sum tr.prow td:first-child { padding-inline-start:20px; }
   .sum tr.sub td:first-child { padding-inline-start:34px; }
   .sum .big { font-size:16px; font-weight:700; }
@@ -134,7 +136,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 8;
+const APP_VERSION = 9;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -447,7 +449,7 @@ let S = JSON.parse(JSON.stringify(DEFAULTS));
 let files = [], srcPaths = [], ovs = {}, qty = {}, allQty = {}, C = null, cfg = {};
 let askedFor = new Set();
 let sideTab = 'div', showExc = false;
-const openDivs = new Set();
+const openDivs = new Set(), openPromos = new Set();
 let sizes = {}, dismissed = new Set(), sizeRun = 0, sizeProg = null, sizeNoApi = false;
 
 async function saveSettings() { if (D) await D.setCfg({ settings: S }); else localStorage.setItem('shemot-settings', JSON.stringify(S)); }
@@ -595,8 +597,9 @@ function renderSide() {
       const promos = [...new Set(rs.map(r => r.promoHe))];
       for (const p of promos) {
         const rp = rs.filter(r => r.promoHe === p);
-        body += `<tr class="prow"><td>${esc(p || '?')}</td><td class="n">${rp.length}</td><td class="n">${uTxt(units(rp))}</td></tr>`;
-        for (const r of rp) body += `<tr class="sub"><td><bdi>${esc(r.genderHe || '?')}${r.subHe ? ' · ' + esc(r.subHe) : ''}</bdi></td><td class="n"></td><td class="n">${uTxt(units([r]))}</td></tr>`;
+        const pk = c + '|' + p, popen = openPromos.has(pk);
+        body += `<tr class="prow" data-pk="${esc(pk)}"><td><span class="arr2">${popen ? '▾' : '◂'}</span> ${esc(p || '?')}</td><td class="n">${rp.length}</td><td class="n">${uTxt(units(rp))}</td></tr>`;
+        if (popen) for (const r of rp) body += `<tr class="sub"><td><bdi>${esc(r.genderHe || '?')}${r.subHe ? ' · ' + esc(r.subHe) : ''}</bdi></td><td class="n"></td><td class="n">${uTxt(units([r]))}</td></tr>`;
       }
     }
     body += `<tr class="tot"><td>סה״כ</td><td class="n big">${withCol.length}</td><td class="n">${uTxt(units(withCol))}</td></tr></tbody></table>`;
@@ -604,6 +607,7 @@ function renderSide() {
   el.innerHTML = `<div class="tabs"><button data-t="div" class="${sideTab === 'div' ? 'on' : ''}">לפי חלוקה</button><button data-t="promo" class="${sideTab === 'promo' ? 'on' : ''}">לפי מבצע</button><button data-t="miss" class="${sideTab === 'miss' ? 'on' : ''}">חוסרים ${openMiss ? `<span class="badge red">${openMiss}</span>` : (sizeProg && sizeProg.done < sizeProg.total ? '' : '<span class="badge green">✓</span>')}</button></div>
     <div class="sum">${body}${sideTab !== 'miss' ? '<div class="muted" style="margin-top:8px">יח׳ = סכום הכמויות. <span class="issue">*</span> = עוד חסרות כמויות.</div>' : ''}</div>`;
   el.querySelectorAll('[data-t]').forEach(b => b.onmousedown = () => { sideTab = b.dataset.t; renderSide(); });
+  el.querySelectorAll('[data-pk]').forEach(tr => tr.onmousedown = () => { const k = tr.dataset.pk; openPromos.has(k) ? openPromos.delete(k) : openPromos.add(k); renderSide(); });
   el.querySelectorAll('[data-div]').forEach(tr => tr.onmousedown = () => { const c = tr.dataset.div; openDivs.has(c) ? openDivs.delete(c) : openDivs.add(c); renderSide(); });
   if (el.querySelector('#openAll')) el.querySelector('#openAll').onmousedown = () => { const all = C.colOrder.every(c => openDivs.has(c)); C.colOrder.forEach(c => all ? openDivs.delete(c) : openDivs.add(c)); renderSide(); };
   el.querySelectorAll('[data-dis]').forEach(b => b.onmousedown = () => { dismissed.add(b.dataset.dis); render(true); });
