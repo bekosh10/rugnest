@@ -818,24 +818,30 @@ function planLayout(groups, o) {
     const ca = COLOR_ORDER.indexOf(groups[a].color), cb = COLOR_ORDER.indexOf(groups[b].color);
     return ((ca < 0 ? 9 : ca) - (cb < 0 ? 9 : cb)) || a - b;
   });
-  const sheets = []; let sh = null, cy = 0;
-  const newSheet = () => { sh = { cells: [], used: 0 }; sheets.push(sh); cy = 0; };
-  const avail = maxH - top - bot;
+  // Types stay whole. A type bigger than a sheet gets full sheets of its own (they become ×N);
+  // what is left of it – and every small type – goes whole into the first sheet that still has room
+  // (first-fit), otherwise a new sheet. Sheet height is not important, keeping types together is.
+  const sheets = [], avail = maxH - top - bot;
+  const place = (sh, gi, n, cols, cw, ch, rot) => {
+    let cy = sh.used + (sh.cells.length ? gap : 0);
+    const x0 = (W - cols * cw) / 2;
+    for (let left = n; left > 0; left -= cols, cy += ch)
+      for (let c = 0; c < Math.min(cols, left); c++) sh.cells.push({ g: gi, x: x0 + c * cw, top: cy, w: cw, h: ch, rot });
+    sh.used = cy;
+  };
   for (const gi of order) {
     const g = groups[gi]; if (!g.qty) continue;
     // turn the sign 90° when that fills the width better (A3 42×29.7 → 4 standing across)
     const aw = W - 2 * o.side * CM + 0.5, fill = w => Math.floor(aw / w) * w;
     const rot = fill(g.h) > fill(g.w) * 1.01;
     const cw = rot ? g.h : g.w, ch = rot ? g.w : g.h;
-    const cols = Math.max(1, Math.floor(aw / cw));
-    if (!sh) newSheet(); else if (sh.cells.length) cy += gap;
+    const cols = Math.max(1, Math.floor(aw / cw)), rps = Math.max(1, Math.floor((avail + 0.5) / ch)), perSheet = cols * rps;
     let left = g.qty;
-    while (left > 0) {
-      if (cy + ch > avail + 0.5) newSheet();
-      const n = Math.min(cols, left), x0 = (W - cols * cw) / 2;
-      for (let c = 0; c < n; c++) sh.cells.push({ g: gi, x: x0 + c * cw, top: cy, w: cw, h: ch, rot });
-      cy += ch; sh.used = cy; left -= n;
-    }
+    while (left > perSheet) { const sh = { cells: [], used: 0 }; sheets.push(sh); place(sh, gi, perSheet, cols, cw, ch, rot); left -= perSheet; }
+    const hNeed = Math.ceil(left / cols) * ch;
+    let sh = sheets.find(z => z.used + (z.cells.length ? gap : 0) + hNeed <= avail + 0.5);
+    if (!sh) { sh = { cells: [], used: 0 }; sheets.push(sh); }
+    place(sh, gi, left, cols, cw, ch, rot);
   }
   for (const s of sheets) {
     s.W = W; s.H = top + s.used + bot;
