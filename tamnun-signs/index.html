@@ -119,6 +119,11 @@
   .lay-set { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:10px; }
   .lay-set input { width:64px; }
   .lay-sheets { display:flex; gap:14px; overflow-x:auto; padding:8px 2px 12px; direction:ltr; }
+  .lay-sheets::-webkit-scrollbar { height:14px; -webkit-appearance:none; }
+  .lay-sheets::-webkit-scrollbar-track { background:#e8edf3; border-radius:7px; }
+  .lay-sheets::-webkit-scrollbar-thumb { background:#9aa7b8; border-radius:7px; border:3px solid #e8edf3; }
+  .lay-sheets::-webkit-scrollbar-thumb:hover { background:#6b7a8f; }
+  .lay-nav { display:flex; gap:6px; align-items:center; justify-content:center; margin-top:2px; }
   .lay-sh { flex:0 0 auto; text-align:center; font-size:12px; }
   .lay-sh svg { background:#fff; border:1px solid #bbb; box-shadow:0 1px 4px rgba(0,0,0,.15); display:block; }
   .lay-sh .cp { font-weight:bold; color:var(--red); }
@@ -1071,6 +1076,7 @@ $('#bLayout').onclick = async () => {
     <div class="mtabs" id="layTabs"></div>
     <div class="lay-set"><span class="muted" id="lSum"></span><span class="muted" id="lInfo"></span></div>
     <div class="lay-sheets" id="laySh"></div>
+    <div class="lay-nav" dir="ltr"><button class="small" id="lPrev" title="שמאלה">◀</button><span class="muted" dir="rtl">גלילה לצדדים: החצים או גלגלת העכבר</span><button class="small" id="lNext" title="ימינה">▶</button></div>
     <div class="foot"><button class="primary" id="lExp">ייצוא</button><button id="lCfg">⚙ הגדרות</button><button id="lClose">סגירה</button></div></div>`;
   document.body.appendChild(bg);
   const close = () => bg.remove();
@@ -1153,6 +1159,11 @@ $('#bLayout').onclick = async () => {
     fill(); document.body.appendChild(d);
   });
   bg.querySelector('#lCfg').onclick = () => settings();
+  // Mac hides scrollbars – buttons + mouse wheel move the sheets sideways
+  const shEl = bg.querySelector('#laySh');
+  bg.querySelector('#lNext').onclick = () => shEl.scrollBy({ left: shEl.clientWidth * 0.8, behavior: 'smooth' });
+  bg.querySelector('#lPrev').onclick = () => shEl.scrollBy({ left: -shEl.clientWidth * 0.8, behavior: 'smooth' });
+  shEl.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { shEl.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
   bg.querySelector('#lExp').onclick = async () => {
     if (!desk) { toast('הייצוא עובד רק בתוכנה המותקנת'); return; }
     if (!cfg.printDir || !cfg.cutDir) { toast('קודם בוחרים תיקיות לפרינט ולקאט בהגדרות'); if (!(await settings()) || !cfg.printDir || !cfg.cutDir) return; }
