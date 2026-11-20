@@ -60,6 +60,10 @@
   .badge.yel { background:#fde9a8; color:#7a5800; }
   select { font:inherit; font-size:12px; padding:2px 4px; width:120px; }
   .fn { unicode-bidi:isolate; direction:ltr; display:inline-block; }
+  #stickTabs { position:sticky; top:var(--hh,62px); z-index:4; background:var(--bg); padding-top:4px; }
+  .tabcard h2.tabhead { position:sticky; top:var(--t2,120px); z-index:3; background:var(--card); margin:0; padding:10px 0; }
+  .tabcard th { position:sticky; top:var(--t3,170px); z-index:3; box-shadow:0 1px 0 var(--line); }
+  .tabcard { padding-top:0; }
   .mtabs { display:flex; gap:0; margin-bottom:0; border-bottom:2px solid var(--blue); }
   .mtabs button { padding:10px 22px; border-radius:10px 10px 0 0; border:1px solid var(--line); border-bottom:none; background:#eef1f4; font-size:15px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:8px; margin-inline-end:4px; }
   .mtabs button.on { background:var(--blue); color:#fff; border-color:var(--blue); }
@@ -393,21 +397,21 @@ function render() {
     const curM = S.table[S.cur].machine;
     const ms = C.MACHINES.filter(m => S.table.some(t => t.machine === m));
     // main tabs: machines
-    out.push('<div class="mtabs">' + ms.map(m => {
+    out.push('<div id="stickTabs"><div class="mtabs">' + ms.map(m => {
       const tis = S.table.map((t, i) => i).filter(i => S.table[i].machine === m);
       const sum = tis.map(st).reduce((a, x) => ({ bad: a.bad + x.bad, fix: a.fix + x.fix }), { bad: 0, fix: 0 });
       return `<button data-m="${esc(m)}" class="${m === curM ? 'on' : ''}">${esc(MLABEL(m))} ${dot(sum)}</button>`;
     }).join('') + '</div>');
     // inner tabs: the types of that machine
     out.push('<div class="ttabs">' + S.table.map((tab, ti) => tab.machine !== curM ? '' :
-      `<button data-t="${ti}" class="${ti === S.cur ? 'on' : ''}">${esc(tab.name)} ${dot(st(ti))}</button>`).join('') + '</div>');
+      `<button data-t="${ti}" class="${ti === S.cur ? 'on' : ''}">${esc(tab.name)} ${dot(st(ti))}</button>`).join('') + '</div></div>');
   }
   if (P) S.table.forEach((tab, ti) => {
     if (ti !== S.cur) return;
     const ai = P.tabArt[ti], art = ai >= 0 ? S.arts[ai] : null;
     const ck = P.checks[ti];
     const sumBadge = ck.so != null ? (ck.so === ck.sum ? `<span class="badge green">סה"כ ${ck.sum} = הזמנה ✓</span>` : `<span class="badge red">סה"כ ${ck.sum} ≠ הזמנה ${ck.so}</span>`) : `<span class="badge">סה"כ ${ck.sum}</span>`;
-    out.push(`<div class="card"><h2 class="tabhead">${esc(tab.name)} <span class="badge">${esc(MLABEL(tab.machine))}</span>${tab.duplex ? '<span class="badge">דו צדדי</span>' : ''} ${sumBadge}
+    out.push(`<div class="card tabcard"><h2 class="tabhead">${esc(tab.name)} <span class="badge">${esc(MLABEL(tab.machine))}</span>${tab.duplex ? '<span class="badge">דו צדדי</span>' : ''} ${sumBadge}
       <span class="muted" title="העמודות שנספרו לכמות">כמות = ${tab.qtyHeaders.map(esc).join(' + ') || '—'}</span>
       <span class="muted r">${art ? esc(art.name) + ' · ' + art.pages.length + ' עמ\'' : '<span class="badge red">אין קובץ בגודל ' + (tab.size ? tab.size.join('×') : '?') + '</span>'}</span></h2>
       <table><tr><th></th><th>#</th><th>צבע</th><th>שילוט</th><th class="n">כמות</th><th>עמוד</th><th></th><th class="fname">שם קובץ</th></tr>`);
@@ -442,6 +446,7 @@ function render() {
     out.push('</table></div>');
   });
   $('#tabsOut').innerHTML = out.join('');
+  stickyOffsets();
   document.querySelectorAll('.ttabs button').forEach(b => b.onclick = () => { S.cur = +b.dataset.t; S.lastOf = S.lastOf || {}; S.lastOf[S.table[S.cur].machine] = S.cur; render(); });
   document.querySelectorAll('.mtabs button').forEach(b => b.onclick = () => {
     const m = b.dataset.m; S.lastOf = S.lastOf || {};
@@ -455,6 +460,18 @@ function render() {
   renderSide();
 }
 
+// sticky layers: app header → tabs → type title → column titles
+function stickyOffsets() {
+  const root = document.documentElement.style;
+  const hh = document.querySelector('header').offsetHeight;
+  const st = document.getElementById('stickTabs');
+  const h2 = document.querySelector('.tabcard h2.tabhead');
+  const t2 = hh + (st ? st.offsetHeight : 0);
+  root.setProperty('--hh', hh + 'px');
+  root.setProperty('--t2', t2 + 'px');
+  root.setProperty('--t3', (t2 + (h2 ? h2.offsetHeight : 0)) + 'px');
+}
+window.addEventListener('resize', stickyOffsets);
 function renderSide() {
   const P = S.plan;
   const nMiss = P ? new Set(P.items.flatMap(i => i.noEn || [])).size + P.missing.length + P.extras.length + P.checks.filter(c => c.so != null && c.so !== c.sum).length + P.unusedArts.length : 0;
