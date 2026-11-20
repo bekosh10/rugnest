@@ -19,7 +19,9 @@ const norm = s => String(s == null ? '' : s)
   .toLowerCase();
 const clean = s => String(s == null ? '' : s).replace(BIDI, '').replace(/\s+/g, ' ').trim();
 const numsOf = s => (norm(s).match(/\d+(?:\.\d+)?/g) || []).map(Number);
+const STOP = new Set(['לבן', 'אדום', 'כחול', 'שחור', 'צבעוני', 'פס', 'collection', 'הזדמנות', 'אחרונה', 'by', 'tamnoon']);
 const wordsOf = s => norm(s).split(' ').filter(w => w && !/^\d+(\.\d+)?$/.test(w));
+const matchWords = s => wordsOf(s).filter(w => !STOP.has(w));
 
 // table words that the artwork writes differently
 const SYN = {
@@ -38,18 +40,13 @@ function tokMatch(a, b) {
 }
 // 0..1 – how well the row words match the page words
 function textScore(rowText, pageText) {
-  const r = wordsOf(rowText), p = wordsOf(pageText);
+  const r = matchWords(rowText), p = matchWords(pageText);
   if (!r.length) return null;            // row has no words (e.g. only a number)
   if (!p.length) return 0;
-  let hit = 0;
-  const used = new Set();
-  for (const w of r) {
-    const j = p.findIndex((x, i) => !used.has(i) && tokMatch(w, x));
-    if (j >= 0) { hit++; used.add(j); }
-  }
-  // synonyms like בייבי -> nb + years count once on each side
-  const denom = Math.max(r.length, Math.min(p.length, r.length + 1));
-  return hit / denom;
+  // both sides must be covered: "חולצות" is not "חולצות מכופתרות"; "בייבי" covers "nb years"
+  const rowCov = r.filter(w => p.some(x => tokMatch(w, x))).length / r.length;
+  const pageCov = p.filter(x => r.some(w => tokMatch(w, x))).length / p.length;
+  return Math.min(rowCov, pageCov);
 }
 
 /* ---------------------------------------------------------------- colors */
@@ -100,9 +97,13 @@ function classifyPixels(data) {
 
 /* ---------------------------------------------------------------- sizes */
 const A = { A0: [841, 1189], A1: [594, 841], A2: [420, 594], A3: [297, 420], A4: [210, 297], A5: [148, 210], A6: [105, 148] };
+// "21 רוחב על 19.8 גובה"
+const SIZE_WORDS = /(\d+(?:\.\d+)?)\s*(?:ס"?מ\s*)?רוחב\s*(?:על|x|X|×)?\s*(\d+(?:\.\d+)?)\s*(?:ס"?מ\s*)?גובה/;
 // find a size (in cm, sorted small->big) in a piece of text
 function sizeFromText(s) {
   const t = clean(s).replace(BIDI, '');
+  const w = t.match(SIZE_WORDS);
+  if (w) return [+w[1], +w[2]].sort((a, b) => a - b);
   const m = t.match(/(\d+(?:\.\d+)?)\s*[xX×*\/]\s*(\d+(?:\.\d+)?)/);
   if (m) return [+m[1], +m[2]].sort((a, b) => a - b);
   const a = t.match(/\bA\s?([0-6])\b/i) || t.match(/איי\s*([0-6])/);
@@ -176,33 +177,52 @@ async function readTableXlsx(buf, ExcelJS) {
     }
     // everything written on the sheet (for size / material hints)
     const allText = grid.flat().map(cellText).join(' ');
-    let stated = null;
-    const rows = [];
+    // a sheet can hold several sets (e.g. "כובע A5" and then "A5"), each closed by a סה"כ row
+    // or recognised by a different format/size → every set becomes its own type
+    const blocks = [];
+    let cur = null;
+    const fmtKey = f => { const z = sizeFromText(f); return z ? z.join('x') : norm(f); };
     for (let r = h + 1; r < grid.length; r++) {
       const g = grid[r] || [];
       const fmt = clean(cellText(g[cFmt]));
       const line = g.map(cellText).join(' ');
-      const st = line.match(/סה"?כ\s*[-–]?\s*(\d+)/);
-      if (st) stated = +st[1];
-      if (!fmt || /סה"?כ/.test(fmt)) continue;
+      if (/סה"?כ/.test(line)) {
+        const st = line.match(/סה"?כ\s*[-–]?\s*(\d+)/) || (() => { const n = g.map(cellNum).filter(x => x != null); return n.length ? [0, n[n.length - 1]] : null; })();
+        if (cur) { if (st && cur.stated == null) cur.stated = +st[1]; cur.closed = true; }
+        else if (blocks.length && st && blocks[blocks.length - 1].stated == null) blocks[blocks.length - 1].stated = +st[1];
+        continue;
+      }
+      if (!fmt) continue;
+      if (!cur || cur.closed || fmtKey(fmt) !== cur.key) { cur = { key: fmtKey(fmt), rows: [], stated: null }; blocks.push(cur); }
       const q = {}; let qty = 0;
       for (const qc of qtyCols) { const n = cellNum(g[qc.c]) || 0; q[qc.name] = n; qty += n; }
-      // notes = text cells that are not one of the known columns
       const notes = g.map((v, c) => (c === cFmt || c === cColor || c === cText || c === cImg || qtyCols.some(x => x.c === c)) ? '' : clean(cellText(v))).filter(Boolean).join(' ');
       let colorText = clean(cellText(g[cColor])), text = cText >= 0 ? clean(cellText(g[cText])) : '';
       // "בייבי" written in the colour column (tabs without a text column)
       if (!text && colorText && !/לבן|אדום|כחול|שחור|צבעוני/.test(colorText)) { text = colorText; colorText = ''; }
-      rows.push({ no: rows.length + 1, sheetRow: r + 1, format: fmt, colorText, color: rowColor(colorText) || (/בייבי/.test(text) ? 'color' : ''), text, notes, q, qty });
+      cur.rows.push({ no: cur.rows.length + 1, sheetRow: r + 1, format: fmt, colorText, color: rowColor(colorText) || (/בייבי/.test(text) ? 'color' : ''), text, notes, q, qty });
     }
-    if (!rows.length) return;
-    const hints = ws.name + ' ' + rows.map(r => r.format + ' ' + r.notes).join(' ') + ' ' + allText;
-    const size = sizeFromText(rows[0].format) || sizeFromText(ws.name) || sizeFromText(allText);
-    tabs.push({
-      name: clean(ws.name), format: rows[0].format, size,
-      machine: machineOf(hints),
-      // duplex: the row notes decide; only if there are no notes – the tab name
-      duplex: (() => { const dup = x => /דו\s*צדדי|דו"צ|דוצ/.test(x); const nt = rows.map(r => r.notes).filter(Boolean); return nt.length ? nt.some(dup) : dup(ws.name); })(),
-      qtyHeaders: qtyCols.map(x => x.name), stated, rows,
+    const real = blocks.filter(b => b.rows.length);
+    real.forEach((b, bi) => {
+      const rows = b.rows;
+      const fmt0 = rows[0].format;
+      const short = clean(fmt0.replace(SIZE_WORDS, '').replace(/ס"?מ/g, ''));
+      // name: the sheet name, or – when a sheet has several sets – the set's own format if it says more
+      let name = clean(ws.name);
+      if (real.length > 1) {
+        const extra = wordsOf(short).filter(w => !wordsOf(ws.name).includes(w));
+        if (extra.length) name = short;
+      }
+      const blockText = rows.map(r => r.format + ' ' + r.notes).join(' ');
+      const hints = ws.name + ' ' + blockText + (real.length === 1 ? ' ' + allText : '');
+      const size = sizeFromText(fmt0) || sizeFromText(blockText) || (real.length === 1 ? (sizeFromText(ws.name) || sizeFromText(allText)) : sizeFromText(ws.name));
+      tabs.push({
+        name, sheet: clean(ws.name), format: fmt0, size,
+        machine: machineOf(hints),
+        // duplex: the row notes decide; only if there are no notes – the tab name
+        duplex: (() => { const dup = x => /דו\s*צדדי|דו"צ|דוצ/.test(x); const nt = rows.map(r => r.notes).filter(Boolean); return nt.length ? nt.some(dup) : dup(ws.name); })(),
+        qtyHeaders: qtyCols.map(x => x.name), stated: b.stated, rows,
+      });
     });
   });
   return tabs;
@@ -261,6 +281,8 @@ async function analyzeArtwork(buf, fileName, deps, opts = {}) {
   const { pdfjs, makeCanvas } = deps;
   const data = new Uint8Array(buf);
   const doc = await pdfjs.getDocument({ data: data.slice(), isEvalSupported: false }).promise;
+  let title = '';
+  try { const md = await doc.getMetadata(); title = clean((md.info && md.info.Title) || ''); } catch (e) {}
   const pages = [];
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
@@ -287,7 +309,7 @@ async function analyzeArtwork(buf, fileName, deps, opts = {}) {
   }
   await doc.destroy();
   const size = pages.length ? pages[0].size : null;
-  return { name: fileName, bytes: data, pages, size };
+  return { name: fileName, title, hasText: pages.some(p => p.text), bytes: data, pages, size };
 }
 
 /* ================================================================ MATCHING */
@@ -318,30 +340,42 @@ function matchTab(tab, art) {
   rows.forEach((r, ri) => pages.forEach((p, pi) => pairs.push({ ri, pi, ...pairScore(r, p, ri, pi) })));
   const okText = x => {
     const r = rows[x.ri];
-    const hasWords = wordsOf(r.text).length > 0, hasNums = numsOf(r.text).length > 0;
+    const hasWords = matchWords(r.text).length > 0, hasNums = numsOf(r.text).length > 0;
     if (!hasWords && !hasNums) return true;                // colour-only rows (21X…)
     if (hasNums && !x.numsOk) return false;
-    if (hasWords && (x.ts || 0) < 0.5) return false;
+    if (hasWords && (x.ts || 0) <= 0.5) return false;
     return true;
   };
   // pass 1 – text and colour agree
   pairs.filter(x => okText(x) && x.cs > -2).sort((a, b) => b.s - a.s).forEach(x => {
     if (res[x.ri] || pageUse[x.pi] != null) return;
-    if (!wordsOf(rows[x.ri].text).length && !numsOf(rows[x.ri].text).length && x.cs < 0) return;
+    if (!matchWords(rows[x.ri].text).length && !numsOf(rows[x.ri].text).length && x.cs < 0) return;
     res[x.ri] = { kind: 'ok', page: x.pi }; pageUse[x.pi] = x.ri;
   });
   // pass 1b – artwork written as outlines (no readable text): same position, colour fits
   rows.forEach((r, ri) => {
     if (res[ri] || ri >= pages.length || pageUse[ri] != null) return;
     const p = pages[ri];
-    if (wordsOf(p.text).length || p.nums.length) return;
+    if (matchWords(p.text).length || p.nums.length) return;
     if (colorScore(r.color, p.color) < -1) return;
     res[ri] = { kind: 'ok', page: ri, byPosition: true }; pageUse[ri] = ri;
   });
+  // pass 1c – what is left: rows with words ↔ pages without readable text (outlines), in order.
+  // A guess – shown in yellow for checking.
+  {
+    const rLeft = rows.map((r, ri) => ri).filter(ri => !res[ri] && rows[ri].qty && matchWords(rows[ri].text).length && !numsOf(rows[ri].text).length);
+    const pLeft = pages.map((p, pi) => pi).filter(pi => pageUse[pi] == null && !matchWords(pages[pi].text).length && !pages[pi].nums.length);
+    rLeft.forEach(ri => {
+      const k = pLeft.findIndex(pi => colorScore(rows[ri].color, pages[pi].color) > -2);
+      if (k < 0) return;
+      const pi = pLeft.splice(k, 1)[0];
+      res[ri] = { kind: 'ok', page: pi, guess: true }; pageUse[pi] = ri;
+    });
+  }
   // pass 2 – right text, wrong colour → recolour a copy (the table decides)
   rows.forEach((r, ri) => {
     if (res[ri]) return;
-    const cand = pairs.filter(x => x.ri === ri && okText(x) && x.cs <= -2 && (wordsOf(r.text).length || numsOf(r.text).length))
+    const cand = pairs.filter(x => x.ri === ri && okText(x) && x.cs <= -2 && (matchWords(r.text).length || numsOf(r.text).length))
       .sort((a, b) => b.s - a.s)[0];
     if (cand && canSwap(r.color, pages[cand.pi].color)) {
       res[ri] = { kind: 'swap', page: cand.pi, from: pages[cand.pi].color, to: r.color };
@@ -352,8 +386,8 @@ function matchTab(tab, art) {
   rows.forEach((r, ri) => {
     if (res[ri]) return;
     const rn = numsOf(r.text);
-    if (rn.length !== 1 || wordsOf(r.text).length) return;
-    const isPrice = p => p.nums.length === 1 && !wordsOf(p.text).length;
+    if (rn.length !== 1 || matchWords(r.text).length) return;
+    const isPrice = p => p.nums.length === 1 && !matchWords(p.text).length;
     let src = pages.findIndex(p => isPrice(p) && p.color === r.color);
     let swap = false;
     if (src < 0) { src = pages.findIndex(p => isPrice(p) && canSwap(r.color, p.color)); swap = src >= 0; }
@@ -372,7 +406,8 @@ function matchTab(tab, art) {
   });
   return { res, extras };
 }
-const canSwap = (to, from) => ['white', 'red'].includes(to) && ['white', 'red'].includes(from) && to !== from;
+const SWAP = ['white', 'red', 'blue'];
+const canSwap = (to, from) => SWAP.includes(to) && SWAP.includes(from) && to !== from;
 
 /* ================================================================ PLAN */
 function fileSafe(s) { return clean(s).replace(/[\\/:*?"<>|]/g, m => (m === '*' ? 'x' : m === '"' ? "''" : '-')).replace(/\s+/g, ' ').trim(); }
@@ -391,7 +426,7 @@ const EN_WORDS = {
   'לבן': 'white', 'אדום': 'red', 'כחול': 'blue', 'שחור': 'black', 'צבעוני': '', 'מתכתי': 'magnetic', 'פס': 'strip',
   "ג'ינסים": 'jeans', 'חולצות': 'shirts', 'סריגים': 'knitwear', 'מכנסיים': 'pants', 'גופיות': 'tank tops', 'שמלות': 'dresses',
   "פיג'מות": 'pajamas', "ג'קטים": 'jackets', 'מעילים': 'coats', 'נעליים': 'shoes', 'אקטיב': 'active', 'בייבי': 'baby',
-  'פריטים': 'items', 'ב': 'for', 'ילדים': 'kids', 'מבוגרים': 'adults', 'נייר': 'paper', 'כרום': 'chrome', 'גרם': 'g',
+  'פריטים': 'items', 'כובע': 'cap', 'כובעים': 'caps', 'קולקציית': 'collection', 'קולציית': 'collection', 'קיץ': 'summer', 'חורף': 'winter', 'כל': 'all', 'עד': 'up to', 'הקולציית': 'collection', 'הקולקציה': 'collection', 'ב': 'for', 'ילדים': 'kids', 'מבוגרים': 'adults', 'נייר': 'paper', 'כרום': 'chrome', 'גרם': 'g',
 };
 const HEB = /[֐-׿]/;
 // returns { text, missing:[hebrew words without a translation] }
@@ -414,7 +449,7 @@ function toEnglish(str, user) {
 
 // format for the file name ("A3 מתכתי" → "A3 metal"), ס"מ dropped, * → x
 function formatLabel(f, user) {
-  let t = clean(f).replace(/ס"?מ/g, '').replace(/[*×]/g, 'x').replace(/[’`׳´‘]/g, "'");
+  let t = clean(f).replace(SIZE_WORDS, '').replace(/ס"?מ/g, '').replace(/[*×]/g, 'x').replace(/[’`׳´‘]/g, "'");
   const dict = { ...EN_PHRASES, ...EN_WORDS, ...(user || {}) };
   for (const k of Object.keys(dict).sort((a, b) => b.length - a.length)) if (HEB.test(k) && t.includes(k)) t = t.split(k).join(dict[k]);
   return fileSafe(t.replace(/\s+/g, ' ').trim());
@@ -429,23 +464,41 @@ function makeName(tab, row, page, gen, user) {
   const miss = [];
   const tr = s => { const r = toEnglish(s, user); miss.push(...r.missing); return r.text; };
   const fmt = formatLabel(row.format || tab.format, user);
-  miss.push(...toEnglish(clean(row.format || tab.format).replace(/ס"?מ/g, ''), user).missing);
+  miss.push(...toEnglish(clean(row.format || tab.format).replace(SIZE_WORDS, '').replace(/ס"?מ/g, ''), user).missing);
   let label = tr(rowLabel(tab, row, page));
 
   const color = row.colorText && !/צבעוני/.test(row.colorText) ? tr(row.colorText) : '';
+  if (color) label = label.split(' ').filter(w => w !== color).join(' ');
   let name = `${fmt} - ${[color, label].filter(Boolean).join(' ')}${tab.duplex ? ' - 2-sided' : ''} x${row.qty}`;
   name = `${row.no} - ${gen ? '!!!!!!!!!! ' : ''}${fileSafe(name)}`.toLowerCase();   // file names: small letters only
   return { name: name + '.pdf', missing: [...new Set(miss)] };
 }
 
 function buildPlan(tabs, arts, so, opts = {}) {
-  // which artwork belongs to which tab – by page size (both orientations)
+  // which artwork belongs to which type: page size (exact, or close – magnets come a bit smaller),
+  // the file's name/title (כובע, פס, A3…) and how many pages it has
   const used = new Set();
-  const tabArt = tabs.map(tab => {
-    let best = -1;
-    arts.forEach((a, ai) => { if (!used.has(ai) && best < 0 && sameSize(tab.size, a.size)) best = ai; });
-    if (best >= 0) used.add(best);
-    return best;
+  const KEYS = ['כובע', 'כובעים', 'פס', 'פסים', 'מתכתי', 'pvc'];
+  const keyOf = t => { const n = norm(t).replace(/כובעים/g, 'כובע').replace(/פסים/g, 'פס'); return KEYS.filter(k => n.split(' ').includes(k)); };
+  const aOf = t => (String(t).match(/\bA\s?([0-6])\b/i) || [])[1] || null;
+  const pairs = [];
+  tabs.forEach((tab, ti) => arts.forEach((a, ai) => {
+    if (!tab.size || !a.size) return;
+    const d = Math.max(Math.abs(tab.size[0] - a.size[0]), Math.abs(tab.size[1] - a.size[1]));
+    let sc = d <= 0.4 ? 10 : d <= 1.5 ? 6 : -99;
+    const tName = tab.name + ' ' + tab.format + ' ' + (tab.sheet || ''), aName = a.name + ' ' + (a.title || '');
+    const tk = keyOf(tName), ak = keyOf(aName);
+    for (const k of ['כובע', 'פס']) { if (tk.includes(k) && ak.includes(k)) sc += 4; else if (tk.includes(k) !== ak.includes(k)) sc -= 4; }
+    const ta = aOf(tab.format) || aOf(tab.name), aa = aOf(aName);
+    if (ta && aa) sc += ta === aa ? 2 : -2;
+    if (!a.hasText) sc -= 3;                                        // a scan / picture with no text at all
+    sc -= Math.min(3, Math.abs(a.pages.length - tab.rows.length) / 4);
+    pairs.push({ ti, ai, sc });
+  }));
+  const tabArt = tabs.map(() => -1);
+  pairs.filter(p => p.sc >= 3).sort((x, y) => y.sc - x.sc).forEach(p => {
+    if (tabArt[p.ti] >= 0 || used.has(p.ai)) return;
+    tabArt[p.ti] = p.ai; used.add(p.ai);
   });
   const unusedArts = arts.map((a, i) => i).filter(i => !used.has(i));
 
@@ -462,7 +515,7 @@ function buildPlan(tabs, arts, so, opts = {}) {
       const nm = makeName(tab, row, page, gen, opts.en);
       const it = { ti, tab: tab.name, machine: tab.machine, row, art: ai, page: m.page, kind: m.kind, m, name: nm.name, noEn: nm.missing, qty: row.qty };
       items.push(it);
-      if (gen) fixed.push(it);
+      if (gen || m.guess) fixed.push(it);
     });
     if (art) ex.forEach(e => extras.push({ tab: tab.name, file: art.name, ...e }));
     // totals
@@ -504,12 +557,13 @@ const CMYK_RE = /(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s
 const cmykClass = (c, m, y, k) => {
   if (c < 0.05 && m < 0.05 && y < 0.05 && k < 0.05) return 'white';
   if (m > 0.8 && y > 0.7 && c < 0.25 && k < 0.25) return 'red';
+  if (c > 0.55 && m < 0.5 && y < 0.25 && k < 0.25) return 'blue';
   if (k > 0.6 || (c > 0.5 && m > 0.5 && y > 0.5)) return 'black';
   return 'other';
 };
 // learn the client's red and black from the file itself
 function learnColors(PDFLib, doc) {
-  let red = null, black = null;
+  let red = null, black = null, blue = null;
   for (const pg of doc.getPages()) {
     const s = getContent(PDFLib, doc, pg);
     let m; CMYK_RE.lastIndex = 0;
@@ -517,10 +571,11 @@ function learnColors(PDFLib, doc) {
       const v = [+m[1], +m[2], +m[3], +m[4]], cl = cmykClass(...v);
       if (cl === 'red' && !red) red = m.slice(1, 5).join(' ');
       if (cl === 'black' && !black) black = m.slice(1, 5).join(' ');
+      if (cl === 'blue' && !blue) blue = m.slice(1, 5).join(' ');
     }
-    if (red && black) break;
+    if (red && black && blue) break;
   }
-  return { red: red || '0.072 0.996 0.93 0.008', black: black || '0.719 0.668 0.586 0.789' };
+  return { red: red || '0.072 0.996 0.93 0.008', black: black || '0.719 0.668 0.586 0.789', blue: blue || '0.763 0.235 0.04 0' };
 }
 
 // how the client lays out a price: distance ₪→number and the centre of the group,
@@ -566,20 +621,23 @@ function swapColors(PDFLib, doc, page, from, to, pal) {
   if (/\bDo\b|\bsh\b|\bscn?\b|\brg\b|\bRG\b/.test(s)) return false;     // images / shadings / rgb – too risky
   const classes = new Set();
   s.replace(CMYK_RE, (all, c, m, y, k) => { classes.add(cmykClass(+c, +m, +y, +k)); return all; });
-  if (classes.has('other')) return false;
+  // other colours (logos, stray text outside the page) stay as they are – the file is marked for checking anyway
   const { width, height } = page.getSize();
   const mb = page.getMediaBox();
-  if (from === 'red' && to === 'white') {
+  if ((from === 'red' || from === 'blue') && to === 'white') {
     s = s.replace(CMYK_RE, (all, c, m, y, k, op) => {
       const cl = cmykClass(+c, +m, +y, +k);
-      if (cl === 'red') return `0 0 0 0 ${op}`;
+      if (cl === from) return `0 0 0 0 ${op}`;
       if (cl === 'white') return `${pal.black} ${op}`;
       return all;
     });
-  } else if (from === 'white' && to === 'red') {
-    if (classes.has('red')) return false;
-    s = s.replace(CMYK_RE, (all, c, m, y, k, op) => cmykClass(+c, +m, +y, +k) === 'black' ? `0 0 0 0 ${op}` : all);
-    s = `q ${pal.red} k ${mb.x} ${mb.y} ${width} ${height} re f Q\n` + s;
+  } else if ((from === 'red' || from === 'blue') && (to === 'red' || to === 'blue')) {
+    s = s.replace(CMYK_RE, (all, c, m, y, k, op) => cmykClass(+c, +m, +y, +k) === from ? `${pal[to]} ${op}` : all);
+  } else if (from === 'white' && (to === 'red' || to === 'blue')) {
+    if (classes.has('red') || classes.has('blue')) return false;
+    // white background (painted or just paper) → colour, black text → white
+    s = s.replace(CMYK_RE, (all, c, m, y, k, op) => { const cl = cmykClass(+c, +m, +y, +k); return cl === 'black' ? `0 0 0 0 ${op}` : cl === 'white' ? `${pal[to]} ${op}` : all; });
+    s = `q ${pal[to]} k ${mb.x} ${mb.y} ${width} ${height} re f Q\n` + s;
   } else return false;
   setContent(PDFLib, doc, page, s);
   return true;

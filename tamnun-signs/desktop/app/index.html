@@ -390,7 +390,7 @@ function render() {
     const st = ti => {
       const tab = S.table[ti], ck = P.checks[ti];
       const bad = tab.rows.filter(r => missOf(r) || ((itemOf(r) || {}).noEn || []).length).length + (ck.so != null && ck.so !== ck.sum ? 1 : 0) + (P.tabArt[ti] < 0 ? 1 : 0) + P.extras.filter(e => e.tab === tab.name).length;
-      const fix = tab.rows.filter((r, ri) => { const it = itemOf(r); return isRemoved(ti, ri) || (it && (it.kind !== 'ok' || it.manual)); }).length;
+      const fix = tab.rows.filter((r, ri) => { const it = itemOf(r); return isRemoved(ti, ri) || (it && (it.kind !== 'ok' || it.manual || (it.m && it.m.guess))); }).length;
       return { bad, fix };
     };
     const dot = ({ bad, fix }) => bad ? `<span class="dot red">${bad}</span>` : fix ? `<span class="dot yel">${fix}</span>` : '<span class="dot">✓</span>';
@@ -425,7 +425,7 @@ function render() {
     tab.rows.forEach((row, ri) => {
       const off = isRemoved(ti, ri);
       const it = itemOf(row), ms = missOf(row);
-      const cls = off ? 'off' : !row.qty ? 'zero' : ms ? 'miss' : (it && it.kind !== 'ok') || (it && it.manual) ? 'fix' : '';
+      const cls = off ? 'off' : !row.qty ? 'zero' : ms ? 'miss' : (it && it.kind !== 'ok') || (it && it.manual) || (it && it.m && it.m.guess) ? 'fix' : '';
       const page = it ? art.pages[it.page] : null;
       let sel = '';
       if (art && row.qty && !off) {
@@ -436,6 +436,7 @@ function render() {
       const status = off ? '<span class="badge">בוטל – לא יוצא</span>' : !row.qty ? '<span class="muted">כמות 0 – לא יוצא</span>'
         : ms ? `<span class="badge red">חסר</span> <span class="muted">${esc(ms.reason)}</span>`
         : it.kind !== 'ok' ? `<span class="badge yel">${MKIND[it.kind]} – לבדוק</span>`
+        : it.m && it.m.guess ? '<span class="badge yel">שויך לפי סדר (עמוד בלי טקסט) – לבדוק</span>'
         : it.manual ? '<span class="badge yel">שיוך ידני</span>' : '';
       const rmBtn = row.qty ? `<button class="rm" data-rm="${ti}:${ri}" title="${off ? 'להחזיר' : 'לבטל את השורה – לא ייצא קובץ'}">${off ? '↺' : '✕'}</button>` : '';
       out.push(`<tr class="${cls}"><td>${rmBtn}</td><td class="muted">${row.no}</td><td class="st">${swatch(row.color)}${esc(row.colorText)}</td><td class="st">${esc(row.text)}</td><td class="n st"><b>${row.qty || ''}</b></td>
@@ -506,7 +507,7 @@ function renderSide() {
     const rem = (P.removed || []).length ? '<div class="grp">בוטלו ידנית – לא יוצאים</div>' + P.removed.map(r => `<div class="it" style="color:#8a949e"><s>${esc(r.row.colorText)} ${esc(r.row.text)}</s> · ${r.row.qty} יח'<br><span class="muted">${esc(r.tab)} · שורה ${r.row.no}</span></div>`).join('') : '';
     el.innerHTML = rem + (P.fixed.length ? P.fixed.map(i => {
       const art = S.arts[i.art], p = art.pages[i.page];
-      const what = i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
+      const what = i.manual ? `שויך ידנית לעמוד ${i.page + 1}` : i.m && i.m.guess ? `שויך לפי סדר לעמוד ${i.page + 1} (אין בו טקסט קריא)` : i.kind === 'swap' ? `נוצר מעמוד ${i.page + 1} (${C.COLOR_HE[i.m.from]}) – הצבע הוחלף ל${C.COLOR_HE[i.m.to]}` : `נוצר מעמוד ${i.page + 1} (${i.m.fromNum}) – המספר שונה ל-${i.m.toNum}${i.m.to ? ' והצבע ל' + C.COLOR_HE[i.m.to] : ''}`;
       return `<div class="it"><b class="fn" dir="ltr">${esc(i.name)}</b><br><span class="muted">${esc(i.tab)} · ${what}</span>${thumbOf(i, p) ? `<img class="th" style="margin-top:4px" src="${thumbOf(i, p)}">` : ''}</div>`;
     }).join('') + '<div class="muted" style="padding-top:8px">קבצים שנוצרו מתחילים ב-!!!!!!!!!! – לבדוק בעין לפני הדפסה.</div>' : (rem ? '' : '<div class="empty">לא תוקן כלום – הכל הגיע תקין ✓</div>'));
   } else {
