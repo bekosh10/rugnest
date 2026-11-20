@@ -100,7 +100,16 @@ ipcMain.handle('export', async (e, { parent, folderName, files, report }) => {
 ipcMain.handle('reveal', (e, p) => { if (p && fs.existsSync(p)) { shell.openPath(p); return true; } return false; });
 
 /* ---------- updates ---------- */
-async function fetchText(u) { const r = await net.fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }
+// GitHub raw first; if it is blocked or down, the same files through jsDelivr
+const MIRRORS = [RAW, 'https://cdn.jsdelivr.net/gh/bekosh10/rugnest@main/tamnun-signs'];
+async function fetchOne(u) { const r = await net.fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }
+async function fetchText(u) {
+  let last;
+  for (const base of MIRRORS) {
+    try { return await fetchOne(u.replace(RAW, base)); } catch (e) { last = e; }
+  }
+  throw last;
+}
 ipcMain.handle('update:check', async () => {
   try {
     const j = JSON.parse(await fetchText(`${RAW}/version.json`));

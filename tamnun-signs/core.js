@@ -376,6 +376,13 @@ const canSwap = (to, from) => ['white', 'red'].includes(to) && ['white', 'red'].
 /* ================================================================ PLAN */
 function fileSafe(s) { return clean(s).replace(/[\\/:*?"<>|]/g, m => (m === '*' ? 'x' : m === '"' ? "''" : '-')).replace(/\s+/g, ' ').trim(); }
 
+// format for the file name: Hebrew first ("A3 מתכתי" → "מתכתי A3"), ס"מ dropped, * → x
+function formatLabel(f) {
+  let t = fileSafe(clean(f).replace(/ס"?מ/g, '').replace(/[*×]/g, 'x'));
+  const m = t.match(/^([A-Za-z0-9.x]+)\s+([\u0590-\u05FF].*)$/);
+  if (m) t = m[2] + ' ' + m[1];
+  return t;
+}
 function rowLabel(tab, row, page) {
   let t = row.text;
   if (!t && page) t = page.text;                         // 21X tabs have no text column
@@ -406,7 +413,7 @@ function buildPlan(tabs, arts, so) {
       const page = art.pages[m.page];
       const label = rowLabel(tab, row, page);
       const colorHe = row.colorText && !/צבעוני/.test(row.colorText) ? clean(row.colorText) : '';
-      let fmt = fileSafe(clean(row.format || tab.format).replace(/ס"?מ/g, '').replace(/[*×]/g, 'x'));
+      let fmt = formatLabel(row.format || tab.format);
       let name = `${fmt} - ${[colorHe, label].filter(Boolean).join(' ')}${tab.duplex ? ' - דו צדדי' : ''} x${row.qty}`;
       name = fileSafe(name);
       const gen = m.kind !== 'ok';
@@ -591,7 +598,8 @@ async function buildReport(plan, tabs, so, ExcelJS) {
   const s2 = wb.addWorksheet('חוסרים', rtl);
   s2.columns = [{ header: 'סוג', width: 22 }, { header: 'שורה', width: 6 }, { header: 'צבע', width: 10 }, { header: 'שילוט', width: 28 }, { header: 'כמות', width: 8 }, { header: 'בעיה', width: 40 }];
   plan.missing.forEach(m => s2.addRow([m.tab, m.row.sheetRow, m.row.colorText, m.row.text, m.row.qty, m.reason]));
-  plan.extras.forEach(e => s2.addRow([e.tab, '', COLOR_HE[e.color], e.text, '', `עמוד ${e.page + 1} בקובץ – לא בהזמנה${e.twin != null ? ' (כפול)' : ''}`]));
+  plan.extras.forEach(e => s2.addRow([e.tab, e.label || '', COLOR_HE[e.color], e.text, '', `עמוד ${e.page + 1} בקובץ – לא בהזמנה${e.twinRow ? ` (כפול של שורה ${e.twinRow})` : e.twin != null ? ' (כפול)' : ''}`]));
+  (plan.removed || []).forEach(r => s2.addRow([r.tab, r.row.sheetRow, r.row.colorText, r.row.text, r.row.qty, 'בוטל ידנית – לא יצא קובץ']));
   plan.checks.forEach(c => { if (c.so != null && c.so !== c.sum) s2.addRow([c.tab, '', '', '', c.sum, `סה"כ בטבלה ${c.sum} – בהזמנה ${c.so}`]); });
   head(s2);
 
@@ -607,6 +615,6 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 }
 
 const api = { CORE_VERSION, norm, numsOf, wordsOf, textScore, classifyPixels, sizeFromText, machineOf, MACHINES, COLOR_HE,
-  readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, buildItemPdf, buildReport, fileSafe };
+  formatLabel, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, buildItemPdf, buildReport, fileSafe };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TamnunCore = api;
 })(typeof self !== 'undefined' ? self : this);
