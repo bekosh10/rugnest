@@ -889,7 +889,7 @@ $('#bExport').onclick = async () => {
 const LAYKEY = 'tamnunLayout';
 function layCfg() { try { return JSON.parse(localStorage.getItem(LAYKEY)) || {}; } catch (e) { return {}; } }
 function laySave(c) { try { localStorage.setItem(LAYKEY, JSON.stringify(c)); } catch (e) {} }
-const layJob = tab => /a3/i.test(tab) ? 'magneti A3' : 'magneti pass';
+const layJob = tab => /a3/i.test(tab) ? 'magneti A3' : 'magneti';
 $('#bLayout').onclick = async () => {
   const P = S.plan; if (!P) return;
   const mag = P.items.filter(i => i.machine === 'מגנטי');
@@ -969,7 +969,7 @@ $('#bLayout').onclick = async () => {
         const gs = groupsOf[t]; if (!gs.length) continue;
         const r = await C.buildLayoutPdfs(gs, optsFor(t), `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
         const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
-        files.push({ sub: [], name: `${base} print.pdf`, data: r.print }, { sub: [], name: `${base} cut.pdf`, data: r.cut });
+        files.push({ sub: [], name: `${base} print.pdf`, data: r.print }, { sub: [], name: `${base} cut.pdf`, data: r.cut }, { sub: [], name: `${base} proof - לבדיקה.pdf`, data: r.proof });
       }
       const res = await desk.exportFiles({ parent, folderName: `${soNo() || 'הזמנה'} פריסת מגנטי`, files });
       toast(res.ok ? `הפריסה נשמרה ב-<b>${esc(res.dir)}</b>` : 'שגיאה: ' + esc(res.error), 9000);

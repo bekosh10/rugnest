@@ -878,28 +878,34 @@ function layerKit(PDFLib, doc) {
 async function buildLayoutPdfs(groups, o, label, PDFLib) {
   for (const g of groups) if (!g.w) { const d = await PDFLib.PDFDocument.load(g.bytes); const { width, height } = d.getPage(0).getSize(); g.w = width; g.h = height; }
   const sheets = planLayout(groups, o);
-  const pr = await PDFLib.PDFDocument.create(), cu = await PDFLib.PDFDocument.create();
-  const prL = layerKit(PDFLib, pr), cuL = layerKit(PDFLib, cu);
-  const font = await pr.embedFont(PDFLib.StandardFonts.Helvetica);
-  const emb = {};
+  const pr = await PDFLib.PDFDocument.create(), cu = await PDFLib.PDFDocument.create(), pf = await PDFLib.PDFDocument.create();
+  const prL = layerKit(PDFLib, pr), cuL = layerKit(PDFLib, cu), pfL = layerKit(PDFLib, pf);
+  const font = await pr.embedFont(PDFLib.StandardFonts.Helvetica), fontP = await pf.embedFont(PDFLib.StandardFonts.Helvetica);
+  const emb = {}, embP = {};
   for (let si = 0; si < sheets.length; si++) {
     const s = sheets[si];
-    const p = pr.addPage([s.W, s.H]), c = cu.addPage([s.W, s.H]);
+    const p = pr.addPage([s.W, s.H]), c = cu.addPage([s.W, s.H]), f = pf.addPage([s.W, s.H]);
     for (const cell of s.cells) {
       if (!emb[cell.g]) [emb[cell.g]] = await pr.embedPdf(groups[cell.g].bytes, [0]);
-      if (cell.rot) p.drawPage(emb[cell.g], { x: cell.x + cell.w, y: cell.y, width: cell.h, height: cell.w, rotate: PDFLib.degrees(90) });
-      else p.drawPage(emb[cell.g], { x: cell.x, y: cell.y, width: cell.w, height: cell.h });
+      if (!embP[cell.g]) [embP[cell.g]] = await pf.embedPdf(groups[cell.g].bytes, [0]);
+      for (const [pg, e] of [[p, emb[cell.g]], [f, embP[cell.g]]]) {
+        if (cell.rot) pg.drawPage(e, { x: cell.x + cell.w, y: cell.y, width: cell.h, height: cell.w, rotate: PDFLib.degrees(90) });
+        else pg.drawPage(e, { x: cell.x, y: cell.y, width: cell.w, height: cell.h });
+      }
     }
     const txt = `${String(label).replace(/[^\x20-\x7e]+/g, ' ').replace(/\s+/g, ' ').trim()}   sheet ${si + 1}/${sheets.length} x ${s.copies}`;
     const size = 16, tw = font.widthOfTextAtSize(txt, size);
     const dot2 = s.W - 0.2 * CM - 0.6 * CM - 5.08 * CM;           // left edge of the 2nd bottom dot
-    p.drawText(txt, { x: Math.max(1.2 * CM, dot2 - 5 * CM - tw), y: 0.5 * CM - size * 0.35, size, font, color: PDFLib.cmyk(0, 0, 0, 1) });
+    for (const [pg, fn] of [[p, font], [f, fontP]])
+      pg.drawText(txt, { x: Math.max(1.2 * CM, dot2 - 5 * CM - fn.widthOfTextAtSize(txt, size)), y: 0.5 * CM - size * 0.35, size, font: fn, color: PDFLib.cmyk(0, 0, 0, 1) });
     const marks = `q /OC /Pr1 BDC /CSall cs 1 scn\n${regMarks(s.W, s.H)}\nEMC Q\n`;
     prL(p, marks);
     const rects = s.cells.map(z => `${z.x.toFixed(3)} ${z.y.toFixed(3)} ${z.w.toFixed(3)} ${z.h.toFixed(3)} re S`).join('\n');
     cuL(c, `${marks}q /OC /Pr2 BDC /CScut CS 1 SCN 1 w 0 J 0 j\n${rects}\nEMC Q\n`);
+    // proof: graphics + cut lines on top – for checking only, not for the machine
+    pfL(f, `${marks}q /OC /Pr2 BDC 1 0 0 0 K 2 w 0 J 0 j\n${rects}\nEMC Q\n`);
   }
-  return { print: await pr.save(), cut: await cu.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies })) };
+  return { print: await pr.save(), cut: await cu.save(), proof: await pf.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies })) };
 }
 
 /* ================================================================ REPORT (xlsx) */
