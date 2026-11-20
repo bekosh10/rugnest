@@ -30,7 +30,6 @@
   .muted { color:var(--muted); font-size:13px; font-weight:400; }
   #drop { border:2px dashed #b8c2cc; border-radius:14px; padding:34px 20px; text-align:center; background:#fafbfc; }
   body.over #drop { border-color:var(--blue); background:var(--blue2); }
-  #drop.small { padding:10px 14px; }
   #drop.small .big, #drop.small > .muted { display:none; }
   #drop.small .inputs { margin-top:0; }
   #drop .big { font-size:19px; font-weight:600; margin-bottom:8px; }
@@ -63,7 +62,14 @@
   .ttabs .dot.yel { background:#e8a200; color:#fff; }
   .ttabs button.on .dot { box-shadow:0 0 0 1px #fff; }
   .sum td.n { white-space:nowrap; }
-  aside#side { width:330px; flex:none; position:sticky; top:70px; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - 70px - 50px); }
+  #leftCol { width:330px; flex:none; position:sticky; top:70px; display:flex; flex-direction:column; gap:12px; max-height:calc(100vh - 70px - 50px); }
+  aside#side { padding:0; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:1 1 auto; margin:0; }
+  #dropSlot:empty { display:none; }
+  #dropSlot #drop { margin:0; padding:10px 12px; text-align:right; flex:none; }
+  #dropSlot #drop .inputs { justify-content:flex-start; flex-direction:column; align-items:stretch; gap:5px; margin-top:6px; max-height:28vh; overflow-y:auto; }
+  #dropSlot #drop .chip { border-radius:7px; }
+  #dropSlot #drop .ftitle { display:block; font-weight:600; font-size:13px; }
+  #drop .ftitle { display:none; }
   .tabs { display:flex; border-bottom:1px solid var(--line); flex:none; }
   .tabs button { flex:1; border:none; border-radius:0; padding:10px 6px; background:#fafbfc; color:var(--muted); font-weight:600; }
   .tabs button.on { background:#fff; color:var(--blue); box-shadow:inset 0 -2px 0 var(--blue); }
@@ -109,10 +115,12 @@
       <div class="card" id="drop">
         <div class="big">גררי לכאן את כל הקבצים של ההזמנה</div>
         <div class="muted">הטבלה (אקסל), הזמנת העבודה (PDF), וקבצי העיצוב (PDF) – אפשר הכל ביחד, או תיקייה</div>
+        <span class="ftitle">קבצים <span class="muted">– אפשר לגרור עוד לכל מקום בחלון</span></span>
         <div class="inputs" id="inputs"></div>
       </div>
       <div id="tabsOut"></div>
     </div>
+    <div id="leftCol">
     <aside class="card" id="side">
       <div class="tabs">
         <button data-p="miss" class="on">חוסרים<span class="cnt" id="cMiss">0</span></button>
@@ -121,6 +129,8 @@
       </div>
       <div class="pane" id="pane"></div>
     </aside>
+    <div id="dropSlot"></div>
+    </div>
   </div>
 </main>
 <footer><span id="ver"></span><span class="spacer"></span><span id="upd"></span></footer>
@@ -143,6 +153,17 @@ async function busy(msg, fn) {
 }
 function toast(html, ms = 5000) { const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = html; document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
 
+async function pdfKind(buf) {
+  try {
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(buf).slice() }).promise;
+    const tc = await (await doc.getPage(1)).getTextContent();
+    const t = tc.items.map(i => i.str).join(' ');
+    const n = doc.numPages; await doc.destroy();
+    if (n <= 3 && (/הזמנת עבודה/.test(t) || (/SO/.test(t) && /יח'/.test(t)))) return 'so';
+    if (/צבע/.test(t) && /(פורמט|גודל)/.test(t) && /(מחסן|הזמנה|תמונה)/.test(t)) return 'tablepdf';
+    return 'art';
+  } catch (e) { return 'art'; }
+}
 async function isSO(buf) {
   try {
     const doc = await pdfjs.getDocument({ data: new Uint8Array(buf).slice() }).promise;
@@ -163,7 +184,9 @@ async function addFiles(list) {   // list of {name, buf}
           S.table = await C.readTableXlsx(f.buf, ExcelJS); S.tableName = f.name;
           if (!S.table.length) toast('לא מצאתי לשוניות עם טבלת שילוט באקסל ' + esc(f.name));
         } else if (/\.pdf$/.test(n)) {
-          if (await isSO(f.buf)) { S.so = await C.readSO(f.buf, pdfjs); S.soName = f.name; }
+          const kind = await pdfKind(f.buf);
+          if (kind === 'so') { S.so = await C.readSO(f.buf, pdfjs); S.soName = f.name; }
+          else if (kind === 'tablepdf') { S.tablePdf = f.name; }
           else {
             S.arts = S.arts.filter(a => a.name !== f.name);
             S.arts.push(await C.analyzeArtwork(f.buf, f.name, deps, { thumb: 160, keepThumb: true }));
@@ -190,7 +213,7 @@ document.addEventListener('drop', async e => {
   }
   addFiles(out);
 });
-$('#bClear').onclick = () => { Object.assign(S, { cur: 0, table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
+$('#bClear').onclick = () => { Object.assign(S, { cur: 0, tablePdf: '', table: null, tableName: '', so: null, soName: '', arts: [], plan: null, override: {} }); recompute(); };
 
 /* ---------------- plan ---------------- */
 function recompute() {
@@ -223,6 +246,7 @@ const missOf = row => S.plan && S.plan.missing.find(m => m.row === row);
 function inputsChips() {
   const chips = [];
   chips.push(S.table ? `<span class="chip ok">טבלה: ${esc(S.tableName)} (${S.table.length} לשוניות)</span>` : `<span class="chip no">חסרה טבלה (אקסל)</span>`);
+  if (S.tablePdf) chips.push(`<span class="chip" title="הטבלה נקראת מהאקסל">PDF של הטבלה – לא בשימוש</span>`);
   chips.push(S.so ? `<span class="chip ok">הזמנה: ${esc(S.so.soNumber || S.soName)}</span>` : `<span class="chip">אין הזמנת עבודה</span>`);
   S.arts.forEach(a => chips.push(`<span class="chip ${S.plan && S.plan.unusedArts.includes(S.arts.indexOf(a)) ? 'no' : 'ok'}">${esc(a.name)} · ${a.pages.length} עמ' · ${a.size.map(x => x.toFixed(1)).join('×')}</span>`));
   return chips.join('');
@@ -232,7 +256,9 @@ const MKIND = { swap: 'צבע הוחלף', number: 'מספר שונה', ok: 'ש�
 
 function render() {
   $('#inputs').innerHTML = inputsChips();
-  $('#drop').classList.toggle('small', !!S.table);
+  const drop = $('#drop');
+  if (S.table && drop.parentElement.id !== 'dropSlot') { drop.classList.add('small'); $('#dropSlot').appendChild(drop); }
+  if (!S.table && drop.parentElement.id === 'dropSlot') { drop.classList.remove('small'); $('.mainCol').prepend(drop); }
   $('#soLbl').textContent = S.so && S.so.soNumber || '';
   const P = S.plan;
   $('#bExport').disabled = !P || !P.items.length;
