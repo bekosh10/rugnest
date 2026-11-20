@@ -1015,7 +1015,7 @@ async function orderFor(mc, P, magBytes) {
     const cfg = layCfg(); sheetsInfo = [];
     for (const t of tabs) {
       const gs = magBytes[t] || []; if (!gs.length) continue;
-      const o = { ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen };
+      const o = { ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, collect: (cfg.collect || {})[t] != null ? cfg.collect[t] : C.layoutCollectFor(t) };
       const sh = C.planLayout(gs, o), prints = sh.reduce((a, x) => a + x.copies, 0);
       sheetsOf[t] = prints; sheetsInfo.push({ label: /a3/i.test(t) ? 'A3' : 'פסים', prints, unique: sh.length });
     }
@@ -1058,7 +1058,7 @@ $('#bLayout').onclick = async () => {
     }
   });
   let cfg = layCfg(), cur = tabs[0];
-  const optsFor = t => ({ ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed });
+  const optsFor = t => ({ ...C.LAYOUT_DEF, width: (cfg.width || {})[t] || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: (cfg.collect || {})[t] != null ? cfg.collect[t] : C.layoutCollectFor(t) });
   const soNo = () => ((S.so && S.so.soNumber) || '').replace(/\D/g, '');
   const bg = document.createElement('div'); bg.className = 'modal-bg';
   bg.innerHTML = `<div class="modal wide"><button class="mx" title="סגירה">✕</button><h3>פריסת מגנטי – תצוגה לפני ייצוא</h3>
@@ -1068,6 +1068,7 @@ $('#bLayout').onclick = async () => {
       <label>אורך מקסימלי <input type="number" step="1" id="lL"> ס"מ</label>
       <label>רווח בין סוגים <input type="number" step="0.1" id="lG"> ס"מ</label>
       <label>גלישה <input type="number" step="0.05" id="lB"> ס"מ</label>
+      <label title="שורה אחרונה של סוג עם 2 שלטים או פחות עוברת לגיליון השלמות בסוף"><input type="checkbox" id="lH"> גיליון השלמות</label>
       <span class="muted" id="lInfo"></span>
     </div>
     <div class="lay-sheets" id="laySh"></div>
@@ -1079,7 +1080,7 @@ $('#bLayout').onclick = async () => {
     const o = optsFor(cur);
     bg.querySelector('#layTabs').innerHTML = tabs.map(t => `<button class="${t === cur ? 'on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('');
     bg.querySelectorAll('#layTabs button').forEach(b => b.onclick = () => { cur = b.dataset.t; draw(); });
-    bg.querySelector('#lW').value = o.width; bg.querySelector('#lL').value = o.maxLen; bg.querySelector('#lG').value = o.gap; bg.querySelector('#lB').value = o.bleed;
+    bg.querySelector('#lW').value = o.width; bg.querySelector('#lL').value = o.maxLen; bg.querySelector('#lG').value = o.gap; bg.querySelector('#lB').value = o.bleed; bg.querySelector('#lH').checked = !!o.collect;
     const gs = groupsOf[cur] || [];
     const sheets = C.planLayout(gs, o), CMP = 72 / 2.54, sc = 0.9;   // px per cm
     const prints = sheets.reduce((a, s) => a + s.copies, 0), units = sheets.reduce((a, s) => a + s.copies * s.cells.length, 0);
@@ -1097,8 +1098,9 @@ $('#bLayout').onclick = async () => {
       }).join('');
       const dots = [[0.5, H - 0.5], [W - 0.5, H - 0.5], [W - 0.5 - 5.08, H - 0.5], [0.5, 0.5], [W - 0.5, 0.5]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="0.3"/>`).join('');
       const tx = W - 0.8 - 5.08 - 5;
-      return `<div class="lay-sh"><div>גיליון ${si + 1}/${sheets.length} ${s.copies > 1 ? `<span class="cp">× ${s.copies}</span>` : ''}</div>
-        <svg width="${W * sc}" height="${H * sc}" viewBox="0 0 ${W} ${H}">${cells}${dots}<text x="${tx}" y="${H - 0.35}" font-size="0.9" text-anchor="end">${esc(label)} sheet ${si + 1}/${sheets.length} x ${s.copies}</text></svg>
+      const big = s.collect ? `<text x="${W / 2}" y="2.1" font-size="1.4" font-weight="bold" text-anchor="middle">HASHLAMOT</text>` : '';
+      return `<div class="lay-sh"><div>גיליון ${si + 1}/${sheets.length} ${s.copies > 1 ? `<span class="cp">× ${s.copies}</span>` : ''}${s.collect ? ' <span class="cp">השלמות</span>' : ''}</div>
+        <svg width="${W * sc}" height="${H * sc}" viewBox="0 0 ${W} ${H}">${cells}${dots}${big}<text x="${tx}" y="${H - 0.35}" font-size="0.9" text-anchor="end">${esc(label)}${s.collect ? ' hashlamot' : ''} sheet ${si + 1}/${sheets.length} x ${s.copies}</text></svg>
         <div class="muted">${(s.W / CMP).toFixed(1)}×${(s.H / CMP).toFixed(1)} · ${s.cells.length} שלטים</div></div>`;
     }).join('') || '<div class="muted">אין שלטים</div>';
   };
@@ -1107,9 +1109,10 @@ $('#bLayout').onclick = async () => {
     cfg.width = { ...(cfg.width || {}) }; if (w > 10) cfg.width[cur] = w;
     const B = +bg.querySelector('#lB').value;
     if (L > 20) cfg.maxLen = L; if (G >= 0) cfg.gap = G; if (B >= 0 && B <= 1) cfg.bleed = B;
+    cfg.collect = { ...(cfg.collect || {}), [cur]: bg.querySelector('#lH').checked };
     laySave(cfg); draw();
   };
-  ['#lW', '#lL', '#lG', '#lB'].forEach(id => bg.querySelector(id).onchange = upd);
+  ['#lW', '#lL', '#lG', '#lB', '#lH'].forEach(id => bg.querySelector(id).onchange = upd);
   bg.querySelector('#lExp').onclick = () => exportDialog();
   const isWin = /win/i.test(navigator.platform || navigator.userAgent);
   const exportDialog = () => {
@@ -1146,7 +1149,7 @@ $('#bLayout').onclick = async () => {
             const gs = groupsOf[t]; if (!gs.length) continue;
             const r = await C.buildLayoutPdfs(gs, { ...optsFor(t), splitPrint: true }, `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
             const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
-            for (const ps of r.printSheets) { await desk.bankWrite(cfg.printDir, `${base} ${String(ps.no).padStart(3, '0')}${star}${ps.copies}.pdf`, ps.bytes); n++; }
+            for (const ps of r.printSheets) { await desk.bankWrite(cfg.printDir, `${base}${ps.collect ? ' hashlamot' : ''} ${String(ps.no).padStart(3, '0')}${star}${ps.copies}.pdf`, ps.bytes); n++; }
             await desk.bankWrite(cfg.cutDir, `${base} cut.pdf`, r.cut); n++;
             if (cfg.proof) { await desk.bankWrite(cfg.printDir, `${base} proof.pdf`, r.proof); n++; }
           }

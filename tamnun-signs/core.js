@@ -813,7 +813,8 @@ async function buildItemPdf(item, arts, PDFLib, cache) {
 
 /* ================================================================ EFI LAYOUT (print + cut, like Griffin) */
 const CM = 72 / 2.54;
-const LAYOUT_DEF = { width: 124, maxLen: 295, gap: 2.5, top: 1.3, bottom: 2, side: 0.8, bleed: 0.3 };
+const LAYOUT_DEF = { width: 124, maxLen: 295, gap: 2.5, top: 1.3, bottom: 2, side: 0.8, bleed: 0.3, collect: false, collectTop: 3.2 };
+function layoutCollectFor(tabName) { return /a3/i.test(tabName || ''); }
 function layoutWidthFor(tabName) { return /a3/i.test(tabName || '') ? 122 : 124; }
 const COLOR_ORDER = ['red', 'white', 'blue', 'black'];
 // groups: [{w,h (pt), qty, color}] in table order → sheets [{W,H, cells:[{g,x,y}]}] (pt, origin bottom-left)
@@ -835,28 +836,59 @@ function planLayout(groups, o) {
       for (let c = 0; c < Math.min(cols, left); c++) sh.cells.push({ g: gi, x: x0 + c * cw, top: cy, w: cw, h: ch, rot });
     sh.used = cy;
   };
-  for (const gi of order) {
-    const g = groups[gi]; if (!g.qty) continue;
+  const aw = W - 2 * o.side * CM + 0.5, fill = w => Math.floor(aw / w) * w;
+  const geo = g => {
     // turn the sign 90° when that fills the width better (A3 42×29.7 → 4 standing across)
-    const aw = W - 2 * o.side * CM + 0.5, fill = w => Math.floor(aw / w) * w;
     const rot = fill(g.h) > fill(g.w) * 1.01;
     const cw = rot ? g.h : g.w, ch = rot ? g.w : g.h;
-    const cols = Math.max(1, Math.floor(aw / cw)), rps = Math.max(1, Math.floor((avail + 0.5) / ch)), perSheet = cols * rps;
-    let left = g.qty;
+    return { rot, cw, ch, cols: Math.max(1, Math.floor(aw / cw)) };
+  };
+  // completions ("hashlamot"): a last row with only a few signs (2 or less of 4) leaves the type
+  // and goes to completion sheets at the end, packed tight by colour
+  const collected = [], qtyOf = {};
+  for (const gi of order) {
+    const g = groups[gi], { cols } = geo(g); qtyOf[gi] = g.qty || 0;
+    const rem = qtyOf[gi] % cols;
+    if (o.collect && cols >= 3 && rem > 0 && rem <= cols - 2) { collected.push({ gi, n: rem }); qtyOf[gi] -= rem; }
+  }
+  for (const gi of order) {
+    const g = groups[gi]; if (!qtyOf[gi]) continue;
+    const { rot, cw, ch, cols } = geo(g);
+    const rps = Math.max(1, Math.floor((avail + 0.5) / ch)), perSheet = cols * rps;
+    let left = qtyOf[gi];
     while (left > perSheet) { const sh = { cells: [], used: 0 }; sheets.push(sh); place(sh, gi, perSheet, cols, cw, ch, rot); left -= perSheet; }
     const hNeed = Math.ceil(left / cols) * ch;
     let sh = sheets.find(z => z.used + (z.cells.length ? gap : 0) + hNeed <= avail + 0.5);
     if (!sh) { sh = { cells: [], used: 0 }; sheets.push(sh); }
     place(sh, gi, left, cols, cw, ch, rot);
   }
+  if (collected.length) {
+    const ctop = o.collectTop * CM, cav = maxH - ctop - bot;
+    let sh = null, cy = 0, col = 0, rowH = 0, lastColor = null, lastCols = 0;
+    const newSheet = () => { sh = { cells: [], used: 0, collect: true }; sheets.push(sh); cy = 0; col = 0; rowH = 0; lastColor = null; };
+    for (const { gi, n } of collected) {
+      const g = groups[gi], { rot, cw, ch, cols } = geo(g);
+      if (!sh) newSheet();
+      if (lastColor !== null && (g.color !== lastColor || cols !== lastCols)) { if (col) { cy += rowH; col = 0; rowH = 0; } cy += gap; }
+      lastColor = g.color; lastCols = cols;
+      for (let k = 0; k < n; k++) {
+        if (col === 0 && cy + ch > cav + 0.5) { newSheet(); lastColor = g.color; lastCols = cols; }
+        const x0 = (W - cols * cw) / 2;
+        sh.cells.push({ g: gi, x: x0 + col * cw, top: cy, w: cw, h: ch, rot });
+        rowH = Math.max(rowH, ch); sh.used = cy + rowH;
+        if (++col === cols) { col = 0; cy += rowH; rowH = 0; }
+      }
+    }
+  }
   for (const s of sheets) {
-    s.W = W; s.H = top + s.used + bot;
-    for (const c of s.cells) c.y = s.H - top - c.top - c.h;
+    const tp = s.collect ? o.collectTop * CM : top;
+    s.W = W; s.H = tp + s.used + bot;
+    for (const c of s.cells) c.y = s.H - tp - c.top - c.h;
   }
   // identical sheets → one sheet printed N times
   const uniq = [], seen = {};
   for (const s of sheets) {
-    const sig = s.H.toFixed(1) + '|' + s.cells.map(c => `${c.g}@${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(';');
+    const sig = (s.collect ? 'C' : '') + s.H.toFixed(1) + '|' + s.cells.map(c => `${c.g}@${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(';');
     if (seen[sig]) seen[sig].copies++; else { s.copies = 1; seen[sig] = s; uniq.push(s); }
   }
   return uniq;
@@ -923,7 +955,11 @@ async function buildLayoutPdfs(groups, o, label, PDFLib) {
       }
     }
     for (const cell of s.cells) { put(p, emb[cell.g], cell); put(f, embP[cell.g], cell); }
-    const txt = `${String(label).replace(/[^\x20-\x7e]+/g, ' ').replace(/\s+/g, ' ').trim()}   sheet ${si + 1}/${sheets.length} x ${s.copies}`;
+    const txt = `${String(label).replace(/[^\x20-\x7e]+/g, ' ').replace(/\s+/g, ' ').trim()}${s.collect ? ' hashlamot' : ''}   sheet ${si + 1}/${sheets.length} x ${s.copies}`;
+    if (s.collect) for (const [pg, fn] of [[p, font], [f, fontP]]) {
+      const big = 'HASHLAMOT', bs = 40, bw = fn.widthOfTextAtSize(big, bs);
+      pg.drawText(big, { x: (s.W - bw) / 2, y: s.H - 1.0 * CM - bs * 0.72, size: bs, font: fn, color: PDFLib.cmyk(0, 0, 0, 1) });
+    }
     const size = 16, tw = font.widthOfTextAtSize(txt, size);
     const dot2 = s.W - 0.2 * CM - 0.6 * CM - 5.08 * CM;           // left edge of the 2nd bottom dot
     for (const [pg, fn] of [[p, font], [f, fontP]])
@@ -945,9 +981,9 @@ async function buildLayoutPdfs(groups, o, label, PDFLib) {
       const reg = props.get(PDFLib.PDFName.of('Pr1')), cut = props.get(PDFLib.PDFName.of('Pr2'));
       d.catalog.set(PDFLib.PDFName.of('OCProperties'), d.context.obj({ OCGs: [cut, reg], D: { Order: [cut, reg], ON: [cut, reg] } }));
     }
-    printSheets.push({ bytes: await d.save(), copies: sheets[i].copies, no: i + 1 });
+    printSheets.push({ bytes: await d.save(), copies: sheets[i].copies, no: i + 1, collect: !!sheets[i].collect });
   }
-  return { print: await pr.save(), printSheets, cut: await cu.save(), proof: await pf.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies })) };
+  return { print: await pr.save(), printSheets, cut: await cu.save(), proof: await pf.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies, collect: !!s.collect })) };
 }
 
 /* ================================================================ REPORT (xlsx) */
@@ -981,6 +1017,6 @@ async function buildReport(plan, tabs, so, ExcelJS) {
 }
 
 const api = { CORE_VERSION, norm, numsOf, wordsOf, textScore, classifyPixels, sizeFromText, machineOf, MACHINES, COLOR_HE,
-  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, sameSize, matchWords, buildItemPdf, buildReport, fileSafe, planLayout, buildLayoutPdfs, layoutWidthFor, LAYOUT_DEF };
+  formatLabel, makeName, toEnglish, EN_PHRASES, EN_WORDS, readTableXlsx, readSO, analyzeArtwork, matchTab, buildPlan, sameSize, matchWords, buildItemPdf, buildReport, fileSafe, planLayout, buildLayoutPdfs, layoutWidthFor, layoutCollectFor, LAYOUT_DEF };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TamnunCore = api;
 })(typeof self !== 'undefined' ? self : this);
