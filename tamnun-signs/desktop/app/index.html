@@ -225,6 +225,8 @@ document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.bod
 document.addEventListener('drop', async e => {
   e.preventDefault(); document.body.classList.remove('over');
   const files = [...e.dataTransfer.files];
+  const bk = files.find(f => /\.tamnunbank$/i.test(f.name));
+  if (bk) { bankImport(await bk.arrayBuffer()); return; }
   const job = files.find(f => /\.tamnun$/i.test(f.name));
   if (job) { openJob(await job.arrayBuffer()); return; }
   const out = [];
@@ -303,14 +305,20 @@ $('#bBank').onclick = async () => {
   all.forEach(e => (groups[sizeKey(e.size)] = groups[sizeKey(e.size)] || []).push(e));
   bg.innerHTML = `<div class="modal" style="width:min(860px,94vw)"><h3>בנק גרפיקות <span class="muted">(${all.length})</span></h3>
     <div class="muted" style="margin-bottom:10px">כל עמוד שיוצא בייצוא כמו שהוא נשמר כאן. כשבהזמנה הבאה חסר שלט באותו גודל – התוכנה לוקחת אותו מכאן (או צובעת / משנה מספר), ומסמנת לבדיקה.</div>
-    <div style="margin-bottom:10px"><button class="small" id="bkAdd">הוספה לבנק מהעבודה הפתוחה</button></div>
+    <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button class="small" id="bkAdd">הוספה לבנק מהעבודה הפתוחה</button>
+      <button class="small" id="bkExp">שמירת הבנק לקובץ</button><button class="small" id="bkImp">טעינת בנק מקובץ</button><button class="small" id="bkSync">עדכון מהבנק המשותף</button>
+      <input type="file" id="bkFile" accept=".tamnunbank" style="display:none"></div>
     <div style="max-height:56vh;overflow:auto">${Object.entries(groups).map(([k, list]) => `<div class="grp" style="font-size:13px">${k.replace('x', ' × ')} ס"מ · ${list.length}</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">${list.map(e => `<div style="border:1px solid var(--line);border-radius:8px;padding:6px;width:150px;text-align:center;font-size:12px">
         ${e.thumb ? `<img src="${e.thumb}" style="max-width:136px;max-height:70px;display:block;margin:0 auto 4px">` : ''}<div>${swatch(e.color)}${esc(e.text) || '(ללא טקסט)'}</div>
-        <div class="muted" style="font-size:11px">${esc(e.so || '')}</div><button class="small" data-del="${esc(e.id)}">מחיקה</button></div>`).join('')}</div>`).join('') || '<div class="muted">הבנק ריק. הוא מתמלא בכל ייצוא, או בכפתור "הוספה לבנק".</div>'}</div>
+        <div class="muted" style="font-size:11px">${esc(e.so || '')}${e.shared ? ' · משותף' : ''}</div><button class="small" data-del="${esc(e.id)}">מחיקה</button></div>`).join('')}</div>`).join('') || '<div class="muted">הבנק ריק. הוא מתמלא בכל ייצוא, או בכפתור "הוספה לבנק".</div>'}</div>
     <div class="foot"><button id="bkClose">סגירה</button></div></div>`;
   document.body.appendChild(bg);
   bg.querySelector('#bkClose').onclick = () => bg.remove();
+  bg.querySelector('#bkExp').onclick = () => bankExport();
+  bg.querySelector('#bkImp').onclick = () => bg.querySelector('#bkFile').click();
+  bg.querySelector('#bkFile').onchange = async () => { const f = bg.querySelector('#bkFile').files[0]; if (!f) return; bg.remove(); await bankImport(await f.arrayBuffer()); $('#bBank').click(); };
+  bg.querySelector('#bkSync').onclick = async () => { const n = await busy('מעדכן…', () => bankSyncShared(true)); await bankLoad(); bg.remove(); recompute(); toast(n ? `עודכנו ${n} גרפיקות מהבנק המשותף` : 'לא נמצאו גרפיקות חדשות'); $('#bBank').click(); };
   bg.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => { await bankDel(b.dataset.del); await bankLoad(); bg.remove(); recompute(); $('#bBank').click(); });
   bg.querySelector('#bkAdd').onclick = async () => {
     if (!S.plan) return;
@@ -323,7 +331,36 @@ $('#bBank').onclick = async () => {
     bg.remove(); recompute(); toast(`נוספו/עודכנו ${list.length} גרפיקות בבנק`); $('#bBank').click();
   };
 };
-bankLoad().then(() => { if (S.table) recompute(); });
+// shared bank – comes with the program (GitHub), merged under the user's own graphics
+async function bankSyncShared(force) {
+  const urls = ['https://raw.githubusercontent.com/bekosh10/rugnest/main/tamnun-signs/bank/bank.json', 'https://cdn.jsdelivr.net/gh/bekosh10/rugnest@main/tamnun-signs/bank/bank.json'];
+  let data = null;
+  for (const u of urls) { try { const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { data = await r.json(); break; } } catch (e) {} }
+  if (!data || data.app !== 'tamnun-signs-bank') return 0;
+  let last = ''; try { last = localStorage.getItem('sharedBank') || ''; } catch (e) {}
+  if (!force && last === data.made) return 0;
+  const mine = new Set((await bankAll()).filter(e => !e.shared).map(e => e.id));
+  const list = data.entries.filter(e => !mine.has(e.id)).map(e => ({ ...e, bytes: unb64(e.bytes), shared: true }));
+  await bankPut(list);
+  try { localStorage.setItem('sharedBank', data.made); } catch (e) {}
+  return list.length;
+}
+async function bankExport() {
+  const all = await bankAll();
+  const out = { app: 'tamnun-signs-bank', v: 1, made: new Date().toISOString(), entries: all.map(e => ({ ...e, bytes: b64(e.bytes), shared: undefined })) };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: 'application/octet-stream' }));
+  a.download = `בנק גרפיקות תמנון ${new Date().toLocaleDateString('he-IL').replace(/[./]/g, '-')}.tamnunbank`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+async function bankImport(buf) {
+  let data; try { data = JSON.parse(new TextDecoder().decode(buf)); } catch (e) { toast('הקובץ לא נפתח'); return; }
+  if (data.app !== 'tamnun-signs-bank') { toast('זה לא קובץ בנק גרפיקות'); return; }
+  await bankPut(data.entries.map(e => ({ ...e, bytes: unb64(e.bytes), shared: false })));
+  await bankLoad(); recompute();
+  toast(`נוספו/עודכנו ${data.entries.length} גרפיקות בבנק`);
+}
+bankSyncShared().catch(() => 0).then(() => bankLoad()).then(() => { if (S.table) recompute(); });
 
 /* ---------------- dictionary (Hebrew → English for file names) ---------------- */
 $('#bDict').onclick = () => {
