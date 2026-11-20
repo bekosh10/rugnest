@@ -16,6 +16,7 @@
   .order label { font-weight:600; }
   .order input { font-size:20px; font-weight:700; width:170px; padding:6px 10px; border:2px solid var(--blue); border-radius:8px; direction:ltr; text-align:center; }
   .order input.missing { border-color:var(--red); background:var(--redbg); }
+  .order input::placeholder { color:#d98a84; font-size:15px; font-weight:400; }
   .client { color:var(--muted); direction:ltr; }
   .spacer { flex:1; }
   .btns { display:flex; gap:8px; }
@@ -97,7 +98,7 @@
 <body>
 <header>
   <h1>Urbanica Magnet</h1>
-  <div class="order"><label for="order">מס׳ הזמנה</label><input id="order" placeholder="26001234" autocomplete="off"></div>
+  <div class="order"><label for="order">מס׳ הזמנה</label><input id="order" placeholder="הקלידי מספר" autocomplete="off"></div>
   <span class="client" id="clientLbl"></span>
   <div class="spacer"></div>
   <div class="btns">
@@ -126,7 +127,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 5;
+const APP_VERSION = 6;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -243,7 +244,9 @@ function compute(files, S, ovs, qty, order, sizes = {}, dismissed = new Set()) {
       const got = [rs.w, rs.h].map(x => x * 2.54 / 72).sort((a, b) => a - b);
       const tol = (+S.sizeTol >= 0 ? +S.sizeTol : 0.2) + 1e-6;
       r.real = got.map(x => String(Math.round(x * 10) / 10)).join('×');
-      r.sizeSt = Math.abs(got[0] - exp[0]) <= tol && Math.abs(got[1] - exp[1]) <= tol ? 'ok' : 'bad';
+      // files are often built at 1:10 (5.9×15.9 for 59×159) – both scales are fine
+      const fits = sc => Math.abs(got[0] - exp[0] / sc) <= tol / sc && Math.abs(got[1] - exp[1] / sc) <= tol / sc;
+      r.sizeSt = fits(1) || fits(10) ? 'ok' : 'bad';
     } else if (rs) r.sizeSt = rs.st === 'got' ? '' : rs.st;
   }
   const seen = {};
@@ -605,7 +608,7 @@ function confirmBox(msg) { return window.confirm(msg); }
 /* ---------- excel / export ---------- */
 function guard() {
   if (!files.length) { toast('קודם צריך לגרור תיקייה'); return false; }
-  if (C.problems.length) { toast('יש דברים לתקן לפני כן – הם מסומנים באדום'); $('#problems').scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
+  if (C.problems.length) { toast('לפני כן צריך לתקן: ' + C.problems.join(' · ')); if (!$('#order').value.trim()) $('#order').focus(); $('#problems').scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
   const miss = C.missing.filter(m => !m.dismissed).length, bad = C.sizeBad.length;
   if (miss || bad) {
     const msg = [miss ? `${miss} קבצים חסרים` : '', bad ? `${bad} קבצים בגודל לא תואם` : ''].filter(Boolean).join(' ו-');
