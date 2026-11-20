@@ -82,7 +82,7 @@ ipcMain.handle('scan', async (e, paths) => {
 });
 
 // copy everything flat into a NEW folder <parent>/<folderName> (adds (2), (3)… if it exists)
-ipcMain.handle('export', async (e, { parent, folderName, items, xlsx }) => {
+ipcMain.handle('export', async (e, { parent, folderName, items, xlsx, pdf }) => {
   try {
     const clean = s => s.replace(/[\\/:*?"<>|]/g, '-').trim();
     let dir = path.join(parent, clean(folderName)), n = 2;
@@ -91,6 +91,7 @@ ipcMain.handle('export', async (e, { parent, folderName, items, xlsx }) => {
     for (const it of items) await fsp.copyFile(it.src, path.join(dir, clean(it.name)), fs.constants.COPYFILE_EXCL);
     let xlsxPath = null;
     if (xlsx) { xlsxPath = dir + '.xlsx'; await fsp.writeFile(xlsxPath, Buffer.from(xlsx)); }
+    if (pdf) await fsp.writeFile(dir + '.pdf', Buffer.from(pdf));
     shell.openPath(dir);
     return { ok: true, dir, xlsxPath, count: items.length };
   } catch (err) { return { ok: false, error: String(err.message || err) }; }
@@ -117,6 +118,18 @@ ipcMain.handle('read-range', async (e, { path: p, start = 0, length }) => {
     const buf = Buffer.alloc(len); await fh.read(buf, 0, len, s);
     return { size: st.size, data: new Uint8Array(buf.buffer, buf.byteOffset, len) };
   } finally { await fh.close(); }
+});
+// render an HTML document to an A4 PDF (used for the production sheets)
+ipcMain.handle('html-to-pdf', async (e, html) => {
+  const tmp = path.join(app.getPath('temp'), `um-print-${Date.now()}.html`);
+  await fsp.writeFile(tmp, html);
+  const w = new BrowserWindow({ show: false, width: 800, height: 1100, webPreferences: { offscreen: true, javascript: false } });
+  try {
+    await w.loadFile(tmp);
+    await new Promise(r => setTimeout(r, 300));
+    const pdf = await w.webContents.printToPDF({ pageSize: 'A4', printBackground: true, margins: { marginType: 'none' }, preferCSSPageSize: true });
+    return new Uint8Array(pdf);
+  } finally { w.destroy(); fsp.rm(tmp, { force: true }).catch(() => {}); }
 });
 ipcMain.handle('reveal', (e, p) => { if (p && fs.existsSync(p)) { if (fs.statSync(p).isDirectory()) shell.openPath(p); else shell.showItemInFolder(p); return true; } return false; });
 

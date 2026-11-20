@@ -104,6 +104,7 @@
   <div class="btns">
     <button id="bSettings">הגדרות מיפוי</button>
     <button id="bExcel">טבלת אקסל</button>
+    <button id="bPdf">PDF לייצור</button>
     <button id="bExport" class="primary">ייצוא</button>
   </div>
 </header>
@@ -127,7 +128,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -287,50 +288,147 @@ function compute(files, S, ovs, qty, order, sizes = {}, dismissed = new Set()) {
 }
 
 /* ---------- excel ---------- */
+const todayStr = (withTime) => { const d = new Date(), z = n => String(n).padStart(2, '0'); return `${z(d.getDate())}.${z(d.getMonth() + 1)}.${d.getFullYear()}` + (withTime ? `, ${z(d.getHours())}:${z(d.getMinutes())}` : ''); };
+const divTitle = (c, S) => c === LARGE ? 'מגנט גדול ' + S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
+const sumQty = rs => rs.reduce((a, r) => a + (+r.qty > 0 ? +r.qty : 0), 0);
+
 async function buildExcel(C, S, order) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Urbanica Magnet';
-  const colHe = c => c === LARGE ? 'מגנט גדול ' + S.largeSize.replace('x', '×') : ((S.divisions.find(d => d.en === c) || {}).he || c);
-  const FILLS = ['FFE8F0FE', 'FFE6F4EA', 'FFFEF7E0', 'FFFCE8E6', 'FFF3E8FD', 'FFE0F7FA'];
-  const hdr = ws => { const row = ws.getRow(1); row.font = { bold: true, color: { argb: 'FFFFFFFF' } }; row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F6FEB' } }; row.alignment = { vertical: 'middle' }; row.height = 22; };
+  const date = todayStr();
+  const BLUE = 'FF2563EB', LIGHT = 'FFF0F5FF', ZEBRA = 'FFF8F9FB', LINE = { style: 'thin', color: { argb: 'FFE5E7EB' } };
+  const fill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
 
-  const ws = wb.addWorksheet('קבצים', { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
-  ws.columns = [
-    { header: '#', key: 'n', width: 5 }, { header: 'חלוקה', key: 'div', width: 16 }, { header: 'מבצע', key: 'promo', width: 18 },
-    { header: 'תת-מבצע', key: 'sub', width: 12 }, { header: 'מגדר', key: 'gender', width: 9 }, { header: 'גודל', key: 'size', width: 10 },
-    { header: 'כמות', key: 'qty', width: 8 }, { header: 'שם קובץ חדש', key: 'name', width: 62 }, { header: 'קובץ מקורי', key: 'orig', width: 60 },
-  ];
-  hdr(ws);
-  const cols = C.colOrder;
-  C.sorted.forEach((r, i) => {
-    const row = ws.addRow({ n: i + 1, div: r.col ? colHe(r.col) : '?', promo: r.promoHe, sub: r.subHe, gender: r.genderHe, size: r.size.replace('x', '×'), qty: r.qty === '' ? '' : +r.qty, name: r.newName, orig: r.rel });
-    const f = FILLS[Math.max(0, cols.indexOf(r.col)) % FILLS.length];
-    row.eachCell({ includeEmpty: true }, c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: f } }; });
-    row.getCell('name').alignment = { horizontal: 'left' };
-    row.getCell('orig').alignment = { horizontal: 'right' };
-    row.getCell('qty').alignment = { horizontal: 'center' };
-  });
-  const last = ws.rowCount;
-  const tot = ws.addRow({ div: 'סה״כ', qty: { formula: `SUM(G2:G${last})` }, name: `${C.sorted.length} קבצים` });
-  tot.font = { bold: true }; tot.getCell('qty').alignment = { horizontal: 'center' };
-  ws.autoFilter = { from: 'A1', to: `I${last}` };
+  // one sheet per division: ארצי / אילת / סטיישן / 119×159
+  for (const c of C.colOrder) {
+    const rs = C.sorted.filter(r => r.col === c);
+    if (!rs.length) continue;
+    const sheetName = c === LARGE ? S.largeSize.replace('x', '×') : divTitle(c, S);
+    const ws = wb.addWorksheet(sheetName, {
+      views: [{ rightToLeft: true, state: 'frozen', ySplit: 4 }],
+      pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } },
+    });
+    ws.columns = [{ key: 'n', width: 5 }, { key: 'name', width: 56 }, { key: 'promo', width: 16 }, { key: 'sub', width: 10 }, { key: 'gender', width: 9 }, { key: 'qty', width: 9 }, { key: 'st', width: 18 }];
+    ws.mergeCells('A1:G1');
+    const t = ws.getCell('A1'); t.value = `הזמנה ${order}  ·  ${S.client}`; t.font = { size: 22, bold: true }; t.alignment = { vertical: 'middle', horizontal: 'right' };
+    ws.getRow(1).height = 40;
+    ws.mergeCells('A2:G2');
+    const t2 = ws.getCell('A2'); t2.value = `${divTitle(c, S)}   ·   תאריך ${date}   ·   ${rs.length} קבצים   ·   ${sumQty(rs).toLocaleString('he-IL')} יח׳`;
+    t2.font = { size: 14, bold: true, color: { argb: 'FF1D4ED8' } }; t2.fill = fill(LIGHT); t2.alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+    ws.getRow(2).height = 30;
+    ws.getRow(3).height = 8;
+    const h = ws.getRow(4);
+    h.values = ['#', 'שם קובץ', 'מבצע', 'תת-מבצע', 'מגדר', 'כמות', 'סטטוס הדפסה'];
+    h.height = 28;
+    h.eachCell(cell => { cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 }; cell.fill = fill(BLUE); cell.alignment = { vertical: 'middle', horizontal: 'right' }; });
+    ['F4', 'A4'].forEach(a => { ws.getCell(a).alignment = { vertical: 'middle', horizontal: 'center' }; });
+    rs.forEach((r, i) => {
+      const row = ws.addRow({ n: i + 1, name: r.newName, promo: r.promoHe, sub: r.subHe, gender: r.genderHe, qty: r.qty === '' ? '' : +r.qty, st: '' });
+      row.height = 32;
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+        cell.border = { bottom: LINE };
+        cell.font = { size: 12 };
+        if (i % 2) cell.fill = fill(ZEBRA);
+      });
+      row.getCell('n').alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell('name').alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+      row.getCell('qty').alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell('qty').font = { size: 12, bold: true };
+      row.getCell('st').dataValidation = { type: 'list', allowBlank: true, formulae: ['"הודפס,בהדפסה,לא הודפס"'] };
+      row.getCell('st').border = { bottom: LINE, left: LINE, right: LINE };
+    });
+    const last = ws.rowCount;
+    const tot = ws.addRow({ name: 'סה״כ', qty: { formula: `SUM(F5:F${last})`, result: sumQty(rs) } });
+    tot.height = 30; tot.font = { bold: true, size: 13 };
+    tot.getCell('name').alignment = { vertical: 'middle', horizontal: 'right' };
+    tot.getCell('qty').alignment = { vertical: 'middle', horizontal: 'center' };
+    tot.eachCell({ includeEmpty: true }, cell => { cell.border = { top: { style: 'medium', color: { argb: 'FFD1D5DB' } } }; });
+  }
 
   // quantities matrix
+  const cols = C.colOrder;
+  const hdr = ws => { const row = ws.getRow(1); row.font = { bold: true, color: { argb: 'FFFFFFFF' } }; row.fill = fill(BLUE); row.alignment = { vertical: 'middle' }; row.height = 24; };
   const wq = wb.addWorksheet('כמויות', { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
   wq.columns = [{ header: 'מגדר', key: 'g', width: 9 }, { header: 'מבצע', key: 'p', width: 18 }, { header: 'תת-מבצע', key: 's', width: 12 }]
-    .concat(cols.map(c => ({ header: colHe(c), key: 'c_' + c, width: 13 })));
+    .concat(cols.map(c => ({ header: divTitle(c, S), key: 'c_' + c, width: 14 })));
   hdr(wq);
   for (const g of C.groupList) {
     const o = { g: g.genderHe, p: g.promoHe, s: g.subHe };
     for (const c of cols) { const r = C.recs.find(x => x.groupKey === g.key && x.col === c); o['c_' + c] = r ? (r.qty === '' ? '' : +r.qty) : null; }
-    const row = wq.addRow(o);
-    cols.forEach((c, i) => { row.getCell(4 + i).alignment = { horizontal: 'center' }; });
+    const row = wq.addRow(o); row.height = 22;
+    cols.forEach((c, i) => { row.getCell(4 + i).alignment = { horizontal: 'center', vertical: 'middle' }; });
   }
   const lq = wq.rowCount, t = { g: 'סה״כ' };
   cols.forEach((c, i) => { const L = String.fromCharCode(68 + i); t['c_' + c] = { formula: `SUM(${L}2:${L}${lq})` }; });
   const tr = wq.addRow(t); tr.font = { bold: true };
   cols.forEach((c, i) => { tr.getCell(4 + i).alignment = { horizontal: 'center' }; });
+
+  // how each file was renamed
+  const wm = wb.addWorksheet('שמות מקוריים', { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
+  wm.columns = [{ header: '#', key: 'n', width: 5 }, { header: 'חלוקה', key: 'd', width: 16 }, { header: 'שם קובץ חדש', key: 'name', width: 58 }, { header: 'קובץ מקורי', key: 'orig', width: 70 }];
+  hdr(wm);
+  C.sorted.forEach((r, i) => { const row = wm.addRow({ n: i + 1, d: r.col ? divTitle(r.col, S) : '?', name: r.newName, orig: r.rel }); row.getCell('name').alignment = { horizontal: 'left' }; });
   return new Uint8Array(await wb.xlsx.writeBuffer());
+}
+
+/* ---------- production sheet PDF: one A4 page per division, in the Campus order style ---------- */
+const escH = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function buildPrintHtml(C, S, order, fontCss) {
+  const made = todayStr(true), date = todayStr();
+  const dt = c => c === LARGE ? `מגנט גדול <span dir="ltr">${escH(S.largeSize.replace('x', '×'))}</span>` : escH(divTitle(c, S));
+  const pages = [];
+  for (const c of C.colOrder) {
+    const rs = C.sorted.filter(r => r.col === c);
+    if (!rs.length) continue;
+    const rh = Math.max(16, Math.min(36, Math.floor(650 / (rs.length + 1))));
+    pages.push(`<section class="page">
+      <div class="hd">
+        <div><div class="brand">קמפוס לדפוס דיגיטלי</div><div class="sub">הזמנת עבודה לייצור</div></div>
+        <div><div class="ord">${escH(order)}</div><div class="made">הופק: ${escH(made)}</div></div>
+      </div>
+      <div class="box">
+        <div class="div"><div class="k">חלוקה</div><div class="v">${dt(c)}</div></div>
+        <div><div class="k">לקוח</div><div class="v">${escH(S.client)}</div></div>
+        <div><div class="k">תאריך</div><div class="v">${escH(date)}</div></div>
+        <div><div class="k">קבצים</div><div class="v">${rs.length}</div></div>
+        <div><div class="k">סה״כ יחידות</div><div class="v">${sumQty(rs).toLocaleString('he-IL')}</div></div>
+      </div>
+      <table style="--rh:${rh}px">
+        <thead><tr><th class="c">#</th><th>שם קובץ</th><th>מבצע</th><th>תת-מבצע</th><th>מגדר</th><th class="c">כמות</th><th class="c">סטטוס הדפסה</th></tr></thead>
+        <tbody>${rs.map((r, i) => `<tr><td class="c">${i + 1}</td><td class="name">${escH(r.newName)}</td><td><b>${escH(r.promoHe)}</b></td><td><bdi>${escH(r.subHe)}</bdi></td><td>${escH(r.genderHe)}</td><td class="c q">${escH(r.qty)} יח׳</td><td class="c st"><span></span></td></tr>`).join('')}
+        <tr class="tot"><td></td><td>סה״כ</td><td></td><td></td><td></td><td class="c q">${sumQty(rs).toLocaleString('he-IL')} יח׳</td><td></td></tr></tbody>
+      </table>
+      <div class="ft"><span>קמפוס לדפוס דיגיטלי — מסמך פנימי לרצפת הייצור</span><span>${escH(order)} · ${dt(c)}</span></div>
+    </section>`);
+  }
+  return `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><style>
+  @page { size: A4; margin: 0; }
+  ${fontCss || ''}
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Heebo, "Arial Hebrew", Arial, sans-serif; color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; height: 296mm; padding: 13mm 12mm 9mm; display: flex; flex-direction: column; page-break-after: always; overflow: hidden; }
+  .page:last-child { page-break-after: auto; }
+  .hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }
+  .brand { color: #2563eb; font-weight: 700; font-size: 23px; line-height: 1.2; }
+  .sub, .made { color: #6b7280; font-size: 11px; margin-top: 3px; }
+  .ord { font-weight: 700; font-size: 25px; direction: ltr; text-align: left; line-height: 1.2; }
+  .made { text-align: left; }
+  .box { margin-top: 14px; background: #f0f5ff; border: 1px solid #dbe4f3; border-radius: 9px; padding: 9px 18px; display: flex; gap: 34px; align-items: flex-end; }
+  .box .k { color: #6b7280; font-size: 10.5px; }
+  .box .v { font-weight: 700; font-size: 15px; }
+  .box .div .v { font-size: 24px; color: #1d4ed8; line-height: 1.1; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+  th { background: #2563eb; color: #fff; font-weight: 700; font-size: 12px; padding: 8px 7px; text-align: right; }
+  td { border-bottom: 1px solid #e5e7eb; padding: 0 7px; height: var(--rh); font-size: 12px; }
+  tbody tr:nth-child(even) td { background: #f8f9fb; }
+  .c { text-align: center; }
+  td.name { direction: ltr; text-align: left; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  td.q { font-weight: 700; white-space: nowrap; }
+  td.st span { display: inline-block; width: 15px; height: 15px; border: 1.5px solid #9ca3af; border-radius: 3px; vertical-align: middle; }
+  tr.tot td { font-weight: 700; border-top: 2px solid #d1d5db; border-bottom: none; background: #fff !important; font-size: 13px; }
+  .ft { margin-top: auto; border-top: 1px solid #e5e7eb; padding-top: 6px; display: flex; justify-content: space-between; color: #6b7280; font-size: 10px; }
+  </style></head><body>${pages.join('')}</body></html>`;
 }
 </script>
 
@@ -630,9 +728,34 @@ $('#bExport').onclick = async () => {
   if (!parent) return;
   cfg.lastOut = parent; D.setCfg({ lastOut: parent });
   const xlsx = await buildExcel(C, S, $('#order').value.trim());
-  const res = await D.exportFiles({ parent, folderName: jobName(), items: C.sorted.map(r => ({ src: r.path, name: r.newName })), xlsx });
-  if (res.ok) toast(`${res.count} קבצים הועתקו לתיקייה חדשה, והאקסל נשמר לידה`, res.dir);
+  const pdf = D.htmlToPdf ? await makePdf() : null;
+  const res = await D.exportFiles({ parent, folderName: jobName(), items: C.sorted.map(r => ({ src: r.path, name: r.newName })), xlsx, pdf });
+  if (res.ok) toast(`${res.count} קבצים הועתקו לתיקייה חדשה, והאקסל${pdf ? ' וה-PDF' : ''} נשמרו לידה`, res.dir);
   else toast('שגיאה בייצוא: ' + res.error);
+};
+
+/* ---------- PDF ---------- */
+let fontCssCache = null;
+async function fontCss() {
+  if (fontCssCache !== null) return fontCssCache;
+  const ranges = { hebrew: 'U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F', latin: 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD' };
+  const b64 = buf => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  const out = [];
+  try {
+    for (const w of [400, 500, 700]) for (const sub of ['hebrew', 'latin']) {
+      const r = await fetch(`lib/fonts/heebo-${sub}-${w}-normal.woff2`); if (!r.ok) continue;
+      out.push(`@font-face{font-family:Heebo;font-style:normal;font-weight:${w};src:url(data:font/woff2;base64,${b64(await r.arrayBuffer())}) format('woff2');unicode-range:${ranges[sub]};}`);
+    }
+  } catch (e) {}
+  return (fontCssCache = out.join('\n'));
+}
+async function makePdf() { return D.htmlToPdf(buildPrintHtml(C, S, $('#order').value.trim(), await fontCss())); }
+$('#bPdf').onclick = async () => {
+  render(true); if (!guard()) return;
+  if (!D.htmlToPdf) { toast('ל-PDF צריך להתקין את הקובץ החדש של האפליקציה'); return; }
+  const data = await makePdf();
+  const p = await D.saveDialog({ name: jobName() + '.pdf', data, ext: 'pdf', extName: 'PDF', title: 'שמירת PDF לייצור', start: cfg.lastOut });
+  if (p) toast('ה-PDF נשמר', p);
 };
 
 /* ---------- updates ---------- */
