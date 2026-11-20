@@ -29,7 +29,7 @@
   main { padding:16px 20px 70px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
   .card h2 { font-size:15px; margin:0 0 10px; display:flex; align-items:center; gap:10px; }
-  .card h2 .muted { font-weight:400; }
+  .card h2 .muted, .card h2 button, .card h2 .badge { font-weight:400; }
   .muted { color:var(--muted); font-size:13px; }
   #drop { border:2px dashed #b8c2cc; border-radius:14px; padding:50px 20px; text-align:center; background:#fafbfc; }
   #drop.over, body.over #drop { border-color:var(--blue); background:var(--blue2); }
@@ -143,7 +143,7 @@
 
 <script id="logic">
 /* ================= pure logic (no DOM) ================= */
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 const DEFAULTS = {
   client: 'urbanica',
   largeSize: '119x159',
@@ -505,7 +505,7 @@ function render(soft) {
   if (soft) { renderFiles(); renderTop(); renderSide(); return; }
   const colHe = c => c === LARGE ? '\u2066' + S.largeSize.replace('x', '×') + '\u2069' : ((S.divisions.find(d => d.en === c) || {}).he || c);
   const cols = C.colOrder.filter(c => C.groupList.some(g => g.cols[c]));
-  let h = `<div class="layout"><div class="mainCol"><div class="card"><div class="loaded" id="topInfo"></div></div>`;
+  let h = `<div class="layout"><div class="mainCol">`;
   const nOv = Object.keys(qty).filter(k => k !== '*').reduce((a, k) => a + Object.values(qty[k]).filter(v => v !== '' && v != null).length, 0);
   h += `<div class="card"><h2>כמויות <span class="muted">— ארבעה מספרים לכל העבודה</span></h2>
     <div class="q4">${cols.map(c => `<label><span>${esc(colHe(c))}</span><input type="number" min="1" data-all="${esc(c)}" value="${esc(allQty[c] ?? '')}"></label>`).join('')}</div>
@@ -515,7 +515,7 @@ function render(soft) {
     ${C.groupList.map(g => `<tr><td>${esc(g.genderHe || '?')}</td><td>${esc(g.promoHe)}${g.promoEn ? ` <span class="muted ltr">${esc(g.promoEn)}</span>` : ''}</td><td><bdi>${esc(g.subHe)}</bdi></td>
       ${cols.map(c => `<td class="qty">${g.cols[c] ? `<input type="number" min="1" data-g="${esc(g.key)}" data-c="${esc(c)}" value="${esc((qty[g.key] || {})[c] ?? '')}" placeholder="${esc(allQty[c] ?? '')}">` : '<span class="none">–</span>'}</td>`).join('')}</tr>`).join('')}
     </tbody></table>` : ''}</div>`;
-  h += `<div class="card"><h2>קבצים <span class="muted" id="fileCount"></span></h2><div id="problems"></div><table><thead><tr><th>שם חדש</th><th>קובץ מקורי</th><th style="width:230px">הערות</th></tr></thead><tbody id="fileRows"></tbody></table></div></div><aside class="card" id="side"></aside></div>`;
+  h += `<div class="card"><h2 class="loaded">קבצים <span class="muted" id="fileCount"></span><span id="topInfo" style="display:contents"></span></h2><div id="problems"></div><table><thead><tr><th>שם חדש</th><th>קובץ מקורי</th><th style="width:230px">הערות</th></tr></thead><tbody id="fileRows"></tbody></table></div></div><aside class="card" id="side"></aside></div>`;
   $('#work').innerHTML = h;
   $('#bExc').onclick = () => { showExc = !showExc; render(); };
   $('#work').querySelectorAll('input[data-g]').forEach(inp => inp.addEventListener('input', () => {
@@ -536,9 +536,8 @@ function markQty() {
 }
 function renderTop() {
   const errs = C.recs.filter(r => r.issues.length).length;
-  $('#topInfo').innerHTML = `<b>${C.recs.length} קבצים</b>
-    ${errs ? `<span class="badge red">${errs} דורשים טיפול</span>` : '<span class="badge green">הכול מוכן</span>'}
-    <span class="path">${esc(srcPaths.join(' , '))}</span><span class="spacer" style="flex:1"></span>
+  $('#topInfo').innerHTML = `${errs ? `<span class="badge red">${errs} דורשים טיפול</span>` : '<span class="badge green">הכול מוכן</span>'}
+    <span class="spacer" style="flex:1"></span>
     ${C.unmappedPromos.length + C.unmappedSubs.length ? '<button class="small" id="bMapNow">מיפוי שמות חדשים</button>' : ''}
     <button class="small" id="bClear">ניקוי / תיקייה אחרת</button>`;
   $('#bClear').onclick = () => { files = []; srcPaths = []; sizeRun++; sizeProg = null; render(); };
