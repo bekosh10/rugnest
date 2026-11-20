@@ -419,11 +419,11 @@ const EN_PHRASES = {
   "חולצות טי שרוול קצר": 't-shirts short sleeve', 'חולצות שרוול ארוך': 'shirts long sleeve', 'חולצות מכופתרות': 'button shirts',
   'מכנס פוטר': 'sweatpants', 'מכנסי פוטר': 'sweatpants', 'טופ פוטר': 'sweat top', 'בגד ים שלם': 'swimsuit one-piece',
   'טופ תחתון ביקיני': 'bikini top-bottom', "פיג'מות ילדים": 'pajamas kids', "פיג'מות מבוגרים": 'pajamas adults',
-  'סוף עונה על אמת': 'end of season', 'פס מתכתי': 'magnetic strip', 'דו צדדי': '2-sided', 'מבצע כמותי': 'deal',
+  'סוף עונה על אמת': 'end of season', 'פס מתכתי': 'magneti strip', 'דו צדדי': '2-sided', 'מבצע כמותי': 'deal',
   'הזדמנות אחרונה': 'last chance',
 };
 const EN_WORDS = {
-  'לבן': 'white', 'אדום': 'red', 'כחול': 'blue', 'שחור': 'black', 'צבעוני': '', 'מתכתי': 'magnetic', 'פס': 'strip',
+  'לבן': 'white', 'אדום': 'red', 'כחול': 'blue', 'שחור': 'black', 'צבעוני': '', 'מתכתי': 'magneti', 'פס': 'strip',
   "ג'ינסים": 'jeans', 'חולצות': 'shirts', 'סריגים': 'knitwear', 'מכנסיים': 'pants', 'גופיות': 'tank tops', 'שמלות': 'dresses',
   "פיג'מות": 'pajamas', "ג'קטים": 'jackets', 'מעילים': 'coats', 'נעליים': 'shoes', 'אקטיב': 'active', 'בייבי': 'baby',
   'פריטים': 'items', 'כובע': 'cap', 'כובעים': 'caps', 'קולקציית': 'collection', 'קולציית': 'collection', 'קיץ': 'summer', 'חורף': 'winter', 'כל': 'all', 'עד': 'up to', 'הקולציית': 'collection', 'הקולקציה': 'collection', 'ב': 'for', 'ילדים': 'kids', 'מבוגרים': 'adults', 'נייר': 'paper', 'כרום': 'chrome', 'גרם': 'g',
