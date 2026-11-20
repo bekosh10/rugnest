@@ -80,9 +80,12 @@
   .sum td.n { white-space:nowrap; }
   #leftCol { width:330px; flex:none; position:sticky; top:70px; display:flex; flex-direction:column; gap:12px; max-height:calc(100vh - 70px - 50px); }
   aside#side { padding:0; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:1 1 auto; margin:0; }
-  #dropSlot:empty { display:none; }
+  #dropSlot:empty, #soBox:empty { display:none; }
+  #soBox { flex:0 1 auto; min-height:0; overflow-y:auto; max-height:26vh; }
+  #soBox .card { margin:0; }
+  #leftCol aside#side { min-height:260px; }
   #dropSlot #drop { margin:0; padding:10px 12px; text-align:right; flex:none; }
-  #dropSlot #drop .inputs { justify-content:flex-start; flex-direction:column; align-items:stretch; gap:5px; margin-top:6px; max-height:28vh; overflow-y:auto; }
+  #dropSlot #drop .inputs { justify-content:flex-start; flex-direction:column; align-items:stretch; gap:5px; margin-top:6px; max-height:18vh; overflow-y:auto; }
   #dropSlot #drop .chip { border-radius:7px; }
   #dropSlot #drop .ftitle { display:block; font-weight:600; font-size:13px; }
   #drop .ftitle { display:none; }
@@ -166,6 +169,7 @@
       </div>
       <div class="pane" id="pane"></div>
     </aside>
+    <div id="soBox"></div>
     <div id="dropSlot"></div>
     </div>
   </div>
@@ -691,12 +695,27 @@ function inputsChips() {
 const swatch = c => c ? `<span class="sw ${c}"></span>` : '';
 const MKIND = { swap: 'נוצר – צבע הוחלף', number: 'נוצר – מספר שונה', ok: 'שיוך ידני', bank: 'מבנק הגרפיקות' };
 
+
+// the print-shop work order (SO) as uploaded – under the summaries
+function renderSO() {
+  const el = $('#soBox'); if (!el) return;
+  if (!S.so || !S.so.lines || !S.so.lines.length) { el.innerHTML = ''; return; }
+  const m = S.so.meta || {}, open = S.soOpen !== false;
+  const rows = S.so.lines.map((l, i) => `<tr><td class="muted">${i + 1}</td><td>${esc(l.desc)}</td><td class="n"><b>${l.qty}</b></td><td class="muted" style="font-size:11px">${esc(l.machine || '')}</td></tr>`).join('');
+  el.innerHTML = `<div class="card" style="padding:10px 12px">
+    <div id="soHead" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center"><b>${open ? '▾' : '◂'} הזמנת דפוס ${esc(S.so.soNumber || '')}</b>
+      <span class="muted" style="font-size:11px">${esc([m['לקוח'], m['תאריך סיום נדרש'] ? 'סיום ' + m['תאריך סיום נדרש'] : ''].filter(Boolean).join(' · '))}</span></div>
+    ${open ? `<table class="sum" style="width:100%;margin-top:6px;font-size:12.5px"><tr><th>#</th><th style="text-align:right">תיאור</th><th>כמות</th><th>מחלקה</th></tr>${rows}</table>` : ''}</div>`;
+  el.querySelector('#soHead').onclick = () => { S.soOpen = !open; renderSO(); };
+}
+
 function render() {
   $('#inputs').innerHTML = inputsChips();
   const drop = $('#drop');
   if (S.table && drop.parentElement.id !== 'dropSlot') { drop.classList.add('small'); $('#dropSlot').appendChild(drop); }
   if (!S.table && drop.parentElement.id === 'dropSlot') { drop.classList.remove('small'); $('.mainCol').prepend(drop); }
   $('#soLbl').textContent = S.so && S.so.soNumber || '';
+  renderSO();
   const P = S.plan;
   $('#bExport').disabled = !P || !P.items.length;
   $('#bLayout').disabled = !P || !P.items.some(i => i.machine === 'מגנטי');
@@ -838,7 +857,8 @@ function renderSide() {
       if (!mo) return;
       [...new Set(its.map(i => i.tab))].forEach(t => {
         const ti = its.filter(i => i.tab === t), key = mc + '|' + t, to = !!S.open[key];
-        h.push(`<tr class="trow" data-o="${esc(key)}"><td><span class="arr">${to ? '▾' : '◂'}</span>${esc(t)}</td><td class="n">${ti.length}</td><td class="n">${ti.reduce((a, i) => a + i.qty, 0)}</td></tr>`);
+        const shn = mc === 'מגנטי' ? magSheets(t, ti) : null;
+        h.push(`<tr class="trow" data-o="${esc(key)}"><td><span class="arr">${to ? '▾' : '◂'}</span>${esc(t)}${shn ? `<div class="muted" style="font-size:11px;padding-inline-start:14px">${shn.prints} גיליונות הדפסה${shn.unique !== shn.prints ? ` (${shn.unique} שונים)` : ''}</div>` : ''}</td><td class="n">${ti.length}</td><td class="n">${ti.reduce((a, i) => a + i.qty, 0)}</td></tr>`);
         if (to) ti.forEach(i => h.push(`<tr class="frow"><td colspan="2"><span class="fn" dir="ltr">${esc(i.name.replace(/\.pdf$/, ''))}</span></td><td class="n">${i.qty}</td></tr>`));
       });
     });
@@ -900,6 +920,26 @@ $('#bExport').onclick = async () => {
 };
 
 
+
+
+// magnet: how many print sheets a type will take, with the saved layout settings (cached per plan)
+function layOpts(t) {
+  const cfg = layCfg(), k = /a3/i.test(t) ? 'a3' : 'strip', kv = obj => obj && (obj[k] != null ? obj[k] : obj[t]);
+  return { ...C.LAYOUT_DEF, width: kv(cfg.width) || C.layoutWidthFor(t), gap: cfg.gap != null ? cfg.gap : C.LAYOUT_DEF.gap, maxLen: cfg.maxLen || C.LAYOUT_DEF.maxLen, bleed: cfg.bleed != null ? cfg.bleed : C.LAYOUT_DEF.bleed, collect: kv(cfg.collect) != null ? kv(cfg.collect) : C.layoutCollectFor(t) };
+}
+function magSheets(t, its) {
+  try {
+    const CMp = 72 / 2.54;
+    const gs = its.map(i => {
+      const art = S.allArts[i.art], pg = art && art.pages[i.vpage != null ? i.vpage : i.page];
+      const [w, h] = i.target ? i.target : pg ? [pg.w * CMp, pg.h * CMp] : [0, 0];
+      return { w, h, qty: i.qty, color: i.row.color };
+    }).filter(g => g.w > 0);
+    if (!gs.length) return null;
+    const sh = C.planLayout(gs, layOpts(t));
+    return { prints: sh.reduce((a, x) => a + x.copies, 0), unique: sh.length };
+  } catch (e) { return null; }
+}
 
 /* ---------------- work order per department (looks like the Campus SO) ---------------- */
 const DEPT_MAT = { 'דיגיטל': 'דיגיטל', 'מגנטי': 'מגנטי', 'דורסט': 'דורסט (PVC)' };
@@ -1154,7 +1194,7 @@ $('#bLayout').onclick = async () => {
       d.querySelector('.mx').onclick = cancel; d.querySelector('#sX').onclick = cancel;
       d.querySelector('#pP').onclick = () => pick('printDir', 'תיקייה לקבצי פרינט');
       d.querySelector('#pC').onclick = () => pick('cutDir', 'תיקייה לקבצי קאט');
-      d.querySelector('#sSave').onclick = () => { read(); cfg = t; laySave(cfg); d.remove(); draw(); res(true); };
+      d.querySelector('#sSave').onclick = () => { read(); cfg = t; laySave(cfg); d.remove(); draw(); try { renderSide(); } catch (e) {} res(true); };
     };
     fill(); document.body.appendChild(d);
   });
