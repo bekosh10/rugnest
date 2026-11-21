@@ -1877,9 +1877,207 @@ function typeName(t,i){
 }
 
 // build the page plan for the canvas, filtered to the selected type
+/* ---------- kit split: where each package sits on the sheet (shared by the PDF and the preview) ----------
+   G = {W,H,gw,gh,gp,offX,offY,cols,rows,MM} in any unit (points for the PDF, mm for the preview), y from the bottom. */
+function splitRegions(mode, G){
+  const {W,H,gw,gh,gp,offX,offY,MM}=G, lay={cols:G.cols, rows:G.rows};
+  function makeCustomRegions(){
+    // column ranges split by vCuts (cut BEFORE column c). e.g. vCuts={3} on 7 cols → [0..2],[3..6]
+    const vb=[0, ...[...customSplit.vCuts].sort((a,b)=>a-b), lay.cols];
+    const hb=[0, ...[...customSplit.hCuts].sort((a,b)=>a-b), lay.rows];
+    const colRanges=[], rowRanges=[];
+    for(let i=0;i<vb.length-1;i++) colRanges.push([vb[i], vb[i+1]]);   // [start,end)
+    for(let i=0;i<hb.length-1;i++) rowRanges.push([hb[i], hb[i+1]]);
+    // geometry: place each block with equal margins. Use uniform edge based on the largest row.
+    // simplest robust layout: keep each block at its natural grid position (same pitch), and add
+    // the standard 2mm+ dividers where cuts are. We position blocks so cut gaps = 2× edge margin.
+    const nc=colRanges.length, nr=rowRanges.length;
+    // total cells width per col-range (in cells) — blocks may differ in size, so lay them out
+    // proportionally with equal dividers. Edge E and centre 2E, consistent across the sheet.
+    // horizontal:
+    const colCellCounts=colRanges.map(([s,e])=>e-s);
+    const rowCellCounts=rowRanges.map(([s,e])=>e-s);
+    const totalCw=colCellCounts.reduce((a,b)=>a+b,0);
+    const totalRh=rowCellCounts.reduce((a,b)=>a+b,0);
+    // widths in points of each block (cells*gw + internal gaps)
+    const colW = colCellCounts.map(n=> n*gw + (n-1)*gp);
+    const rowH = rowCellCounts.map(n=> n*gh + (n-1)*gp);
+    const sumW = colW.reduce((a,b)=>a+b,0), sumH=rowH.reduce((a,b)=>a+b,0);
+    // dividers: nc+1 vertical gaps (2 edges + (nc-1) centres). edge E, centres 2E.
+    // sumW + 2E + (nc-1)*2E = W → E=(W-sumW)/(2nc)
+    const EX = Math.max((W - sumW)/(2*nc), 2*MM);
+    const EY = Math.max((H - sumH)/(2*nr), 2*MM);
+    // compute x offsets (RTL: first block on the right). We'll compute left positions then flip.
+    const regions=[];
+    // reading order: row 0 top; within row, col 0 = rightmost (RTL)
+    let yTop = H - EY;   // top inner edge
+    for(let ri=0; ri<nr; ri++){
+      const bh=rowH[ri];
+      const oy = yTop - bh;
+      let xRight = W - EX;   // right inner edge
+      for(let ci=0; ci<nc; ci++){
+        const bw=colW[ci];
+        const ox = xRight - bw;
+        regions.push({
+          cols: colCellCounts[ci], rows: rowCellCounts[ri],
+          ox, oy,
+          // remember which sheet-cells are ignored inside this block (relative), to leave white
+          ignored: filterIgnored(colRanges[ci], rowRanges[ri])
+        });
+        xRight = ox - 2*EX;
+      }
+      yTop = oy - 2*EY;
+    }
+    return regions;
+  }
+  function filterIgnored(colRange, rowRange){
+    const set=new Set();
+    customSplit.ignored.forEach(k=>{
+      const [r,c]=k.split(',').map(Number);
+      if(c>=colRange[0]&&c<colRange[1]&&r>=rowRange[0]&&r<rowRange[1])
+        set.add((r-rowRange[0])+','+(c-colRange[0]));
+    });
+    return set;
+  }
+
+  function makeRegionsV(nParts){        // stack nParts vertically
+    const per=Math.floor(lay.rows/nParts); if(per<1) return null;
+    const blkH=per*gh+(per-1)*gp;
+    const E=Math.max((H - nParts*blkH)/(2*nParts), 2*MM);
+    const regs=[]; for(let k=0;k<nParts;k++) regs.push({cols:lay.cols, rows:per, ox:offX, oy:E+k*(blkH+2*E)});
+    return regs.reverse();              // index 0 = top
+  }
+  function makeRegionsH(nParts){        // place nParts side by side horizontally
+    const per=Math.floor(lay.cols/nParts); if(per<1) return null;
+    const blkW=per*gw+(per-1)*gp;
+    const E=Math.max((W - nParts*blkW)/(2*nParts), 2*MM);
+    const regs=[]; for(let k=0;k<nParts;k++) regs.push({cols:per, rows:lay.rows, ox:E+k*(blkW+2*E), oy:offY});
+    return regs.reverse();              // index 0 = right (RTL)
+  }
+  function makeRegionsGrid(nc, nr){     // nc columns × nr rows of regions (e.g. 2×2)
+    const perC=Math.floor(lay.cols/nc), perR=Math.floor(lay.rows/nr);
+    if(perC<1 || perR<1) return null;
+    const blkW=perC*gw+(perC-1)*gp, blkH=perR*gh+(perR-1)*gp;
+    const EX=Math.max((W - nc*blkW)/(2*nc), 2*MM);
+    const EY=Math.max((H - nr*blkH)/(2*nr), 2*MM);
+    const regs=[];
+    // order: reading order top→bottom, right→left (RTL). region index 0 = top-right.
+    for(let rr=0; rr<nr; rr++) for(let cc=0; cc<nc; cc++){
+      const ox = EX + cc*(blkW+2*EX);
+      const oyFromBottom = EY + rr*(blkH+2*EY);
+      const oy = H - blkH - oyFromBottom;   // rr=0 → top
+      regs.push({cols:perC, rows:perR, ox: W - blkW - ox, oy});  // W-...-ox → right-first
+    }
+    return regs;
+  }
+  function planKitSplitRegions(N){
+    const sheetTall = H>=W;
+    // 1) try pure long-side strips first (widest, easiest pieces)
+    let regs = sheetTall ? makeRegionsV(N) : makeRegionsH(N);
+    if(regs) return regs;
+    // 2) try the other single direction
+    regs = sheetTall ? makeRegionsH(N) : makeRegionsV(N);
+    if(regs) return regs;
+    // 3) grid split: try every factor pair nc×nr = N, pick the one that fits and wastes least
+    const pairs=[];
+    for(let a=1;a<=N;a++){ if(N%a===0) pairs.push([a, N/a]); }
+    let best=null, bestWaste=Infinity;
+    for(const [a,b] of pairs){
+      // orient so more divisions go on the axis with more cells
+      const tries = [[a,b],[b,a]];
+      for(const [nc,nr] of tries){
+        const perC=Math.floor(lay.cols/nc), perR=Math.floor(lay.rows/nr);
+        if(perC<1||perR<1) continue;
+        const used = nc*perC * nr*perR;               // cells used across all regions
+        const waste = lay.cols*lay.rows - used;
+        if(waste < bestWaste){ bestWaste=waste; best=[nc,nr]; }
+      }
+    }
+    if(best) return makeRegionsGrid(best[0], best[1]);
+    return [{cols:lay.cols,rows:lay.rows,ox:offX,oy:offY}];   // give up → whole block
+  }
+  return mode==='custom' ? makeCustomRegions() : planKitSplitRegions(mode);
+}
+// the order of sheets inside each package (same rules as the PDF): items {kind:'g',t,back} / {kind:'s',color}
+function splitGroupsPlan(types, N){
+  const nTypes=types.length, perType=Math.max(1,+els.perType.value||1);
+  const useTypeSep=!els.noTypeSep.checked, dup=anyDuplex(types), sepPages=dup?2:1;
+  const qtyOf=t=>(t.qty!=null?t.qty:perType);
+  const chunkOf=t=>{ const c=[], ty=types[t], two=!!(ty.duplex&&ty.back);
+    for(let u=0;u<qtyOf(ty);u++){ c.push({kind:'g',t,back:false}); if(two) c.push({kind:'g',t,back:true}); }
+    if(useTypeSep && t<nTypes-1) for(let i=0;i<sepPages;i++) c.push({kind:'s',color:state.sepTypeColor});
+    return c; };
+  const kitSep=[]; for(let i=0;i<sepPages;i++) kitSep.push({kind:'s',color:state.sepKitColor});
+  if(els.splitMethod.value==='types'){
+    const groups=Array.from({length:N},()=>[]);
+    const base=Math.floor(nTypes/N), extra=nTypes%N; let ti=0;
+    for(let g=0;g<N;g++){ const cnt=base+(g<extra?1:0); for(let k=0;k<cnt&&ti<nTypes;k++,ti++) groups[g].push(...chunkOf(ti)); }
+    for(let g=N-1;g>=0;g--){ if(groups[g].length){ groups[g].push(...kitSep); break; } }
+    return groups.filter(x=>x.length);
+  }
+  const all=[]; for(let t=0;t<nTypes;t++) all.push(...chunkOf(t)); all.push(...kitSep);
+  const len=Math.ceil(all.length/N), groups=[];
+  for(let g=0;g<N;g++) groups.push(all.slice(g*len,(g+1)*len));
+  return groups.filter(x=>x.length);
+}
+function splitActive(){ const v=els.kitSplit.value; return !stackMode() && (v==='custom' || (+v|0)>1); }
+function buildSplitPreviewPlan(types, lay){
+  const W=lay.sheetW, H=lay.sheetH, gw=lay.gwmm, gh=lay.ghmm, gp=lay.gap;
+  const blockW=lay.cols*gw+(lay.cols-1)*gp, blockH=lay.rows*gh+(lay.rows-1)*gp;
+  const v=els.kitSplit.value, mode = v==='custom' ? 'custom' : Math.max(1,+v|0);
+  const regions=splitRegions(mode,{W,H,gw,gh,gp,offX:(W-blockW)/2,offY:(H-blockH)/2,cols:lay.cols,rows:lay.rows,MM:1});
+  const groups=splitGroupsPlan(types, regions.length);
+  const N=Math.min(regions.length, groups.length);
+  const L=Math.max(0,...groups.slice(0,N).map(g=>g.length));
+  previewState.split={regions:regions.slice(0,N), groups:groups.slice(0,N)};
+  const nm=i=>typeName(types[i],i);
+  const plan=[];
+  for(let k=0;k<L;k++){
+    const parts=previewState.split.groups.map((g,gi)=>{ const it=g[k]; return `${gi+1}: ${!it?'ריק':it.kind==='s'?'מפריד':nm(it.t)+(it.back?' (אחורי)':'')}`; });
+    plan.push({kind:'split', k, label:`גיליון ${k+1} מתוך ${L} · ${parts.join(' · ')}`});
+  }
+  return plan;
+}
+function drawSplitPreview(lay, k){
+  const W=lay.sheetW, H=lay.sheetH, gw=lay.gwmm, gh=lay.ghmm, gp=lay.gap, pX=gw+gp, pY=gh+gp;
+  els.sheetbox.style.setProperty('--ar', W/H);
+  const types=previewState.types, S=previewState.split;
+  const FRAME=Math.min(Math.max(1,(+els.frameW.value)*10), 0.45*Math.min(gw,gh));
+  const tones=['#7b3fe4','#e0832b','#1f9d6b','#d6336c','#1c7ed6','#9c6b00','#5f3dc4','#2b8a3e'];
+  let out='';
+  S.regions.forEach((R,g)=>{
+    const it=S.groups[g][k];
+    const bW=R.cols*gw+(R.cols-1)*gp, bH=R.rows*gh+(R.rows-1)*gp;
+    const X0=R.ox, Y0=H-(R.oy+bH);                      // svg: y from the top
+    const tone=tones[g%tones.length];
+    for(let r=0;r<R.rows;r++) for(let c=0;c<R.cols;c++){
+      if(R.ignored && R.ignored.has(r+','+c)) continue;
+      const x=X0+c*pX, y=Y0+r*pY;
+      if(!it){ out+=`<rect x="${x}" y="${y}" width="${gw}" height="${gh}" fill="#f1f3f5"/>`; }
+      else if(it.kind==='s'){ const hex=colorHex(it.color);
+        out+= hex ? `<rect x="${x+FRAME/2}" y="${y+FRAME/2}" width="${gw-FRAME}" height="${gh-FRAME}" fill="none" stroke="${hex}" stroke-width="${FRAME}"/>`
+                  : `<rect x="${x}" y="${y}" width="${gw}" height="${gh}" fill="#fff"/>`; }
+      else { const t=types[it.t]; let th=null, rot=t.rot||0;
+        if(!it.back) th=t.thumb||(t.front&&t.front.thumb);
+        else { th=(t.back.pageThumbs&&t.back.pageThumbs[t.backPage||0])||t.back.thumb||t.thumb; rot=backRot(rot); }
+        if(th) out+=svgThumb(th,x,y,gw,gh,rot); }
+      out+=`<rect x="${x}" y="${y}" width="${gw}" height="${gh}" fill="none" stroke="#2f6f4e" stroke-width=".3"/>`;
+    }
+    // package outline + number, so it's clear which part of the sheet is which package
+    out+=`<rect x="${X0-1.5}" y="${Y0-1.5}" width="${bW+3}" height="${bH+3}" fill="none" stroke="${tone}" stroke-width="1.2" stroke-dasharray="4 2.5" rx="2"/>`;
+    const tag=Math.min(gw,gh)*0.13;
+    out+=`<rect x="${X0+bW-tag*1.1}" y="${Y0-tag*0.55}" width="${tag*1.2}" height="${tag*1.1}" rx="${tag*0.25}" fill="${tone}"/>`+
+         `<text x="${X0+bW-tag*0.5}" y="${Y0}" text-anchor="middle" dominant-baseline="middle" font-size="${tag*0.75}" font-weight="700" fill="#fff">${g+1}</text>`;
+  });
+  els.sheetbox.innerHTML=`<svg class="sheet" viewBox="0 0 ${W} ${H}" font-family="Google Sans, Noto Sans Hebrew, Arial, sans-serif">
+    <rect x="0" y="0" width="${W}" height="${H}" fill="#fff" stroke="#d9d5cc" stroke-width=".5"/>${out}</svg>`;
+}
+
 function rebuildPreviewPlan(){
   const types = previewState.types;
-  if(previewState.typeFilter==null){
+  if(splitActive() && previewState.lay){
+    previewState.plan = buildSplitPreviewPlan(types, previewState.lay);   // the split kit, sheet by sheet
+  }else if(previewState.typeFilter==null){
     previewState.plan = buildSheetPlan(types);          // full kit sequence
     $('canvasTitle').textContent = 'הגיליון המלא';
   }else{
@@ -1929,7 +2127,8 @@ function renderPreviewPage(){
   $('pgFirst').disabled = idx<=0;
   $('pgLast').disabled = idx>=plan.length-1;
   $('pgcaption').textContent=item.label;
-  if(item.kind==='stack') drawStackPreview(lay, previewState.stack, previewState.types, item.k, item.back);
+  if(item.kind==='split') drawSplitPreview(lay, item.k);
+  else if(item.kind==='stack') drawStackPreview(lay, previewState.stack, previewState.types, item.k, item.back);
   else if(item.kind==='sep') drawSeparatorPreview(lay, item.color);
   else drawPreview(lay, item.thumb?{thumb:item.thumb}:null, item.mirror, item.rot||0);
 }
@@ -2218,7 +2417,7 @@ document.addEventListener('click',()=>document.querySelectorAll('.preset-menu').
   new MutationObserver(()=>{ if(!list.children.length) reset(); }).observe(list,{childList:true});
 })();
 /* ---------- installed app: version + updates from GitHub ---------- */
-const APP_VERSION = 2;
+const APP_VERSION = 3;
 (function(){
   if(!window.desk) return;                     // artifact / browser: nothing to show
   const bar=$('appbar'), ver=$('appver'), upd=$('appupd');
@@ -2574,7 +2773,7 @@ async function build(){
   const isCustom = splitMode==='custom' && countRegions()>1;
   let done=0;
   if(isCustom || kitSplitN>1){
-    const regions = isCustom ? makeCustomRegions() : planKitSplitRegions(kitSplitN);
+    const regions = splitRegions(isCustom ? 'custom' : kitSplitN, {W,H,gw,gh,gp,offX,offY,cols:lay.cols,rows:lay.rows,MM});
     const groups  = buildSplitGroups(regions.length);
     const N = Math.min(regions.length, groups.length);
     const maxLen = Math.max(...groups.map(g=>g.length));
