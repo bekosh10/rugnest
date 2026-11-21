@@ -124,6 +124,14 @@
   .pthumb .pimg{width:64px;height:64px;display:grid;place-items:center;background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden}
   .pthumb img{max-width:58px;max-height:58px;transition:transform .15s}
   .pthumb span{font-size:10px;color:var(--muted);white-space:nowrap}
+  .pthumb{cursor:pointer}
+  .pthumb:hover .pimg{border-color:var(--accent)}
+  .pthumb.off .pimg{position:relative;background:#f1f3f5}
+  .pthumb.off img{filter:grayscale(1);opacity:.3}
+  .pthumb.off .pimg::after{content:'';position:absolute;inset:6px;background:linear-gradient(to top left,transparent calc(50% - 1px),#c02828 50%,transparent calc(50% + 1px))}
+  .pthumb.off span{text-decoration:line-through}
+  .pgtoggle.partial{border-color:#ee8a1c;color:#b35c00}
+  .pgtoggle.partial.open{background:#ee8a1c;color:#fff}
   .appbar{display:flex;align-items:center;justify-content:center;gap:12px;margin:18px 0 6px;font-size:12.5px;color:var(--muted)}
   .appbar button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:5px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
   .appbar button.ghost{background:var(--paper);color:var(--accent)}
@@ -1049,7 +1057,7 @@ function renderTypes(){
     }
     const np = r.pages||1;
     const pageBadge = np>1
-      ? `<button type="button" class="pgtoggle${r.open?' open':''}" title="${r.open?'הסתרת העמודים':'הצגת כל '+np+' העמודים'}"><span>${np}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>`
+      ? `<button type="button" class="pgtoggle${r.open?' open':''}${r.skip&&r.skip.size?' partial':''}" title="${r.open?'הסתרת העמודים':'הצגת כל '+np+' העמודים'}${r.skip&&r.skip.size?` · ${r.skip.size} לא בשימוש`:''}"><span>${r.skip&&r.skip.size?`${np-r.skip.size}/${np}`:np}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>`
       : `<span class="pgcount" title="${np} עמודים בקובץ">${np}</span>`;
     const perQty = els.multiQtyPer.checked;
     const qtyField = perQty
@@ -1072,8 +1080,16 @@ function renderTypes(){
       strip.innerHTML=r.pageThumbs.map((th0,p)=>{
         const th = rotThumb(th0, r.rotSet!=null ? r.rotSet : autoRot(r,p));
         const side = state.sided==='pair' ? (p%2===0?' · קדמי':' · אחורי') : '';
-        return `<div class="pthumb" title="עמוד ${p+1}${side}"><div class="pimg"><img src="${th}"></div><span>עמ׳ ${p+1}${side}</span></div>`;
+        const off = r.skip && (r.skip.has(p) || (state.sided==='pair' && r.skip.has(p%2?p-1:p+1)));
+        return `<div class="pthumb${off?' off':''}" data-p="${p}" title="${off?'לא בשימוש — לחצי להחזיר':'לחצי כדי לא להשתמש בעמוד הזה'}"><div class="pimg"><img src="${th}"></div><span>עמ׳ ${p+1}${side}</span></div>`;
       }).join('');
+      strip.querySelectorAll('.pthumb').forEach(el=>{
+        el.onclick=e=>{ e.stopPropagation();
+          const f=state.files[i], p=+el.dataset.p; f.skip=f.skip||new Set();
+          if(state.sided==='pair'){ const a=p-(p%2); const on=f.skip.has(a)||f.skip.has(a+1); f.skip.delete(a); f.skip.delete(a+1); if(!on){ f.skip.add(a); f.skip.add(a+1); } }
+          else { if(f.skip.has(p)) f.skip.delete(p); else f.skip.add(p); }
+          renderTypes(); recompute(); };
+      });
       row.classList.add('has-pages'); row.appendChild(strip);
     }
     { const rb=row.querySelector('.rotbtn'); if(rb) rb.onclick=e=>{ e.stopPropagation(); const f=state.files[i]; f.rotSet=nextRot(f.rotSet!=null?f.rotSet:autoRot(f,0)); renderTypes(); recompute(); }; }
@@ -1468,6 +1484,10 @@ function getTypes(){
           const thumb=(f.pageThumbs&&f.pageThumbs[p])||f.thumb;
           out.push({front:f, back:null, duplex:false, frontPage:p, backPage:0, thumb});
         }
+      }
+      if(f.skip && f.skip.size){                                   // pages switched off in the page list
+        const kept=out.slice(start).filter(t=>!(f.skip.has(t.frontPage) || (state.sided==='pair' && t.backPage!=null && f.skip.has(t.backPage))));
+        out.splice(start, out.length-start, ...kept);
       }
       if(fq!=null) for(let k=start;k<out.length;k++) out[k].qty=fq;   // apply file qty to its pages
       for(let k=start;k<out.length;k++) out[k].rot = f.rotSet!=null ? f.rotSet : autoRot(f, out[k].frontPage);
@@ -2417,7 +2437,7 @@ document.addEventListener('click',()=>document.querySelectorAll('.preset-menu').
   new MutationObserver(()=>{ if(!list.children.length) reset(); }).observe(list,{childList:true});
 })();
 /* ---------- installed app: version + updates from GitHub ---------- */
-const APP_VERSION = 4;
+const APP_VERSION = 5;
 (function(){
   if(!window.desk) return;                     // artifact / browser: nothing to show
   const bar=$('appbar'), ver=$('appver'), upd=$('appupd');
