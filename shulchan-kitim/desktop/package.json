@@ -1,0 +1,57 @@
+{
+  "name": "shulchan-kitim",
+  "productName": "Shulchan Kitim",
+  "description": "שולחן קיטים – סידור קיטים וחיתוך וערימה",
+  "author": "Campus",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "electron ."
+  },
+  "build": {
+    "appId": "il.campus.shulchankitim",
+    "productName": "Shulchan Kitim",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "build/icon.png"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dir"
+        }
+      ],
+      "identity": null,
+      "icon": "build/icon.png",
+      "extendInfo": {
+        "LSMinimumSystemVersion": "10.13"
+      }
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "publish": null
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8",
+    "resedit": "^2.0.3"
+  }
+}

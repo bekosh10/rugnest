@@ -1,0 +1,2945 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>שולחן קיטים</title>
+<!-- SHULCHAN_KITIM_APP -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="lib/pdf-lib.min.js"></script>
+<script src="lib/pdf.min.js"></script>
+<style>
+  :root{
+    --brand:#7b3fe4;
+    /* aligned to שולחן הפריסה house style: neutral slate structure, PURPLE accent */
+    --brand-08:#f6f7f8;             /* field / panel-inset background (--panel) */
+    --brand-70:#d0d6da;            /* default borders (--line) */
+    --brand-solid:#7b3fe4;          /* header band + accent fills (--accent) */
+    --brand-line:#d0d6da;           /* panel outline */
+    --ink:#182024; --paper:#ffffff; --line:#d0d6da; --line2:#e3e7ea;
+    --accent:#7b3fe4; --accent-soft:rgba(123,63,228,.12); --warn:#c02828; --muted:#5a656d;
+    --accent-deep:#5a2bb0; --brand-bar:#cdb8f0; --brand-bar-ink:#23173a; --brand-soft:#f1eafc;
+    --ok:#1b7a45; --shadow:0 1px 2px rgba(0,0,0,.04),0 6px 18px rgba(24,32,36,.07);
+    /* plain numbers — no slashed zero */
+    --mono:'Google Sans','Noto Sans Hebrew','Segoe UI',system-ui,-apple-system,Arial,sans-serif;
+    --sans:'Google Sans','Noto Sans Hebrew','Rubik','Segoe UI',system-ui,-apple-system,Arial,sans-serif;
+    --display:'Google Sans','Noto Sans Hebrew','Rubik','Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  /* keep numbers evenly spaced but never use a slashed zero */
+  input[type=number],input[type=text]{font-feature-settings:"zero" 0,"tnum" 1;font-variant-numeric:tabular-nums}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--sans);
+    background:#e8ebed; color:var(--ink); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1820px;margin:0 auto;padding:16px 20px 70px}
+
+  /* thin purple title bar */
+  header.topbar{background:var(--brand-bar);border-radius:10px;
+    padding:10px 20px;margin-bottom:14px;box-shadow:0 1px 6px rgba(35,23,58,.12)}
+  header.topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .jobname-wrap{margin-inline-start:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--brand-bar-ink)}
+  .jobname-wrap input{width:240px;background:#fff;border:1px solid rgba(35,23,58,.25);border-radius:8px;padding:6px 10px;font:inherit;font-size:14px;font-weight:500}
+  .jobname-wrap input:focus{outline:2px solid var(--accent);outline-offset:0}
+  header.topbar h1{font-family:var(--display);font-size:20px;margin:0;font-weight:700;
+    letter-spacing:-.01em;color:var(--brand-bar-ink)}
+
+  /* settings strip = two framed groups side by side */
+  .settings-strip{display:flex;gap:18px;margin-top:10px;align-items:stretch}
+  @media(max-width:980px){.settings-strip{flex-wrap:wrap}}
+  .settings-strip>.sgroup:first-child{flex:1 1 0;min-width:0}      /* הגדרות הקיט: takes the rest */
+  .settings-strip>.sgroup-sheet{flex:0 0 auto}                       /* הגדרות הגיליון: as wide as its rows */
+  .sgroup-body.rows{flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:10px}
+  .srow1{display:flex;align-items:flex-end;gap:12px 16px;flex-wrap:wrap}
+  .sgroup-sheet .srow1,.sgroup-sheet .sep-row{flex-wrap:nowrap}
+  .sgroup{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:20px 16px 14px;box-shadow:var(--shadow);position:relative}
+  .sgroup-body{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px}
+  /* modern toggle switch */
+  .switch{position:relative;display:inline-block;width:46px;height:26px;margin:6px 0;cursor:pointer}
+  .switch input{position:absolute;opacity:0;width:0;height:0}
+  .switch .slider{position:absolute;inset:0;background:#c9d0d5;border-radius:26px;transition:.18s}
+  .switch .slider::before{content:'';position:absolute;width:20px;height:20px;top:3px;inset-inline-start:3px;
+    background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:.18s}
+  .switch input:checked+.slider{background:var(--accent)}
+  .switch input:checked+.slider::before{transform:translateX(-20px)}
+  .switch input:focus-visible+.slider{outline:2px solid var(--accent);outline-offset:2px}
+  /* separators row inside sheet settings: compact pickers side by side */
+  .sep-row{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 18px;
+    border-top:1px solid var(--line2);padding-top:10px}
+  .cpick{position:relative}
+  .cpick-row{display:flex;align-items:center;gap:6px}
+  .cpick .swatch.mini-none{flex:none;width:34px;height:34px;max-width:none;aspect-ratio:auto}
+  .cchip{display:flex;align-items:center;gap:2px;height:34px;padding:0 2px 0 3px;border-radius:10px;
+    border:1px solid var(--line);background:var(--paper);cursor:pointer;transition:box-shadow .12s}
+  .cchip .cdot{width:26px;height:26px;border-radius:7px;background:#d5342b;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center;font-size:9px;color:var(--muted)}
+  .cchip .cdot.white{box-shadow:inset 0 0 0 1px var(--line)}
+  .cchip .ccaret{border:0;background:none;padding:0 4px;height:100%;font-size:12px;color:var(--muted);cursor:pointer}
+  .cchip .ccaret:hover{color:var(--accent)}
+  .cchip.sel{box-shadow:0 0 0 2px var(--chipc,var(--accent))}
+  .cpick .swatch.mini-none.sel{box-shadow:0 0 0 2px var(--accent)}
+  .cpick .cpop{display:none;position:absolute;top:calc(100% + 6px);inset-inline-start:0;z-index:30;
+    background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px;
+    box-shadow:0 8px 24px rgba(24,32,36,.18);width:max-content;margin-top:0}
+  .cpick .cpop.open{display:grid;grid-template-columns:repeat(4,34px);gap:8px}
+  .cpop .swatch{width:34px;height:34px;max-width:none;flex:none}
+  .sg{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .sg>.sglab{font-size:10.5px;color:var(--muted);font-weight:600;white-space:nowrap}
+  .sg>.sglab .hint{font-weight:400;color:var(--muted)}
+  .sg-inputs{display:flex;align-items:center;gap:5px}
+  .sg-inputs input[type=number]{width:72px}
+  .sg-inputs select{padding:5px 6px;min-width:62px}
+  .sg .mini{font-size:10px;color:var(--muted)}
+  .sg-chk{display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:4px}
+  .clearall.on-border{position:absolute;top:-13px;inset-inline-end:18px;z-index:5;box-shadow:0 0 0 4px #e8ebed}
+  .files-head h2{margin:0}
+  .clearall{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--accent);background:var(--accent);
+    color:#fff;border-radius:8px;padding:4px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:.12s}
+  .clearall svg{width:14px;height:14px}
+  .clearall:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
+  .clearall.confirm{background:var(--warn);border-color:var(--warn);color:#fff}
+  .rotbtn{display:inline-flex;align-items:center;gap:3px;flex-shrink:0;border:1px solid var(--accent);background:var(--paper);
+    color:var(--accent);border-radius:7px;padding:3px 6px;font:inherit;font-size:11px;font-weight:700;cursor:pointer;line-height:1}
+  .rotbtn svg{width:13px;height:13px}
+  .rotbtn.on{background:var(--accent);color:#fff}
+  .rotbtn i{font-style:normal;font-size:8.5px;opacity:.8;margin-inline-start:2px}
+  .rep-row .rotbtn{justify-self:center}
+  .type-row img.thumb,.rep-row .slot img{transition:transform .15s}
+  .pgtoggle{display:inline-flex;align-items:center;gap:1px;flex-shrink:0;border:1px solid var(--accent);background:var(--paper);
+    color:var(--accent);border-radius:6px;padding:1px 3px 1px 5px;font:inherit;font-size:10px;font-weight:700;cursor:pointer;line-height:1.3}
+  .pgtoggle svg{width:11px;height:11px;transition:transform .15s}
+  .pgtoggle.open{background:var(--accent);color:#fff}
+  .pgtoggle.open svg{transform:rotate(180deg)}
+  .type-row.has-pages{flex-wrap:wrap}
+  .pages-strip{order:20;flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;padding:8px 2px 2px;margin-top:4px;border-top:1px dashed var(--line)}
+  .pthumb{display:flex;flex-direction:column;align-items:center;gap:3px;width:64px}
+  .pthumb .pimg{width:64px;height:64px;display:grid;place-items:center;background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .pthumb img{max-width:58px;max-height:58px;transition:transform .15s}
+  .pthumb span{font-size:10px;color:var(--muted);white-space:nowrap}
+  .appbar{display:flex;align-items:center;justify-content:center;gap:12px;margin:18px 0 6px;font-size:12.5px;color:var(--muted)}
+  .appbar button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:5px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  .appbar button.ghost{background:var(--paper);color:var(--accent)}
+  .appbar button:disabled{opacity:.6;cursor:default}
+  .trimnote{font-size:11.5px;color:var(--warn);line-height:1.5}
+  .trimnote:empty{display:none}
+  @keyframes flashIn{0%{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}100%{}}
+  input.flash{animation:flashIn 1.2s ease-out}
+  /* cut & stack mode (different quantity per type, no kits) */
+  body:not(.stackmode) .stack-only{display:none}
+  body.stackmode .kit-only{opacity:.38;pointer-events:none;filter:grayscale(1)}
+  .stackbadge{display:none;background:var(--accent);color:#fff;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:600;margin-inline-start:10px}
+  body.stackmode .stackbadge{display:inline-block}
+  .pile{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line2);font-size:12px}
+  .pile .pn{flex:none;min-width:22px;height:22px;border-radius:6px;background:var(--accent);color:#fff;font-weight:700;display:grid;place-items:center;font-family:var(--mono)}
+  .pile .pc{line-height:1.6}
+  .pile .run{display:inline-block;margin-inline-end:8px;white-space:nowrap}
+  .pile .run i{font-style:normal;display:inline-block;width:9px;height:9px;border-radius:2px;margin-inline-end:4px;vertical-align:-1px}
+  .vline{width:1px;align-self:stretch;background:var(--line);margin:2px 2px}
+
+  /* main layout: big live canvas on the LEFT, file/separator controls on the RIGHT */
+  /* desk: main (settings + canvas) on the right, tall "עמודים" frame on the left */
+  .desk{display:grid;grid-template-columns:300px minmax(0,1fr) 300px;gap:18px;align-items:stretch}
+  @media(max-width:1350px){.desk{grid-template-columns:300px minmax(0,1fr)}.summary-col{grid-column:1 / -1;order:3}}
+  @media(max-width:980px){.desk{grid-template-columns:1fr}}
+  .main-col{display:flex;flex-direction:column;gap:18px;min-width:0}
+  .canvas-col{display:flex;flex-direction:column;gap:14px}
+  .pages-col{min-width:0;padding-top:10px;order:-1}
+  .summary-col{min-width:0;padding-top:10px;order:3}
+  .summary-frame{padding:22px 12px 12px}
+  /* summary in a narrow column: stack the boxes */
+  .summary-frame .readout{padding:6px 2px;background:transparent;border:none;box-shadow:none}
+  .summary-frame .readout .statgrid{grid-template-columns:repeat(3,1fr);gap:6px}
+  .summary-frame .readout .statbox{padding:8px 4px}
+  .summary-frame .readout .threerow{grid-template-columns:1fr 1fr}
+  .summary-frame .readout .threerow .framed:last-child{grid-column:1 / -1}
+  .summary-frame .readout .kitinfo{grid-template-columns:1fr;gap:10px}
+  .summary-frame .readout .kitinfo-l{border-inline-start:none;padding-inline-start:0;border-top:1px solid var(--line2);padding-top:10px}
+  .pages-frame{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:22px 0 12px;box-shadow:var(--shadow);height:100%}
+  .pages-frame .panel{background:transparent;border:none;box-shadow:none;border-radius:0;margin:0;
+    border-top:1px solid var(--line2)}
+  .pages-frame .panel:first-of-type{border-top:none}
+  .pages-frame>.btn,.pages-frame>.prog{margin-inline:16px;width:calc(100% - 32px)}
+  /* frame titles sit on the border line (fieldset style) */
+  .frame-title,.sgroup-title{position:absolute;top:-10px;inset-inline-start:22px;
+    background:var(--bg,#e8ebed);padding:0 8px;font-size:13px;font-weight:700;color:var(--ink);
+    line-height:20px;margin:0}
+
+  .panel{background:#fff;border:1px solid var(--brand-line);border-radius:10px;
+    box-shadow:var(--shadow);overflow:hidden}
+  .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted);margin:0;padding:14px 16px 0;font-weight:700}
+  .panel .body{padding:16px}
+
+  label.field{display:block;margin-bottom:14px}
+  label.field .lab{font-size:13px;font-weight:600;margin-bottom:5px;display:block}
+  label.field .hint{font-size:11px;color:var(--muted);font-weight:400}
+  input[type=number],select{width:100%;padding:9px 10px;border:1px solid var(--brand-70);
+    border-radius:7px;font-size:15px;font-family:var(--mono);background:var(--brand-08);
+    color:var(--ink);text-align:left;direction:ltr}
+  input[type=number]:focus,select:focus{outline:2px solid var(--accent);
+    outline-offset:-1px;border-color:var(--accent)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .chkline{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer}
+  .chkline input{width:17px;height:17px;accent-color:var(--accent)}
+  .chkline .hint{font-size:11px;color:var(--muted);font-weight:400}
+  .rowswap{display:grid;grid-template-columns:1fr 34px 1fr;gap:8px;align-items:end}
+  .sizerow{display:grid;grid-template-columns:34px 1fr 34px 1fr;gap:8px;align-items:center}
+  .sizerow input{width:100%;padding:9px 10px;border:1px solid var(--brand-70);border-radius:7px;
+    font-size:15px;font-family:var(--mono);background:var(--brand-08);color:var(--ink);
+    text-align:center;direction:ltr}
+  .sizerow input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+  .wxh-hint{display:grid;grid-template-columns:34px 1fr 34px 1fr;gap:8px;margin-top:3px;margin-bottom:12px}
+  .wxh-hint span:nth-child(1){grid-column:2;text-align:center;font-size:10px;color:var(--muted)}
+  .wxh-hint span:nth-child(2){grid-column:4;text-align:center;font-size:10px;color:var(--muted)}
+  .preset-wrap{position:relative}
+  .preset-btn{width:34px;height:40px;border:1px solid var(--brand-70);border-radius:7px;
+    background:var(--brand-08);cursor:pointer;font-size:15px;color:var(--accent);padding:0}
+  .preset-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .preset-menu{position:absolute;top:44px;right:0;z-index:20;min-width:180px;background:#fff;
+    border:1px solid var(--brand-70);border-radius:9px;box-shadow:0 8px 24px rgba(20,60,80,.18);
+    padding:5px;display:none}
+  .preset-menu.open{display:block}
+  .preset-menu .pm-item{display:flex;align-items:center;gap:8px;
+    padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;font-family:var(--mono)}
+  .preset-menu .pm-item .pm-pick{flex:1}
+  .preset-menu .pm-item:hover{background:var(--brand-08)}
+  .preset-menu .pm-star{cursor:pointer;color:#e0a800;font-size:15px;line-height:1;flex-shrink:0}
+  .preset-menu .pm-del{color:var(--warn);font-weight:700;cursor:pointer;padding:0 4px;opacity:.6}
+  .preset-menu .pm-del:hover{opacity:1}
+  .preset-menu .pm-add{display:flex;gap:5px;padding:7px 6px 4px;border-top:1px solid var(--line2);margin-top:4px}
+  .preset-menu .pm-add input{width:100%;padding:6px;border:1px solid var(--brand-70);border-radius:6px;
+    font-size:12px;font-family:var(--mono);text-align:center;direction:ltr}
+  .preset-menu .pm-add button{padding:6px 10px;border:none;border-radius:6px;background:var(--accent);
+    color:#fff;font-weight:700;cursor:pointer;font-size:13px}
+  .swapbtn{width:34px;height:40px;border:1px solid var(--brand-70);border-radius:7px;
+    background:var(--brand-08);cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:.12s;padding:0}
+  .swapbtn:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .swapbtn svg{width:18px;height:18px}
+
+  .drop{border:2px dashed var(--brand-70);border-radius:9px;padding:22px 14px;
+    text-align:center;cursor:pointer;transition:.15s;background:var(--brand-08);
+    display:flex;flex-direction:column;align-items:center;gap:6px}
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  .drop .pdficon{width:34px;height:34px;flex-shrink:0}
+  .drop .big{font-size:14px;font-weight:600}
+  .drop .small{font-size:11.5px;color:var(--muted)}
+
+  .types{margin-top:12px;display:flex;flex-direction:column;gap:6px;
+    max-height:260px;overflow-y:auto}
+  /* widenable file list: grows to the left as an overlay, nothing else moves */
+  .pages-frame .panel{overflow:visible}          /* let the widened list float over the canvas */
+  .types-wrap{position:relative;margin-top:12px}
+  .types-wrap .types{margin-top:0}
+  .types-grip{position:absolute;top:0;bottom:0;inset-inline-end:-10px;width:10px;cursor:ew-resize;
+    display:flex;align-items:center;justify-content:center;z-index:41}
+  .types-grip span{width:4px;height:38px;border-radius:3px;background:var(--line);transition:.12s}
+  .types-grip:hover span,.types-wrap.dragging .types-grip span{background:var(--accent)}
+  .types-reset{display:none;position:absolute;top:-14px;inset-inline-end:0;z-index:42;
+    border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:7px;
+    padding:2px 9px;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;box-shadow:0 2px 6px rgba(24,32,36,.12)}
+  .types-wrap.wide .types-reset{display:block;inset-inline-end:auto;left:calc(100% - var(--tw))}
+  .types-wrap.wide .types{position:absolute;top:0;right:0;width:var(--tw);z-index:40;
+    background:#e8ebed;border:1px solid var(--accent);border-radius:10px;padding:8px;margin-top:0;
+    box-shadow:0 10px 30px rgba(24,32,36,.22)}
+  .types-wrap.wide .types-grip{inset-inline-end:auto;left:calc(100% - var(--tw) - 10px)}
+  .types-wrap.dragging{user-select:none}
+  .type-row{display:flex;align-items:center;gap:9px;padding:6px 8px;
+    border:1px solid var(--line2);border-radius:7px;background:var(--brand-08);font-size:13px}
+  .type-row .idx{font-family:var(--mono);font-size:9px;color:#fff;background:var(--accent);
+    min-width:15px;height:15px;border-radius:4px;display:flex;align-items:center;
+    justify-content:center;font-weight:700;flex-shrink:0}
+  .type-row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:left}
+  .type-row .draghandle{cursor:grab;color:var(--muted);font-size:14px;flex-shrink:0;
+    user-select:none;letter-spacing:-1px}
+  .type-row .pgcount{flex-shrink:0;font-family:var(--mono);font-size:9px;color:#fff;
+    background:var(--muted);border-radius:3px;padding:1px 3px;font-weight:600}
+  .type-row.dragging{opacity:.5}
+  .type-row.dragover{border-color:var(--accent);box-shadow:0 -2px 0 var(--accent) inset}
+  .type-row .x{cursor:pointer;color:var(--warn);font-weight:700;padding:0 4px;flex-shrink:0}
+  .type-row.bad{border-color:var(--warn);background:#fbeee8}
+  .type-row.qwarn{border-color:#ee8a1c;background:#fff1df}
+  .type-row.qwarn{flex-wrap:wrap}
+  .type-row .qflag{display:flex;align-items:center;gap:6px;order:10;flex-basis:100%;padding-inline-start:30px;font-size:11.5px;color:#b35c00}
+  .type-row .qflag:empty{display:none}
+  .qflag button{border:1px solid #ee8a1c;border-radius:6px;font:inherit;font-size:11px;line-height:1;
+    padding:4px 6px;cursor:pointer;white-space:nowrap}
+  .qflag .qfix{background:#ee8a1c;color:#fff;font-weight:600}
+  .qflag .qok{background:#fff;color:#1b7a45;border-color:#1b7a45;font-weight:700}
+  .qflag .qfix:hover{background:#d6730b}
+  .qflag .qok:hover{background:#1b7a45;color:#fff}
+  .qtywarn{border:1.5px solid #ee8a1c;background:#fff6ea;border-radius:10px;padding:9px 10px;margin:0 0 10px;font-size:12px}
+  .qtywarn:empty{display:none}
+  .qtywarn .qw-head{font-weight:700;color:#b35c00;margin-bottom:6px}
+  .qtywarn .qw-row{display:flex;align-items:center;gap:6px;padding:3px 0;border-top:1px dashed #f3c48a}
+  .qtywarn .qw-n{font-family:var(--mono);font-size:10px;font-weight:700;color:#fff;background:#ee8a1c;border-radius:4px;min-width:16px;text-align:center}
+  .qtywarn .qw-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:left}
+  .qtywarn .qw-v{flex-shrink:0;color:#b35c00;font-weight:600}
+  .qtywarn .qw-more,.qtywarn .qw-tip{color:var(--muted);font-size:11px;margin-top:4px}
+
+  .type-row .thumb{width:34px;height:24px;object-fit:contain;background:#fff;border:1px solid var(--brand-70);
+    border-radius:3px;flex-shrink:0;background:#fff}
+
+  /* mode tabs */
+  .modetabs{display:flex;gap:6px;margin-bottom:14px;background:var(--brand-08);
+    padding:4px;border-radius:9px;border:1px solid var(--brand-70)}
+  .modetab{flex:1;text-align:center;padding:8px 6px;border-radius:6px;cursor:pointer;
+    font-size:13px;font-weight:600;color:var(--muted);transition:.12s}
+  .modetab.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(20,60,80,.12)}
+  /* sided radio row */
+  .sided{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0}
+  .sided label{display:flex;align-items:center;gap:5px;padding:8px 8px;
+    border:1px solid var(--brand-70);border-radius:7px;cursor:pointer;font-size:12px;
+    background:var(--brand-08);transition:.12s;justify-content:center}
+  .sided label.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+  .sided input{accent-color:var(--accent)}
+  /* repeater rows */
+  .rep-head{display:grid;grid-template-columns:22px 1fr 1fr 54px;gap:8px;font-size:11px;
+    color:var(--muted);font-weight:700;padding:0 2px 6px;text-align:center}
+  .rep-row{display:grid;grid-template-columns:22px 1fr 1fr 54px;gap:8px;align-items:center;
+    margin-bottom:8px}
+  .rep-row .ridx{font-family:var(--mono);font-size:11px;color:#fff;background:var(--accent);
+    width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+    font-weight:700}
+  .slot{border:1.5px dashed var(--brand-70);border-radius:7px;background:var(--brand-08);
+    min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;font-size:10.5px;color:var(--muted);text-align:center;padding:3px;
+    transition:.12s;overflow:hidden;position:relative}
+  .slot:hover,.slot.over{border-color:var(--accent);background:var(--accent-soft)}
+  .slot.filled{border-style:solid;border-color:var(--accent)}
+  .slot img{max-width:100%;max-height:38px;object-fit:contain}
+  .slot .slotx{position:absolute;top:1px;left:2px;color:var(--warn);font-weight:700;
+    font-size:12px;cursor:pointer;background:#fff;border-radius:3px;line-height:1;padding:0 2px}
+  .rep-same{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;color:var(--muted)}
+  .rep-same input{accent-color:var(--accent);width:16px;height:16px}
+  .rep-row.disabledback .slot.backslot{opacity:.4;pointer-events:none}
+  .rep-del{grid-column:1/-1;justify-self:start;font-size:11px;color:var(--warn);cursor:pointer;
+    background:none;border:none;padding:2px 0;margin-top:-2px}
+  .rep-qty{width:100%;min-width:56px;padding:6px 6px;border:1px solid var(--brand-70);border-radius:6px;
+    font-family:var(--mono);font-size:14px;text-align:center;direction:ltr;background:var(--brand-08)}
+  .type-row .tqty{flex:0 0 60px;height:30px}
+  /* page-picker modal */
+  .pp-overlay{position:fixed;inset:0;background:rgba(20,40,50,.55);z-index:100;
+    display:none;align-items:center;justify-content:center;padding:20px}
+  .pp-overlay.on{display:flex}
+  .pp-modal{background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:85vh;
+    display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .pp-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;
+    border-bottom:1px solid var(--line2);font-weight:700}
+  .pp-close{border:none;background:none;font-size:18px;cursor:pointer;color:var(--muted)}
+  .pp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;
+    padding:16px 18px;overflow-y:auto}
+  .pp-item{border:2px solid var(--brand-70);border-radius:8px;cursor:pointer;overflow:hidden;
+    background:var(--brand-08);transition:.12s;display:flex;flex-direction:column}
+  .pp-item:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .pp-item img{width:100%;display:block;background:#fff}
+  .pp-item .pp-n{text-align:center;font-size:12px;font-weight:600;padding:5px;color:var(--ink)}
+  /* custom-split editor */
+  .cs-wrap{padding:20px;overflow:auto;display:flex;justify-content:center}
+  .cs-grid{display:grid;gap:0;direction:rtl}
+  .cs-cell{border:1px solid var(--brand-70);background:var(--brand-08);cursor:pointer}
+  .cs-cell:hover{background:var(--accent-soft)}
+  .cs-cell.ignored{background:#f3f3f3;border-style:dashed;
+    background-image:linear-gradient(45deg,transparent 45%,#c0392b 45%,#c0392b 55%,transparent 55%)}
+  .cs-gapV{cursor:pointer;background:transparent}
+  .cs-gapV:hover{background:rgba(192,57,43,.18)}
+  .cs-gapV.on{background:#c0392b}
+  .cs-gapH{cursor:pointer;background:transparent}
+  .cs-gapH:hover{background:rgba(192,57,43,.18)}
+  .cs-gapH.on{background:#c0392b}
+  .cs-corner{background:transparent}
+  .cs-corner.on{background:#c0392b}
+  .addrow{width:100%;padding:9px;border:1px dashed var(--brand-70);border-radius:7px;
+    background:var(--brand-08);cursor:pointer;font-size:13px;font-weight:600;color:var(--accent);
+    margin-top:4px}
+  .addrow:hover{background:var(--accent-soft)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;padding:12px;border:none;border-radius:8px;font-size:15px;font-weight:700;
+    cursor:pointer;transition:.15s}
+  .btn .bicon{width:24px;height:24px;flex-shrink:0}
+  .btn.primary{background:var(--accent);color:#fff;padding:18px;font-size:18px;
+    border-radius:10px;box-shadow:0 3px 12px rgba(47,159,196,.35)}
+  .btn.primary:hover{background:var(--accent-deep);box-shadow:0 4px 16px rgba(123,63,228,.35)}
+  .btn.primary:disabled{background:#c6cdd8;color:#eef1f5;cursor:not-allowed;box-shadow:none}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--brand-70);margin-top:9px}
+  .btn.ghost:hover{background:var(--brand-08)}
+
+  /* summary readout — white bg, brand border, black text */
+  .readout{background:#fff;color:#111;border-radius:10px;padding:16px 18px;
+    font-family:var(--sans);font-size:13.5px;line-height:1.75;border:1.5px solid var(--brand-70)}
+  .readout .k{color:#4a5a60}
+  .readout .v{color:#000;font-weight:700}
+  .readout .big{font-size:22px;color:#1c7fa0}
+  .readout hr{border:none;border-top:1px solid var(--brand-70);margin:10px 0}
+  .readout .warnline{color:#a4451f;font-size:12px}
+  .readout .framed{border:1.5px solid var(--brand-solid);border-radius:7px;padding:8px 11px;
+    margin:4px 0;background:var(--brand-08)}
+  .readout .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+  .readout .statbox{border:1.5px solid var(--brand-solid);border-radius:8px;
+    background:var(--brand-08);padding:9px 8px;text-align:center}
+  .readout .statbox .sk{display:block;font-size:11px;color:#4a5a60;margin-bottom:3px;
+    font-family:var(--sans)}
+  .readout .statbox .sv{display:block;font-size:22px;font-weight:700;color:#000}
+  .readout .tworow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .readout .tworow .framed{margin:0;text-align:center}
+  .readout .threerow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .readout .threerow .framed{margin:0;text-align:center;padding:8px 6px}
+  .readout .threerow .framed:last-child{background:var(--brand-solid);border-color:var(--accent-deep)}
+  .readout .threerow .framed:last-child .k{color:#fff;font-weight:700}
+  .readout .threerow .framed:last-child .big{color:#fff}
+  .readout .kitinfo{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;align-items:start}
+  .readout .kitinfo-r>div{margin-bottom:3px}
+  .readout .kitinfo-l{border-inline-start:1px solid var(--brand-70);padding-inline-start:12px}
+  .packheight{margin-top:12px;padding:10px 12px;background:var(--brand-08);
+    border:1px solid var(--brand-70);border-radius:8px;font-family:var(--sans);
+    font-size:12.5px;text-align:center;line-height:1.6}
+  .packheight .k{color:#4a5a60}
+  .packheight .v{color:#000;font-weight:700}
+
+  .preview-head{display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:12px}
+  .prev-head-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}
+  .preview-head .t{font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted);font-weight:700}
+  .pager{display:flex;align-items:center;gap:14px}
+  .pgbtn{width:38px;height:38px;border:none;border-radius:10px;
+    background:var(--accent);cursor:pointer;font-size:24px;line-height:1;color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;
+    box-shadow:0 2px 6px rgba(123,63,228,.35);transition:.12s}
+  .pgbtn:hover{background:var(--accent-deep)}
+  .pgbtn:disabled{background:#c9d0d5;box-shadow:none;cursor:not-allowed}
+  .pglabel{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--ink);min-width:70px;text-align:center}
+  /* canvas header: no title, pager centred */
+  .canvas-col .prev-head-bar{justify-content:center;padding:10px 16px 8px}
+  .canvas-col .prev-head-bar .pager{flex:1;justify-content:space-between}
+  .pg-grp{display:flex;gap:8px}
+  .canvas-col .prev-head-bar #canvasTitle{display:none}
+  .pgcaption{font-size:12px;color:var(--muted);text-align:center;margin-top:8px;min-height:16px;font-weight:600}
+  .stack-note{font-size:12px;color:var(--muted);margin-bottom:14px;background:var(--accent-soft);
+    border-right:3px solid var(--accent);padding:8px 11px;border-radius:5px}
+  /* שולחן table surface behind the sheet */
+  .canvas-body{background:#d6dce0;border-radius:0 0 12px 12px}
+  .sheet-preview{width:100%;aspect-ratio:var(--ar,1.414);background:#fff;
+    border:1px solid #b9c2c8;border-radius:4px;position:relative;
+    box-shadow:0 2px 6px rgba(24,32,36,.18),0 10px 28px rgba(24,32,36,.12)}
+  /* type selector strip */
+  .typestrip-head{display:flex;align-items:baseline;justify-content:space-between;padding:12px 16px 0}
+  .typestrip-title{font-weight:600;font-size:13px;color:var(--ink)}
+  .typestrip-hint{font-size:11px;color:var(--muted)}
+  .typestrip{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px 14px}
+  .tchip{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);
+    border-radius:9px;padding:5px 7px 5px 10px;cursor:pointer;transition:.12s;min-width:0}
+  .tchip:hover{border-color:var(--muted)}
+  .tchip.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent)}
+  .tchip .tnum{font-family:var(--mono);font-size:10px;font-weight:700;color:#fff;background:var(--accent);
+    width:17px;height:17px;border-radius:5px;display:grid;place-items:center;flex:none}
+  .tchip img{width:26px;height:26px;border-radius:5px;object-fit:cover;border:1px solid var(--line);flex:none;background:#fff}
+  .tchip .tnm{font-size:12px;color:var(--ink);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tchip .tpg{font-family:var(--mono);font-size:10px;color:var(--muted);flex:none}
+  .tchip.allchip .tnum{background:var(--muted)}
+  .tchip.allchip.on .tnum{background:var(--accent)}
+  svg.sheet{width:100%;height:100%;display:block}
+
+  .stack-list{margin-top:16px;border:1px solid var(--brand-70);border-radius:8px;overflow:hidden}
+
+  /* separator colour swatches — compact modern chips; selected one shows a soft ring in its own colour */
+  .swatches{display:flex;gap:8px;flex-wrap:nowrap;margin-top:8px}
+  /* colour chip = colour dot inside a white frame (modern) */
+  .swatch{flex:1 1 0;min-width:0;aspect-ratio:1/1;max-width:38px;border-radius:10px;cursor:pointer;
+    position:relative;border:none;transition:transform .12s,box-shadow .12s;overflow:visible;
+    background-clip:padding-box;border:3px solid #fff;
+    box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(24,32,36,.10)}
+  .swatch .frm{position:absolute;inset:0;border-style:solid;border-width:0;border-radius:7px;
+    background:transparent;transition:.12s}
+  .swatch:hover{transform:translateY(-2px);
+    box-shadow:0 0 0 1px var(--line),0 4px 10px rgba(24,32,36,.20)}
+  /* selected: the white frame stays, outer ring turns the swatch's own colour + a small check */
+  .swatch.sel{box-shadow:0 0 0 2px currentColor,0 2px 6px rgba(24,32,36,.18)}
+  .swatch.sel::after{content:'';position:absolute;inset:0;margin:auto;width:12px;height:12px;
+    border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.28)}
+  .swatch.none{background:#fff;border-color:#fff;
+    box-shadow:0 0 0 1px var(--brand-70);
+    display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted)}
+  .swatch.none:hover{box-shadow:0 0 0 1px var(--accent),0 4px 10px rgba(24,32,36,.14)}
+  .swatch.none.sel{box-shadow:0 0 0 2px var(--accent);color:var(--accent)}
+  .swatch.none.sel::after{display:none}
+  .sep-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}
+  .linew{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:600}
+  .linew input{width:52px;padding:5px 6px;border:1px solid var(--brand-70);border-radius:6px;
+    font-family:var(--mono);font-size:13px;text-align:left;direction:ltr;background:var(--brand-08)}
+  .linew .u{font-size:10px}
+  .stack-list .sr{display:flex;align-items:center;gap:10px;padding:7px 12px;font-size:13px;
+    border-bottom:1px solid var(--line2)}
+  .stack-list .sr:last-child{border-bottom:none}
+  .stack-list .sr.white{background:#f4f4f2;color:var(--muted);font-style:italic}
+  .stack-list .sr .n{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:34px}
+  .stack-list .sr .cnt{margin-right:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .empty{padding:50px 20px;text-align:center;color:var(--muted);font-size:14px}
+  .prog{display:none;margin-top:14px}
+  .prog.on{display:block}
+  .bar{height:6px;background:var(--line2);border-radius:3px;overflow:hidden}
+  .bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  .prog .lab{font-size:12px;color:var(--muted);margin-top:6px;font-family:var(--mono)}
+  .foot{font-size:11px;color:var(--muted);margin-top:22px;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <h1>סידור קיטים<span class="stackbadge">חיתוך וערימה · כמויות שונות</span></h1>
+    <label class="jobname-wrap"><span>שם העבודה</span>
+      <input type="text" id="jobName" placeholder="לדוגמה SO26006982" autocomplete="off" spellcheck="false"></label>
+  </header>
+
+  <!-- ============ SETTINGS STRIP (two rows) ============ -->
+  <div class="desk">
+    <!-- ===== MAIN: settings + canvas ===== -->
+    <div class="main-col">
+    <div class="settings-strip">
+      <!-- הגדרות הקיט (ימין) -->
+      <div class="sgroup">
+        <div class="sgroup-title">הגדרות הקיט</div>
+        <div class="sgroup-body rows">
+          <div class="srow1">
+          <div class="sg">
+            <span class="sglab">גודל גרפיקה <span class="hint">ס״מ (ר×ג)</span></span>
+            <div class="sg-inputs">
+              <div class="preset-wrap">
+                <button class="preset-btn" id="gPresetBtn" type="button" title="גדלים מוכנים">☰</button>
+                <div class="preset-menu" id="gPresetMenu"></div>
+              </div>
+              <input type="number" id="gw" value="10" step="0.1" min="1" title="רוחב">
+              <button class="swapbtn" id="swapG" title="החלף רוחב↔גובה" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7b3fe4" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3 4 7l4 4"/><path d="M4 7h12"/><path d="m16 21 4-4-4-4"/><path d="M20 17H8"/>
+                </svg>
+              </button>
+              <input type="number" id="gh" value="7" step="0.1" min="1" title="גובה">
+            </div>
+          </div>
+          <div class="sg">
+            <span class="sglab">גלישה (bleed) <span class="hint">מ״מ</span></span>
+            <div class="sg-inputs"><input type="number" id="bleed" value="0" step="0.5" min="0"></div>
+          </div>
+          <div class="sg">
+            <span class="sglab">גלישה אוטומטית מהקובץ</span>
+            <label class="switch" title="משתמש בגלישה הבנויה ב-PDF"><input type="checkbox" id="autoBleed" checked><span class="slider"></span></label>
+          </div>
+          </div>
+          <div class="srow1">
+          <div class="sg">
+            <span class="sglab">כמות מכל סוג <span class="hint">יחידות</span></span>
+            <div class="sg-inputs"><input type="number" id="perType" value="5" min="1" step="1"></div>
+          </div>
+          <div class="sg kit-only">
+            <span class="sglab">כמות קיטים סה״כ</span>
+            <div class="sg-inputs"><input type="number" id="totalKits" value="100" min="1" step="1"></div>
+          </div>
+          </div>
+        <div class="trimnote" id="trimNote"></div>
+        </div>
+      </div>
+  
+      <!-- קבוצת גיליון (שמאל) -->
+      <div class="sgroup sgroup-sheet">
+        <div class="sgroup-title">הגדרות הגיליון</div>
+        <div class="sgroup-body rows">
+          <div class="srow1">
+          <div class="sg">
+            <span class="sglab">גודל גיליון <span class="hint">ס״מ (ר×ג)</span></span>
+            <div class="sg-inputs">
+              <div class="preset-wrap">
+                <button class="preset-btn" id="sPresetBtn" type="button" title="גדלים מוכנים">☰</button>
+                <div class="preset-menu" id="sPresetMenu"></div>
+              </div>
+              <input type="number" id="sheetW" value="29.7" step="0.1" min="5" title="רוחב">
+              <button class="swapbtn" id="swapS" title="החלף רוחב↔גובה" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7b3fe4" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3 4 7l4 4"/><path d="M4 7h12"/><path d="m16 21 4-4-4-4"/><path d="M20 17H8"/>
+                </svg>
+              </button>
+              <input type="number" id="sheetH" value="42" step="0.1" min="5" title="גובה">
+            </div>
+          </div>
+          <div class="sg">
+            <span class="sglab" title="שוליים מהקצה, במ״מ">שוליים</span>
+            <div class="sg-inputs"><input type="number" id="margin" value="5" step="0.5" min="0" title="מ״מ מכל כיוון"></div>
+          </div>
+          <div class="vline"></div>
+          <div class="sg">
+            <span class="sglab">סימני חיתוך</span>
+            <label class="switch" title="סימני חיתוך לגיליוטינה"><input type="checkbox" id="marks" checked><span class="slider"></span></label>
+          </div>
+          <div class="sg">
+            <span class="sglab">חיתוך אחד</span>
+            <label class="switch" title="0 מרווח בין הגרפיקות"><input type="checkbox" id="singleCut" checked><span class="slider"></span></label>
+          </div>
+          <div class="sg" id="gapField" style="display:none">
+            <span class="sglab">מרווחים <span class="hint">ס״מ</span></span>
+            <div class="sg-inputs"><input type="number" id="gap" value="0.5" step="0.1" min="0"></div>
+          </div>
+          </div>
+          <div class="sep-row">
+            <div class="sg cpick" data-which="types">
+              <span class="sglab">מפריד בין סוגים</span>
+              <div class="cpick-row">
+                <div class="cchip" data-pick="color" title="צבע המפריד"><span class="cdot"></span><button class="ccaret" type="button" title="כל הצבעים">▾</button></div>
+              </div>
+              <div class="cpop swatches" id="sw-types"></div>
+            </div>
+            <div class="sg cpick kit-only" data-which="kits">
+              <span class="sglab">מפריד קיטים</span>
+              <div class="cpick-row">
+                <div class="cchip" data-pick="color" title="צבע המפריד"><span class="cdot"></span><button class="ccaret" type="button" title="כל הצבעים">▾</button></div>
+              </div>
+              <div class="cpop swatches" id="sw-kits"></div>
+            </div>
+            <div class="sg">
+              <span class="sglab">עובי מפריד <span class="hint">ס״מ</span></span>
+              <div class="sg-inputs"><input type="number" id="frameW" value="1.5" step="0.5" min="0.5" style="width:64px"></div>
+            </div>
+            <div class="sg">
+              <span class="sglab">ללא מפריד</span>
+              <label class="switch" title="ללא דף מפריד בין סוגים"><input type="checkbox" id="noTypeSep"><span class="slider"></span></label>
+            </div>
+            <div class="sg stack-only">
+              <span class="sglab">דף מספור</span>
+              <label class="switch" title="גיליון ראשון עם מספר לכל ערימה, כדי לדעת מה מניחים על מה"><input type="checkbox" id="numPages" checked><span class="slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+      <div class="canvas-col">
+  
+        <div class="panel">
+          <div class="prev-head-bar">
+            <h2 style="padding:0" id="canvasTitle">הגיליון המלא</h2>
+            <div class="pager" id="pager" style="display:none">
+              <div class="pg-grp">
+                <button class="pgbtn" id="pgFirst" type="button" title="לעמוד הראשון"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6l6 6-6 6"/><path d="M12 6l6 6-6 6"/></svg></button>
+                <button class="pgbtn" id="pgPrev" type="button" title="הקודם"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+              </div>
+              <span class="pglabel" id="pglabel">1 מתוך 1</span>
+              <div class="pg-grp">
+                <button class="pgbtn" id="pgNext" type="button" title="הבא"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+                <button class="pgbtn" id="pgLast" type="button" title="לעמוד האחרון"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6 6 6"/><path d="M19 6l-6 6 6 6"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="body canvas-body">
+            <span class="t" id="ptitle" style="display:none">—</span>
+            <div class="sheet-preview" id="sheetbox">
+              <div class="empty">התצוגה תופיע לאחר טעינת קבצים</div>
+            </div>
+            <div class="pgcaption" id="pgcaption"></div>
+            <div class="stack-list" id="stacklist"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGES (tall, right) ===== -->
+    <div class="pages-col">
+      <div class="pages-frame">
+        <div class="frame-title">עמודים</div>
+        <button class="clearall on-border" id="clearAll" type="button" title="מחיקת כל הקבצים שנטענו">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                <span>נקה הכל</span></button>
+          <div class="panel">
+            <div class="body">
+              <div class="modetabs">
+                <div class="modetab on" id="tab-multi" data-mode="multi">קובץ מרובה עמודים</div>
+                <div class="modetab" id="tab-rep" data-mode="rep">רפיטר (קדמי/אחורי)</div>
+              </div>
+    
+              <!-- MODE A: multipage / single files -->
+              <div id="mode-multi">
+                <div class="sided">
+                  <label class="on" id="sd-single"><input type="radio" name="sided" value="single" checked>חד-צדדי</label>
+                  <label id="sd-dup"><input type="radio" name="sided" value="dup">דו-צדדי זהה</label>
+                  <label id="sd-fixedb"><input type="radio" name="sided" value="fixedb">צד B קבוע</label>
+                  <label id="sd-pair"><input type="radio" name="sided" value="pair">דו-צדדי מזווג</label>
+                </div>
+                <!-- fixed B-side slot (only shown in fixedb mode) -->
+                <div id="fixedb-wrap" style="display:none;margin-bottom:12px">
+                  <div class="lab" style="font-size:12.5px;font-weight:600;margin-bottom:5px">צד B הקבוע (גב אחיד לכל הסוגים)</div>
+                  <div class="slot backslot" id="fixedb-slot" style="min-height:56px">צד B — גררו או לחצו</div>
+                  <input type="file" id="fixedbfile" accept="application/pdf" hidden>
+                </div>
+                <div class="drop" id="drop">
+                  <svg class="pdficon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"
+                      fill="#fff" stroke="#7b3fe4" stroke-width="1.4"/>
+                    <path d="M14 2v4h4" stroke="#7b3fe4" stroke-width="1.4" fill="none"/>
+                    <rect x="6.5" y="12.5" width="11" height="6.2" rx="1.2" fill="#e2453a"/>
+                    <text x="12" y="17.4" text-anchor="middle" font-size="4.4" font-weight="700"
+                      fill="#fff" font-family="Arial">PDF</text>
+                  </svg>
+                  <div class="big">גררו קבצי PDF לכאן</div>
+                  <div class="small" id="dropsub">או לחצו לבחירה · הסדר = סדר הטעינה</div>
+                </div>
+                <input type="file" id="file" accept="application/pdf" multiple hidden>
+                <label class="chkline" style="margin-top:10px">
+                  <input type="checkbox" id="multiQtyPer">
+                  <span>כמות שונה לכל סוג <span class="hint">שדה כמות לכל קובץ</span></span>
+                </label>
+                <div class="types-wrap" id="typesWrap">
+                  <div class="types" id="types"></div>
+                  <div class="types-grip" id="typesGrip" title="גררי שמאלה כדי להרחיב את הרשימה"><span></span></div>
+                  <button class="types-reset" id="typesReset" type="button" title="החזרה לרוחב הרגיל">↺ החזר</button>
+                </div>
+              </div>
+    
+              <!-- MODE B: repeater -->
+              <div id="mode-rep" style="display:none">
+                <label class="chkline" style="margin-bottom:10px">
+                  <input type="checkbox" id="repQtyPer">
+                  <span>כמות שונה לכל סוג <span class="hint">כמות נפרדת בכל שורה</span></span>
+                </label>
+                <div class="rep-head" id="rep-head"><span></span><span>קדמי</span><span>אחורי</span><span>זהה</span></div>
+                <div id="rep-list"></div>
+                <button class="addrow" id="addrow" type="button">+ הוסף סוג</button>
+                <input type="file" id="repfile" accept="application/pdf" hidden>
+              </div>
+            </div>
+          </div>
+    
+          <div class="panel kit-only" style="margin-bottom:0">
+            <div class="body" style="padding:12px 16px">
+              <label class="field" style="margin-bottom:0">
+                <span class="lab">פיצול קיט <span class="hint">לקיט גבוה שקשה לחתוך בבת אחת</span></span>
+                <select id="kitSplit">
+                  <option value="1">ללא פיצול</option>
+                  <option value="2">פצל ל-2</option>
+                  <option value="4">פצל ל-4</option>
+                  <option value="custom">פיצול מותאם אישית…</option>
+                </select>
+              </label>
+              <label class="field" id="splitMethodField" style="margin:10px 0 0;display:none">
+                <span class="lab">שיטת פיצול</span>
+                <select id="splitMethod">
+                  <option value="pages">לפי עמודים (חלוקה שווה)</option>
+                  <option value="types">לפי סוגים (חבילות של סוגים שלמים)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+    
+          <button class="btn primary" id="go" disabled>
+            <svg class="bicon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="7" width="14" height="12" rx="1.5" fill="#fff" opacity=".35"/>
+              <rect x="6" y="5" width="14" height="12" rx="1.5" fill="#fff" opacity=".6"/>
+              <rect x="8" y="3" width="13" height="12" rx="1.5" fill="#fff"/>
+              <path d="M11 9h7M11 11.5h7M11 6.5h4" stroke="#7b3fe4" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            <span id="goLabel">יצירת PDF — קיט בודד</span>
+          </button>
+          <div class="prog" id="prog">
+            <div class="bar"><i id="barfill"></i></div>
+            <div class="lab" id="proglab">מעבד…</div>
+          </div>
+    
+      </div>
+    </div>
+
+    <!-- ===== SUMMARY (left) ===== -->
+    <div class="summary-col">
+      <div class="pages-frame summary-frame">
+        <div class="frame-title">סיכום העבודה</div>
+            <div class="panel">
+              
+              <div class="body">
+                <div class="qtywarn" id="qtyWarn"></div>
+                <div class="readout" id="readout">
+                  <div class="empty" style="padding:20px 0;color:#5c6a70">טענו קבצים כדי לחשב</div>
+                </div>
+              </div>
+            </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="appbar" id="appbar" hidden>
+    <span id="appver"></span>
+    <span id="appupd"></span>
+  </div>
+  <div class="foot">
+    הקובץ = קיט בודד אחד · הדפיסי אותו X פעמים (המערכת אומרת כמה) · כל הדפסה + חיתוך גיליוטינה אחד = בלוק אחד<br>
+    0 מרווח בין גרפיקות · מפריד צבע בין הסוגים · מפריד קיט בסוף הקובץ · הטבעה וקטורית ללא איבוד איכות
+  </div>
+</div>
+
+<div class="pp-overlay" id="ppOverlay">
+  <div class="pp-modal">
+    <div class="pp-head"><span>בחרי עמוד</span><button class="pp-close" id="ppClose" type="button">✕</button></div>
+    <div class="pp-grid" id="ppGrid"></div>
+  </div>
+</div>
+
+<div class="pp-overlay" id="csOverlay">
+  <div class="pp-modal" style="max-width:900px">
+    <div class="pp-head">
+      <span>פיצול מותאם — לחצי בין תאים להוסיף/להסיר קו חלוקה · לחצי על תא כדי להתעלם (לבן)</span>
+      <button class="pp-close" id="csClose" type="button">✕</button>
+    </div>
+    <div style="padding:10px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line2)">
+      <span id="csInfo" style="font-size:12.5px;color:var(--muted)"></span>
+      <button class="addrow" id="csClear" type="button" style="width:auto;padding:6px 12px;margin:0">נקי הכל</button>
+      <button class="btn primary" id="csApply" type="button" style="width:auto;padding:8px 16px;font-size:14px;margin-inline-start:auto">אישור החלוקה</button>
+    </div>
+    <div class="cs-wrap" id="csWrap"></div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'lib/pdf.worker.min.js';
+
+const MM = 72/25.4;               // pt per mm
+const A3 = {w:297, h:420};        // portrait mm
+const state = {
+  mode:'multi',                   // 'multi' | 'rep'
+  sided:'single',                 // multi-mode: 'single' | 'dup'
+  files:[],                       // multi-mode graphics [{name,bytes,thumb,w_mm,h_mm}]
+  fixedB:null,                    // fixed B-side graphic (fixedb mode)
+  rows:[],                        // repeater rows [{front:graphic|null, back:graphic|null, same:bool}]
+  sepTypeColor:'red', sepKitColor:'blue'
+};
+let repSeq=0;
+// custom split definition (per current layout). vCuts: columns after which a vertical cut sits
+// (1..cols-1). hCuts: rows after which a horizontal cut sits (1..rows-1). ignored: "r,c" cells.
+const customSplit = { cols:0, rows:0, vCuts:new Set(), hCuts:new Set(), ignored:new Set() };
+
+// preset sizes in cm, sorted by width. User can extend these arrays.
+const GRAPHIC_PRESETS = [
+  {w:7,   h:10},
+  {w:10,  h:15},
+  {w:14.8,h:21},
+  {w:21,  h:29.7},
+].sort((a,b)=>a.w-b.w);
+const SHEET_PRESETS = [
+  {w:29.7,h:42},      // A3
+  {w:35.2,h:53.3},    // your press sheet
+].sort((a,b)=>a.w-b.w);
+
+// separator colour palette (name -> hex)
+const PALETTE = [
+  {id:'red',    name:'אדום',      hex:'#d5342b'},
+  {id:'mustard',name:'צהוב חרדל', hex:'#d4a017'},
+  {id:'purple', name:'סגול',      hex:'#7c3a9e'},
+  {id:'blue',   name:'כחול',      hex:'#2166c4'},
+  {id:'green',  name:'ירוק',      hex:'#2e9e4f'},
+  {id:'orange', name:'כתום',      hex:'#e8791f'},
+];
+
+const $ = id=>document.getElementById(id);
+const els = {
+  gw:$('gw'), gh:$('gh'), perType:$('perType'), totalKits:$('totalKits'),
+  sheetW:$('sheetW'), sheetH:$('sheetH'), margin:$('margin'), bleed:$('bleed'),
+  gap:$('gap'), singleCut:$('singleCut'), autoBleed:$('autoBleed'), frameW:$('frameW'),
+  noTypeSep:$('noTypeSep'), repQtyPer:$('repQtyPer'), multiQtyPer:$('multiQtyPer'), kitSplit:$('kitSplit'), splitMethod:$('splitMethod'),
+  marks:$('marks'), types:$('types'), readout:$('readout'),
+  sheetbox:$('sheetbox'), stacklist:$('stacklist'), go:$('go'), ptitle:$('ptitle'),
+};
+
+/* ---------- separator colour swatches ---------- */
+function buildSwatches(containerId, which){
+  const box=$(containerId); box.innerHTML='';
+  // "none" (white / no frame) option
+  const none=document.createElement('div');
+  none.className='swatch none'; none.textContent='לבן';
+  none.title='ללא מסגרת (דף לבן)';
+  none.onclick=()=>selectColor(which,null);
+  box.appendChild(none);
+  PALETTE.forEach(col=>{
+    const s=document.createElement('div');
+    s.className='swatch'; s.title=col.name; s.dataset.id=col.id;
+    s.style.background=col.hex;                 // full colour by default
+    s.style.color=col.hex;                      // drives the selected halo ring (currentColor)
+    const frm=document.createElement('div');
+    frm.className='frm'; frm.style.borderColor=col.hex;  // frame colour (shown when selected)
+    s.appendChild(frm);
+    s.onclick=()=>selectColor(which,col.id);
+    box.appendChild(s);
+  });
+}
+// the colour shown on each compact chip (remembers the last colour picked)
+const lastColor = {types:'red', kits:'blue'};
+function selectColor(which, id){
+  if(which==='types') state.sepTypeColor=id; else state.sepKitColor=id;
+  if(id) lastColor[which]=id;
+  closeColorPops();
+  refreshSwatchUI();
+  if(typeof recompute==='function') recompute();
+}
+function closeColorPops(){ document.querySelectorAll('.cpop.open').forEach(p=>p.classList.remove('open')); }
+// wire the compact pickers: white chip, colour chip, caret → popup with all colours
+document.querySelectorAll('.cpick').forEach(pk=>{
+  const which=pk.dataset.which;
+  // one chip shows the current choice (white or a colour); clicking it opens all options
+  pk.querySelector('.cchip').onclick=e=>{
+    e.stopPropagation();
+    const pop=pk.querySelector('.cpop'); const was=pop.classList.contains('open');
+    closeColorPops(); if(!was) pop.classList.add('open');
+  };
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('.cpick')) closeColorPops(); });
+function colorHex(id){ const c=PALETTE.find(p=>p.id===id); return c?c.hex:null; }
+function refreshSwatchUI(){
+  [['sw-types',state.sepTypeColor],['sw-kits',state.sepKitColor]].forEach(([boxId,sel])=>{
+    const box=$(boxId); if(!box) return;
+    [...box.children].forEach(ch=>{
+      const isNone=ch.classList.contains('none');
+      const on = isNone ? (sel==null) : (ch.dataset.id===sel);
+      ch.classList.toggle('sel',on);
+    });
+  });
+  // compact pickers
+  document.querySelectorAll('.cpick').forEach(pk=>{
+    const which=pk.dataset.which;
+    const sel = which==='types' ? state.sepTypeColor : state.sepKitColor;
+    const hex = sel ? colorHex(sel) : null;
+    const chip=pk.querySelector('.cchip'), dot=chip.querySelector('.cdot');
+    dot.style.background = hex || '#fff';
+    dot.textContent = hex ? '' : 'לבן';
+    dot.classList.toggle('white', !hex);
+    chip.style.setProperty('--chipc', hex || 'var(--accent)');
+    chip.classList.add('sel');
+  });
+}
+buildSwatches('sw-types','types');
+buildSwatches('sw-kits','kits');
+refreshSwatchUI();
+
+/* ---------- file loading ---------- */
+$('drop').onclick = ()=> $('file').click();
+$('file').onchange = e=> addFiles(e.target.files);
+const drop = $('drop');
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop', e=> addFiles(e.dataTransfer.files));
+
+// ---- load a File into a graphic object {name,bytes,thumb,w_mm,h_mm} ----
+async function makeGraphic(file){
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const g = {name:file.name, bytes, thumb:null, w_mm:null, h_mm:null, err:false};
+  await makeThumb(g);
+  return g;
+}
+
+// read each page's TrimBox (falls back to Crop/Media box) in mm, honouring page rotation
+async function readTrimSizes(g){
+  if(g.trimMm) return g.trimMm;
+  try{
+    const doc = await PDFLib.PDFDocument.load(g.bytes, {ignoreEncryption:true});
+    g.trimMm = doc.getPages().map(pg=>{
+      const tb = pg.getTrimBox();
+      const rot = ((pg.getRotation().angle%360)+360)%360;
+      let w=tb.width/MM, h=tb.height/MM;
+      if(rot===90||rot===270){ const t=w; w=h; h=t; }
+      return {w, h};
+    });
+  }catch(e){ g.trimMm = null; }
+  return g.trimMm;
+}
+const r1 = v => Math.round(v*10)/10;          // mm → nearest 0.1 mm
+// set "גודל גרפיקה" from a dropped file's trim, and warn when loaded files differ
+async function applyTrimFrom(g){
+  const sizes = await readTrimSizes(g);
+  if(!sizes || !sizes.length) return;
+  const {w,h} = sizes[0];
+  els.gw.value = r1(w/10);  els.gh.value = r1(h/10);
+  [els.gw, els.gh].forEach(el=>{ el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); });
+  await updateTrimNote();
+}
+async function updateTrimNote(){
+  const note=$('trimNote'); if(!note) return;
+  const gw=+els.gw.value*10, gh=+els.gh.value*10, off=[];
+  const all = state.mode==='multi' ? state.files : state.rows.flatMap(r=>[r.front,r.back]);
+  for(const g of all){
+    if(!g || g.err) continue;
+    const sizes = await readTrimSizes(g); if(!sizes) continue;
+    sizes.forEach((z,i)=>{ const ok=(Math.abs(z.w-gw)<=0.5&&Math.abs(z.h-gh)<=0.5)||(Math.abs(z.w-gh)<=0.5&&Math.abs(z.h-gw)<=0.5); if(!ok)
+      off.push(`<bdi>${g.name.replace(/\.pdf$/i,'')}</bdi>${sizes.length>1?' עמ׳ '+(i+1):''}: רוחב ${r1(z.w/10)} · גובה ${r1(z.h/10)}`); });
+  }
+  note.innerHTML = off.length
+    ? `⚠ גודל שונה מהגודל שהוגדר: ${off.slice(0,4).join(' · ')}${off.length>4?` ועוד ${off.length-4}`:''}`
+    : '';
+}
+
+async function addFiles(list){
+  let first=null;
+  for(const f of list){
+    if(f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) continue;
+    const g = await makeGraphic(f);
+    if(!g.err) await readTrimSizes(g);
+    state.files.push(g);
+    if(!first && !g.err) first=g;
+    renderTypes();
+  }
+  if(first) await applyTrimFrom(first);       // graphic size follows the file's trim
+  recompute();
+}
+
+async function makeThumb(rec){
+  try{
+    const doc = await pdfjsLib.getDocument({data:rec.bytes.slice()}).promise;
+    rec.pages = doc.numPages;
+    rec.pageThumbs = [];
+    rec.pageTrims = [];
+    for(let pn=1; pn<=doc.numPages; pn++){
+      const page = await doc.getPage(pn);
+      let tbArr=null;
+      try{ tbArr = page.getBox ? page.getBox('trim') : null; }catch(e){}
+      if(!tbArr && page._pageDict){ try{ tbArr = page._pageDict.get('TrimBox'); }catch(e){} }
+      const view = page.view;
+      let tx0,ty0,tx1,ty1;
+      if(tbArr && tbArr.length===4){ [tx0,ty0,tx1,ty1]=tbArr; } else { [tx0,ty0,tx1,ty1]=view; }
+      rec.pageTrims.push({w_mm:(tx1-tx0)/MM, h_mm:(ty1-ty0)/MM});
+      const scale = 200/(view[2]-view[0]);
+      const vp = page.getViewport({scale});
+      const cv = document.createElement('canvas');
+      cv.width=vp.width; cv.height=vp.height;
+      await page.render({canvasContext:cv.getContext('2d'), viewport:vp}).promise;
+      const px=v=>v*scale;
+      const cropX=px(tx0-view[0]), cropY=px(view[3]-ty1), cropW=px(tx1-tx0), cropH=px(ty1-ty0);
+      let thumb;
+      if(cropW>2 && cropH>2 && cropW<=cv.width+2 && cropH<=cv.height+2){
+        const cc=document.createElement('canvas'); cc.width=Math.round(cropW); cc.height=Math.round(cropH);
+        cc.getContext('2d').drawImage(cv, cropX,cropY,cropW,cropH, 0,0,cropW,cropH);
+        thumb=cc.toDataURL();
+      }else{ thumb=cv.toDataURL(); }
+      rec.pageThumbs.push(thumb);
+    }
+    // first-page summary (used by size-check display)
+    rec.thumb = rec.pageThumbs[0];
+    rec.w_mm = rec.pageTrims[0].w_mm; rec.h_mm = rec.pageTrims[0].h_mm;
+  }catch(err){ rec.err=true; }
+}
+
+function removeFile(i){ state.files.splice(i,1); renderTypes(); recompute(); }
+
+let dragFrom=null;
+function renderTypes(){
+  els.types.innerHTML='';
+  const gw=+els.gw.value, gh=+els.gh.value, tol=2;
+  state.files.forEach((r,i)=>{
+    const row=document.createElement('div'); row.className='type-row'; row.draggable=true; row.dataset.i=i;
+    let note='';
+    { // compare the TRIM size (not the page with its bleed); a turned page is fine
+      const z = (r.trimMm && r.trimMm[0]) || (r.w_mm!=null ? {w:r.w_mm, h:r.h_mm} : null);
+      if(z){
+        const sizeOk = (Math.abs(z.w-gw*10)<=tol && Math.abs(z.h-gh*10)<=tol) ||
+                       (Math.abs(z.w-gh*10)<=tol && Math.abs(z.h-gw*10)<=tol);
+        if(!sizeOk){ note=` · ${z.w.toFixed(0)}×${z.h.toFixed(0)}mm`; row.classList.add('bad'); }
+      }
+    }
+    const np = r.pages||1;
+    const pageBadge = np>1
+      ? `<button type="button" class="pgtoggle${r.open?' open':''}" title="${r.open?'הסתרת העמודים':'הצגת כל '+np+' העמודים'}"><span>${np}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>`
+      : `<span class="pgcount" title="${np} עמודים בקובץ">${np}</span>`;
+    const perQty = els.multiQtyPer.checked;
+    const qtyField = perQty
+      ? `<input type="number" class="rep-qty tqty" min="1" step="1" value="${r.qty||(+els.perType.value||1)}" data-tqty="${i}" title="כמות לסוג">`
+      : '';
+    row.innerHTML=
+      `<span class="draghandle" title="גררי לשינוי סדר">⠿</span>`+
+      `<span class="idx">${i+1}</span>`+
+      (r.thumb?`<img class="thumb" src="${rotThumb(r.thumb, r.rotSet!=null?r.rotSet:autoRot(r,0))}">`:`<span class="thumb"></span>`)+
+      `<span class="nm" title="${r.name}">${r.name}${note?`<span style="color:var(--warn)">${note}</span>`:''}</span>`+
+      pageBadge+
+      qtyField+
+      rotBtn(r.rotSet!=null ? r.rotSet : autoRot(r,0), r.rotSet==null, `data-rot="${i}"`)+
+      `<span class="qflag"></span>`+
+      `<span class="x" title="הסר">✕</span>`;
+    row.querySelector('.x').onclick=()=>removeFile(i);
+    { const pt=row.querySelector('.pgtoggle'); if(pt) pt.onclick=e=>{ e.stopPropagation(); state.files[i].open=!state.files[i].open; renderTypes(); }; }
+    if(np>1 && r.open && r.pageThumbs){              // all pages of this file, under the row
+      const strip=document.createElement('div'); strip.className='pages-strip';
+      strip.innerHTML=r.pageThumbs.map((th0,p)=>{
+        const th = rotThumb(th0, r.rotSet!=null ? r.rotSet : autoRot(r,p));
+        const side = state.sided==='pair' ? (p%2===0?' · קדמי':' · אחורי') : '';
+        return `<div class="pthumb" title="עמוד ${p+1}${side}"><div class="pimg"><img src="${th}"></div><span>עמ׳ ${p+1}${side}</span></div>`;
+      }).join('');
+      row.classList.add('has-pages'); row.appendChild(strip);
+    }
+    { const rb=row.querySelector('.rotbtn'); if(rb) rb.onclick=e=>{ e.stopPropagation(); const f=state.files[i]; f.rotSet=nextRot(f.rotSet!=null?f.rotSet:autoRot(f,0)); renderTypes(); recompute(); }; }
+    const qi=row.querySelector('.tqty');
+    if(qi) qi.oninput=()=>{ state.files[i].qty=Math.max(1,+qi.value|0); refreshQtyFlags(); recompute(); };
+    // drag to reorder
+    row.addEventListener('dragstart',e=>{ dragFrom=i; row.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    row.addEventListener('dragend',()=>{ dragFrom=null; row.classList.remove('dragging'); [...els.types.children].forEach(c=>c.classList.remove('dragover')); });
+    row.addEventListener('dragover',e=>{ e.preventDefault(); row.classList.add('dragover'); });
+    row.addEventListener('dragleave',()=>row.classList.remove('dragover'));
+    row.addEventListener('drop',e=>{
+      e.preventDefault(); row.classList.remove('dragover');
+      const to=+row.dataset.i;
+      if(dragFrom==null||dragFrom===to) return;
+      const [moved]=state.files.splice(dragFrom,1);
+      state.files.splice(to,0,moved);
+      renderTypes(); recompute();
+    });
+    els.types.appendChild(row);
+  });
+  refreshQtyFlags();
+}
+
+/* ---------- quantity written in the file name (x50 / X50 / ×50 / *50) vs. the quantity set ---------- */
+function qtyFromName(name){
+  const base=String(name||'').replace(/\.pdf$/i,'');
+  const re=/(?<![\p{L}\d])[xX×*]\s?(\d{1,6})(?!\d)/gu;   // "x50" but not "box50" or "50x100"-style digits
+  let m,last=null; while((m=re.exec(base))) last=+m[1];
+  return last;
+}
+function effQty(f){
+  return els.multiQtyPer.checked ? Math.max(1, f.qty||(+els.perType.value||1)) : Math.max(1, +els.perType.value||1);
+}
+function qtyMismatch(f){
+  const n=qtyFromName(f.name); if(n==null) return null;
+  const q=effQty(f);
+  if(q===n || f.qtyOkFor===q) return null;          // matches, or approved for this exact quantity
+  return {n,q};
+}
+function refreshQtyFlags(){
+  const issues=[];
+  [...els.types.children].forEach(row=>{
+    const i=+row.dataset.i, f=state.files[i]; if(!f) return;
+    const mm=qtyMismatch(f), slot=row.querySelector('.qflag');
+    row.classList.toggle('qwarn', !!mm);
+    if(!slot) return;
+    if(!mm){ slot.innerHTML=''; return; }
+    issues.push({i,f,mm});
+    slot.innerHTML=`<span>בשם: ${mm.n}</span>`+
+                   `<button type="button" class="qfix" title="שינוי הכמות ל-${mm.n}">תקן ל-${mm.n}</button>`+
+                   `<button type="button" class="qok" title="הכמות ${mm.q} נכונה">✓ ${mm.q} נכון</button>`;
+    slot.querySelector('.qfix').onclick=e=>{
+      e.stopPropagation();
+      if(!els.multiQtyPer.checked){                  // per-file quantities must be on to fix one row
+        state.files.forEach(x=>{ if(!x.qty) x.qty=+els.perType.value||1; });
+        els.multiQtyPer.checked=true; els.multiQtyPer.dispatchEvent(new Event('change'));
+      }
+      f.qty=mm.n; delete f.qtyOkFor; renderTypes(); recompute();
+    };
+    slot.querySelector('.qok').onclick=e=>{ e.stopPropagation(); f.qtyOkFor=mm.q; refreshQtyFlags(); };
+  });
+  const box=$('qtyWarn'); if(!box) return;
+  if(!issues.length || state.mode!=='multi'){ box.innerHTML=''; return; }
+  box.innerHTML=`<div class="qw-head">⚠ ${issues.length===1?'קובץ אחד':issues.length+' קבצים'} עם כמות שונה ממה שכתוב בשם</div>`+
+    issues.slice(0,8).map(x=>`<div class="qw-row"><span class="qw-n">${x.i+1}</span><span class="qw-nm" title="${x.f.name}">${x.f.name.replace(/\.pdf$/i,'')}</span><span class="qw-v">בשם ${x.mm.n} · בכמות ${x.mm.q}</span></div>`).join('')+
+    (issues.length>8?`<div class="qw-more">ועוד ${issues.length-8}…</div>`:'')+
+    `<div class="qw-tip">תקני בשורה המסומנת בכתום, או ✓ אם הכמות נכונה</div>`;
+}
+els.perType.addEventListener('input',refreshQtyFlags);
+
+/* ---------- mode switching ---------- */
+function setMode(m){
+  state.mode=m;
+  $('tab-multi').classList.toggle('on', m==='multi');
+  $('tab-rep').classList.toggle('on', m==='rep');
+  $('mode-multi').style.display = m==='multi'?'':'none';
+  $('mode-rep').style.display   = m==='rep'?'':'none';
+  recompute();
+}
+$('tab-multi').onclick=()=>setMode('multi');
+$('tab-rep').onclick=()=>setMode('rep');
+
+// sided radios (multi mode)
+document.querySelectorAll('input[name="sided"]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    state.sided=r.value;
+    $('sd-single').classList.toggle('on', r.value==='single');
+    $('sd-dup').classList.toggle('on', r.value==='dup');
+    $('sd-pair').classList.toggle('on', r.value==='pair');
+    $('sd-fixedb').classList.toggle('on', r.value==='fixedb');
+    $('fixedb-wrap').style.display = r.value==='fixedb' ? '' : 'none';
+    renderTypes(); recompute();
+  });
+});
+
+// fixed B-side loader
+function renderFixedB(){
+  const s=$('fixedb-slot');
+  if(state.fixedB && state.fixedB.thumb){
+    s.classList.add('filled');
+    s.innerHTML=`<span class="slotx" id="fixedb-x">✕</span><img src="${state.fixedB.thumb}" style="max-height:48px">`;
+    $('fixedb-x').onclick=(e)=>{ e.stopPropagation(); state.fixedB=null; renderFixedB(); recompute(); };
+  }else{
+    s.classList.remove('filled');
+    s.textContent='צד B — גררו או לחצו';
+  }
+}
+$('fixedb-slot').onclick=(e)=>{ if(e.target.id==='fixedb-x')return; $('fixedbfile').value=''; $('fixedbfile').click(); };
+$('fixedbfile').onchange=async e=>{ const f=e.target.files[0]; if(f) await setFixedB(f); };
+['dragover','dragenter'].forEach(ev=>$('fixedb-slot').addEventListener(ev,e=>{e.preventDefault();$('fixedb-slot').classList.add('over')}));
+['dragleave','drop'].forEach(ev=>$('fixedb-slot').addEventListener(ev,e=>{e.preventDefault();$('fixedb-slot').classList.remove('over')}));
+$('fixedb-slot').addEventListener('drop',async e=>{ e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) await setFixedB(f); });
+async function setFixedB(file){
+  if(file.type!=='application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return;
+  state.fixedB = await makeGraphic(file);
+  renderFixedB(); recompute();
+}
+
+/* ---------- repeater ---------- */
+function addRepRow(){
+  state.rows.push({id:++repSeq, front:null, back:null, same:false, qty:+els.perType.value||1});
+  renderRep(); recompute();
+}
+function renderRep(){
+  const box=$('rep-list'); box.innerHTML='';
+  const perQty = els.repQtyPer.checked;
+  // adjust header + row grid template for the extra qty column
+  const tmpl = perQty ? '22px 1fr 1fr 44px 50px 58px' : '22px 1fr 1fr 44px 54px';
+  $('rep-head').style.gridTemplateColumns = tmpl;
+  $('rep-head').innerHTML = perQty
+    ? '<span></span><span>קדמי</span><span>אחורי</span><span>זהה</span><span>סיבוב</span><span>כמות</span>'
+    : '<span></span><span>קדמי</span><span>אחורי</span><span>זהה</span><span>סיבוב</span>';
+  state.rows.forEach((row,i)=>{
+    const el=document.createElement('div');
+    el.className='rep-row'+(row.same?' disabledback':'');
+    el.style.gridTemplateColumns = tmpl;
+    el.innerHTML =
+      `<span class="ridx">${i+1}</span>`+
+      `<div class="slot ${row.front&&row.front.thumb?'filled':''}" data-side="front" data-i="${i}">
+         ${row.front&&row.front.thumb?`<span class="slotx" data-x="front" data-i="${i}">✕</span><img src="${rotThumb(row.front.thumb, row.rotSet!=null?row.rotSet:autoRot(row.front,row.frontPage||0))}">`:'קדמי'}
+       </div>`+
+      `<div class="slot backslot ${row.back&&row.back.thumb?'filled':''}" data-side="back" data-i="${i}">
+         ${row.same?'= זהה':(row.back&&row.back.thumb?`<span class="slotx" data-x="back" data-i="${i}">✕</span><img src="${rotThumb(row.back.thumb, backRot(row.rotSet!=null?row.rotSet:autoRot(row.front,row.frontPage||0)))}">`:'אחורי')}
+       </div>`+
+      `<label class="rep-same"><input type="checkbox" ${row.same?'checked':''} data-same="${i}">זהה</label>`+
+      (row.front&&row.front.thumb ? rotBtn(row.rotSet!=null?row.rotSet:autoRot(row.front,row.frontPage||0), row.rotSet==null, `data-rrot="${i}"`) : '')+
+      (perQty?`<input type="number" class="rep-qty" min="1" step="1" value="${row.qty||1}" data-qty="${i}" title="כמות לסוג">`:'')+
+      `<button class="rep-del" data-del="${i}">הסר סוג</button>`;
+    box.appendChild(el);
+  });
+  // wire events
+  box.querySelectorAll('.slot').forEach(s=>{
+    const i=+s.dataset.i, side=s.dataset.side;
+    if(side==='back' && state.rows[i].same) return; // disabled
+    s.onclick=(e)=>{
+      if(e.target.classList.contains('slotx'))return;
+      const g=state.rows[i][side];
+      if(g && g.thumb && (g.pages||1)>1){
+        // already loaded & multi-page → let them re-pick the page
+        openPagePicker(g,(pageIdx)=>{ state.rows[i][side+'Page']=pageIdx;
+          if(g.pageThumbs&&g.pageThumbs[pageIdx]) g.thumb=g.pageThumbs[pageIdx];
+          renderRep(); recompute(); });
+      }else{
+        openRepPicker(i,side);   // empty or single-page → choose a file
+      }
+    };
+    ['dragover','dragenter'].forEach(ev=>s.addEventListener(ev,e=>{e.preventDefault();s.classList.add('over')}));
+    ['dragleave','drop'].forEach(ev=>s.addEventListener(ev,e=>{e.preventDefault();s.classList.remove('over')}));
+    s.addEventListener('drop',async e=>{
+      e.preventDefault(); const f=e.dataTransfer.files[0]; if(!f)return;
+      await setRepSlot(i,side,f);
+    });
+  });
+  box.querySelectorAll('.slotx').forEach(x=>{
+    x.onclick=(e)=>{ e.stopPropagation(); const i=+x.dataset.i, side=x.dataset.x;
+      state.rows[i][side]=null; state.rows[i][side+'Page']=0; renderRep(); recompute(); };
+  });
+  box.querySelectorAll('input[data-same]').forEach(c=>{
+    c.onchange=()=>{ const i=+c.dataset.same; state.rows[i].same=c.checked;
+      if(c.checked) state.rows[i].back=null; renderRep(); recompute(); };
+  });
+  box.querySelectorAll('button[data-rrot]').forEach(b=>{
+    b.onclick=e=>{ e.stopPropagation(); const r=state.rows[+b.dataset.rrot];
+      r.rotSet=nextRot(r.rotSet!=null?r.rotSet:autoRot(r.front,r.frontPage||0)); renderRep(); recompute(); };
+  });
+  box.querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick=()=>{ const i=+b.dataset.del; state.rows.splice(i,1); renderRep(); recompute(); };
+  });
+  box.querySelectorAll('input[data-qty]').forEach(q=>{
+    q.oninput=()=>{ const i=+q.dataset.qty; state.rows[i].qty=Math.max(1,+q.value|0); recompute(); };
+  });
+}
+// per-type quantity toggle: disable the global "quantity per type" field when on
+els.repQtyPer.addEventListener('change',()=>{
+  const on=els.repQtyPer.checked;
+  els.perType.disabled=on; els.perType.style.opacity=on?.45:1;
+  renderRep(); recompute();
+});
+let repTarget=null;
+function openRepPicker(i,side){ repTarget={i,side}; $('repfile').value=''; $('repfile').click(); }
+$('repfile').onchange=async e=>{ const f=e.target.files[0]; if(f&&repTarget) await setRepSlot(repTarget.i,repTarget.side,f); };
+async function setRepSlot(i,side,file){
+  if(file.type!=='application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return;
+  const g=await makeGraphic(file);
+  if(!g.err) await readTrimSizes(g);
+  state.rows[i][side]=g;
+  state.rows[i][side+'Page']=0;                 // default page 0
+  if(side==='front' && !g.err) await applyTrimFrom(g);
+  else await updateTrimNote();
+  renderRep(); recompute();
+  // if multi-page, let the user pick which page
+  if((g.pages||1) > 1){
+    openPagePicker(g, (pageIdx)=>{
+      state.rows[i][side+'Page']=pageIdx;
+      // update the slot thumbnail to the chosen page
+      if(g.pageThumbs && g.pageThumbs[pageIdx]) g.thumb=g.pageThumbs[pageIdx];
+      renderRep(); recompute();
+    });
+  }
+}
+// ---- page-picker modal ----
+function openPagePicker(graphic, onPick){
+  const grid=$('ppGrid'); grid.innerHTML='';
+  const thumbs=graphic.pageThumbs||[graphic.thumb];
+  thumbs.forEach((src,idx)=>{
+    const it=document.createElement('div'); it.className='pp-item';
+    it.innerHTML=`<img src="${src}"><div class="pp-n">עמוד ${idx+1}</div>`;
+    it.onclick=()=>{ onPick(idx); closePagePicker(); };
+    grid.appendChild(it);
+  });
+  $('ppOverlay').classList.add('on');
+}
+function closePagePicker(){ $('ppOverlay').classList.remove('on'); }
+$('ppClose').onclick=closePagePicker;
+$('ppOverlay').addEventListener('click',e=>{ if(e.target===$('ppOverlay')) closePagePicker(); });
+
+// ---- custom split editor ----
+function openCustomSplit(){
+  const lay=computeLayout();
+  if(!lay.cols || !lay.rows){ alert('אין פריסה — טעני קבצים והגדירי גדלים תחילה'); els.kitSplit.value='1'; return; }
+  // reset if layout dimensions changed
+  if(customSplit.cols!==lay.cols || customSplit.rows!==lay.rows){
+    customSplit.cols=lay.cols; customSplit.rows=lay.rows;
+    customSplit.vCuts.clear(); customSplit.hCuts.clear(); customSplit.ignored.clear();
+  }
+  renderCustomSplit();
+  $('csOverlay').classList.add('on');
+}
+function renderCustomSplit(){
+  const {cols,rows}=customSplit;
+  const wrap=$('csWrap');
+  const maxW=800, maxH=430;
+  const GAP=9;   // clickable gap strip size in px
+  const cell=Math.max(14, Math.min(Math.floor((maxW-(cols-1)*GAP)/cols), Math.floor((maxH-(rows-1)*GAP)/rows), 56));
+  const grid=document.createElement('div');
+  grid.className='cs-grid';
+  // build column/row track template: cell, gap, cell, gap, ... (2*n-1 tracks)
+  const colTracks=[]; for(let c=0;c<cols;c++){ colTracks.push(cell+'px'); if(c<cols-1) colTracks.push(GAP+'px'); }
+  const rowTracks=[]; for(let r=0;r<rows;r++){ rowTracks.push(cell+'px'); if(r<rows-1) rowTracks.push(GAP+'px'); }
+  grid.style.gridTemplateColumns=colTracks.join(' ');
+  grid.style.gridTemplateRows=rowTracks.join(' ');
+  // place cells and gaps. In RTL, CSS grid column 1 is on the RIGHT — matches our RTL kit order.
+  for(let R=0; R<2*rows-1; R++){
+    for(let C=0; C<2*cols-1; C++){
+      const isCellR = R%2===0, isCellC = C%2===0;
+      const el=document.createElement('div');
+      if(isCellR && isCellC){
+        const r=R/2, c=C/2;
+        el.className='cs-cell'+(customSplit.ignored.has(r+','+c)?' ignored':'');
+        el.title=`שורה ${r+1}, עמודה ${c+1} — לחצי כדי להתעלם`;
+        el.onclick=()=>{ toggleStr(customSplit.ignored, r+','+c); renderCustomSplit(); };
+      }else if(isCellR && !isCellC){
+        // vertical gap between column c=(C-1)/2 and next → cut index = (C+1)/2
+        const cutC=(C+1)/2;
+        el.className='cs-gapV'+(customSplit.vCuts.has(cutC)?' on':'');
+        el.title='לחצי לקו חלוקה אנכי';
+        el.onclick=()=>{ toggle(customSplit.vCuts, cutC); renderCustomSplit(); };
+      }else if(!isCellR && isCellC){
+        const cutR=(R+1)/2;
+        el.className='cs-gapH'+(customSplit.hCuts.has(cutR)?' on':'');
+        el.title='לחצי לקו חלוקה אופקי';
+        el.onclick=()=>{ toggle(customSplit.hCuts, cutR); renderCustomSplit(); };
+      }else{
+        // corner intersection between gaps
+        const cutC=(C+1)/2, cutR=(R+1)/2;
+        el.className='cs-corner'+((customSplit.vCuts.has(cutC)||customSplit.hCuts.has(cutR))?' on':'');
+      }
+      grid.appendChild(el);
+    }
+  }
+  wrap.innerHTML=''; wrap.appendChild(grid);
+  $('csInfo').textContent = `פריסה ${cols}×${rows} · אזורים: ${countRegions()}`;
+}
+function toggle(set,v){ set.has(v)?set.delete(v):set.add(v); }
+function toggleStr(set,v){ set.has(v)?set.delete(v):set.add(v); }
+function countRegions(){
+  // regions = (#vertical strips) × (#horizontal strips) — simple rectangular cut model
+  const vStrips = customSplit.vCuts.size+1;
+  const hStrips = customSplit.hCuts.size+1;
+  return vStrips*hStrips;
+}
+$('csClose').onclick=()=>{ $('csOverlay').classList.remove('on'); els.kitSplit.value='1'; recompute(); };
+$('csClear').onclick=()=>{ customSplit.vCuts.clear(); customSplit.hCuts.clear(); customSplit.ignored.clear(); renderCustomSplit(); };
+$('csApply').onclick=()=>{ $('csOverlay').classList.remove('on'); recompute(); };
+$('csOverlay').addEventListener('click',e=>{ if(e.target===$('csOverlay')){ $('csOverlay').classList.remove('on'); els.kitSplit.value='1'; recompute(); } });
+
+
+
+$('addrow').onclick=addRepRow;
+// start with one empty repeater row
+addRepRow();
+
+// reflect default-checked auto-bleed on load
+if(els.autoBleed.checked){ els.bleed.disabled=true; els.bleed.style.opacity=.45; }
+
+/* ---------- resolve current inputs into a unified TYPE list ----------
+   each type: {front:graphic, back:graphic|null, duplex:bool}
+   multi single  -> each file is a type, back=null
+   multi dup     -> each file is a type; back = page2 of same file if 2+ pages, else = front (same)
+   repeater      -> each row is a type; back = row.back (or front if 'same'); duplex always true */
+/* ---------- page rotation (clockwise degrees 0/90/180/270) ----------
+   auto: a landscape page in a portrait cell (or the reverse) is turned 90°.
+   manual: the ↻ button on a row overrides it (cycles 0→90→180→270).
+   back side of a duplex piece: the sheet is flipped left↔right, so 90 on the front = 270 on the back. */
+function autoRot(g, page){
+  const z = g && g.trimMm && g.trimMm[Math.min(page||0, g.trimMm.length-1)];
+  if(!z) return 0;
+  const gw=+els.gw.value*10, gh=+els.gh.value*10;
+  if(Math.abs(z.w-z.h)<1 || Math.abs(gw-gh)<1) return 0;
+  return ((z.w>z.h)!==(gw>gh)) ? 90 : 0;
+}
+function backRot(r){ return r===90 ? 270 : r===270 ? 90 : (r||0); }
+function rotBtn(cur, isAuto, attr){
+  return `<button type="button" class="rotbtn${cur?' on':''}" ${attr} title="${isAuto?'סיבוב אוטומטי לפי כיוון הקובץ — לחצי לשנות':'סיבוב ידני — לחצי לשנות'}">`+
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>`+
+    `<span>${cur}°${isAuto&&cur?'<i>A</i>':''}</span></button>`;
+}
+function nextRot(cur){ return ((cur||0)+90)%360; }
+// thumbnails in the lists are shown turned exactly as they sit on the sheet (a real turned image, not a CSS turn)
+const _rotThumbs=new Map(); let _rotRerender=null;
+function rotThumb(src, rot){
+  rot=((rot||0)%360+360)%360;
+  if(!src || !rot) return src;
+  const key=rot+'|'+src;
+  if(_rotThumbs.has(key)) return _rotThumbs.get(key) || src;
+  _rotThumbs.set(key,null);
+  const im=new Image();
+  im.onload=()=>{
+    const t=(rot===90||rot===270), cv=document.createElement('canvas');
+    cv.width=t?im.height:im.width; cv.height=t?im.width:im.height;
+    const g=cv.getContext('2d'); g.translate(cv.width/2,cv.height/2); g.rotate(rot*Math.PI/180);
+    g.drawImage(im,-im.width/2,-im.height/2);
+    _rotThumbs.set(key, cv.toDataURL('image/jpeg',0.85));
+    clearTimeout(_rotRerender);
+    _rotRerender=setTimeout(()=>{ if(state.mode==='multi') renderTypes(); else renderRep(); },30);
+  };
+  im.src=src;
+  return src;
+}
+
+function getTypes(){
+  if(state.mode==='multi'){
+    const out=[];
+    const mQty = els.multiQtyPer.checked;
+    state.files.filter(f=>f && !f.err).forEach(f=>{
+      const np = f.pages||1;
+      const fq = mQty ? Math.max(1, f.qty||(+els.perType.value||1)) : null;   // per-file qty
+      const start=out.length;
+      if(state.sided==='pair'){
+        // pages consumed in pairs: (0=front,1=back), (2=front,3=back)...
+        for(let p=0;p<np;p+=2){
+          const frontThumb=(f.pageThumbs&&f.pageThumbs[p])||f.thumb;
+          const hasBack = p+1<np;
+          out.push({front:f, back:hasBack?f:null, duplex:hasBack,
+                    frontPage:p, backPage:p+1, thumb:frontThumb});
+        }
+      }else if(state.sided==='fixedb'){
+        // each A page is a type (front); back = the fixed B graphic (page 0)
+        const B = state.fixedB;
+        for(let p=0;p<np;p++){
+          const thumb=(f.pageThumbs&&f.pageThumbs[p])||f.thumb;
+          out.push({front:f, back:(B&&!B.err)?B:null, duplex:!!(B&&!B.err),
+                    frontPage:p, backPage:0, thumb, backThumb:B?B.thumb:null});
+        }
+      }else if(state.sided==='dup'){
+        for(let p=0;p<np;p++){
+          const thumb=(f.pageThumbs&&f.pageThumbs[p])||f.thumb;
+          out.push({front:f, back:f, duplex:true, frontPage:p, backPage:p, thumb});
+        }
+      }else{ // single
+        for(let p=0;p<np;p++){
+          const thumb=(f.pageThumbs&&f.pageThumbs[p])||f.thumb;
+          out.push({front:f, back:null, duplex:false, frontPage:p, backPage:0, thumb});
+        }
+      }
+      if(fq!=null) for(let k=start;k<out.length;k++) out[k].qty=fq;   // apply file qty to its pages
+      for(let k=start;k<out.length;k++) out[k].rot = f.rotSet!=null ? f.rotSet : autoRot(f, out[k].frontPage);
+    });
+    return out;
+  }else{
+    const perQty = els.repQtyPer.checked;
+    return state.rows
+      .filter(r=>r.front && r.front.thumb)
+      .map(r=>{
+        const back = r.same ? r.front : (r.back && r.back.thumb ? r.back : null);
+        const fp = r.frontPage||0;
+        const bp = r.same ? (r.frontPage||0) : (r.backPage||0);
+        return {front:r.front, back, duplex:true, frontPage:fp, backPage:bp, same:r.same,
+                thumb:(r.front.pageThumbs&&r.front.pageThumbs[fp])||r.front.thumb,
+                qty: perQty ? Math.max(1,r.qty||1) : null,
+                rot: r.rotSet!=null ? r.rotSet : autoRot(r.front, fp)};
+      });
+  }
+}
+/* ===================== cut & stack (different quantity per type) =====================
+   All units of all types form one stream: [sep] + qty×type for each type.
+   The stream is cut into N equal piles (N = cells per sheet). Pile p goes into cell p
+   (order: rows top→bottom, each row right→left). After the guillotine the piles are
+   stacked 1 on 2 on 3… and the stream comes out in order. Optional first sheet = pile numbers. */
+// file name = the job name the user typed (if any) + the descriptive part
+function outName(base){
+  const raw=(($('jobName')||{}).value||'').trim();
+  const nm=raw.replace(/[\\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').slice(0,80).trim();
+  return nm ? `${nm}_${base}` : base;
+}
+// small number labels drawn as images, so the PDF needs no font at all (no Helvetica reference for the RIP)
+async function digitLabels(doc, n){
+  const imgs={};
+  for(let i=1;i<=n;i++){
+    const t=String(i), px=80, cv=document.createElement('canvas'), g=cv.getContext('2d');
+    g.font=`700 ${px}px Arial, sans-serif`;
+    const w=Math.ceil(g.measureText(t).width)+8; cv.width=w; cv.height=Math.ceil(px*1.15);
+    g.font=`700 ${px}px Arial, sans-serif`; g.fillStyle='#000'; g.textBaseline='alphabetic'; g.fillText(t,4,px);
+    const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
+    const img=await doc.embedPng(new Uint8Array(await blob.arrayBuffer()));
+    imgs[t]={img, ar:cv.width/cv.height};
+  }
+  return {imgs};
+}
+function stackMode(){
+  return (state.mode==='multi' && els.multiQtyPer.checked) || (state.mode==='rep' && els.repQtyPer.checked);
+}
+function stackOrder(lay){ const o=[]; for(let r=0;r<lay.rows;r++) for(let c=lay.cols-1;c>=0;c--) o.push([r,c]); return o; }
+function stackName(t,i){
+  const f=t.front; let nm = f&&f.name ? f.name.replace(/\.pdf$/i,'') : `סוג ${i+1}`;
+  if(f && (f.pages||1)>1 && typeof t.frontPage==='number') nm += ` · עמוד ${t.frontPage+1}`;
+  return nm;
+}
+function planStack(types, lay){
+  const useSep = !els.noTypeSep.checked, numbered = $('numPages').checked;
+  const stream=[];
+  types.forEach((t,i)=>{
+    const q=Math.max(1, t.qty||1);
+    if(useSep) stream.push({kind:'sep', t:i, qty:q});
+    for(let u=0;u<q;u++) stream.push({kind:'g', t:i});
+  });
+  const cells=Math.max(1,lay.per), n=stream.length, L=Math.max(1,Math.ceil(n/cells));
+  const sheets=L+(numbered?1:0);
+  const at=(k,p)=>{ if(numbered){ if(k===0) return {kind:'num', p}; k--; } const i=p*L+k; return i<n?stream[i]:null; };
+  const units=types.reduce((a,t)=>a+Math.max(1,t.qty||1),0);
+  return {stream, n, cells, L, sheets, numbered, order:stackOrder(lay), at,
+          blanks:cells*L-n, units, seps:useSep?types.length:0, useSep};
+}
+function updateStackUI(){
+  const on=stackMode();
+  document.body.classList.toggle('stackmode', on);
+  els.totalKits.disabled=on; els.kitSplit.disabled=on;
+  const gl=$('goLabel'); if(gl) gl.textContent = on ? 'יצירת PDF — חיתוך וערימה' : 'יצירת PDF — קיט בודד';
+}
+function anyDuplex(types){ return types.some(t=>t.duplex && t.back); }
+function computeLayout(){
+  const gw=+els.gw.value, gh=+els.gh.value;               // cm (TRIM size, final after cut)
+  const gwmm=gw*10, ghmm=gh*10;
+  const sheetW=Math.max(50,(+els.sheetW.value)*10);      // cm→mm, always portrait as entered
+  const sheetH=Math.max(50,(+els.sheetH.value)*10);
+  const m=Math.max(0,+els.margin.value);                  // margin all sides
+  const bleed=Math.max(0,+els.bleed.value);               // bleed built into each PDF
+  const gap = els.singleCut.checked ? 0 : Math.max(0,(+els.gap.value)*10); // mm between cells
+  const printW=sheetW-2*m, printH=sheetH-2*m;             // usable area
+  // N cells + (N-1) gaps fit in printable area
+  const cols=Math.max(0,Math.floor((printW+gap)/(gwmm+gap)));
+  const rows=Math.max(0,Math.floor((printH+gap)/(ghmm+gap)));
+  return {
+    cols, rows, per:cols*rows,
+    sheetW, sheetH, margin:m, bleed, gap,
+    gwmm, ghmm,
+    printW, printH,
+    landscape:false
+  };
+}
+
+function recompute(){
+  updateStackUI();
+  updateTrimNote();                 // keep the size-mismatch note current (async, cached)
+  const types = getTypes();
+  const nTypes = types.length;
+  if(nTypes===0){
+    els.readout.innerHTML='<div class="empty" style="padding:20px 0;color:#5c6a70">טענו קבצים כדי לחשב</div>';
+    els.sheetbox.innerHTML='<div class="empty">התצוגה תופיע לאחר טעינת קבצים</div>';
+    els.stacklist.innerHTML=''; els.ptitle.textContent='—'; els.go.disabled=true; var pg=document.getElementById('pager'); if(pg)pg.style.display='none'; var pc=document.getElementById('pgcaption'); if(pc)pc.textContent=''; var ph=document.getElementById('packheight'); if(ph)ph.innerHTML='';
+    var tsp0=document.getElementById('typeStripPanel'); if(tsp0)tsp0.style.display='none';
+    return;
+  }
+  const perType=Math.max(1,+els.perType.value|0);
+  const totalKits=Math.max(1,+els.totalKits.value|0);
+  const lay=computeLayout();
+  const perSheet=lay.per;
+
+  // ---- validation: block export on invalid input ----
+  let errMsg='';
+  if(state.mode==='multi' && state.sided==='pair'){
+    const oddF = state.files.find(f=>f && !f.err && (f.pages||1)%2!==0);
+    if(oddF) errMsg = `⚠ "דו-צדדי מזווג" דורש מספר עמודים זוגי בכל קובץ. הקובץ "${oddF.name}" מכיל ${oddF.pages} עמודים (אי-זוגי). הסירי אותו או בחרי מצב אחר.`;
+  }
+  if(!errMsg && state.mode==='rep'){
+    for(let i=0;i<state.rows.length;i++){
+      const r=state.rows[i];
+      if(!(r.front&&r.front.thumb)) continue;         // empty row is just ignored
+      if(!r.same && !(r.back&&r.back.thumb)){
+        errMsg = `⚠ סוג ${i+1}: חסר קובץ בצד האחורי. סמני "זהה" או העלי קובץ אחורי (או הסירי את הסוג).`;
+        break;
+      }
+    }
+  }
+  if(errMsg){
+    els.readout.innerHTML=`<div class="warnline" style="font-size:13px;line-height:1.6">${errMsg}</div>`;
+    els.sheetbox.innerHTML='<div class="empty">תקני את השגיאה כדי להמשיך</div>';
+    els.stacklist.innerHTML=''; els.ptitle.textContent='—'; els.go.disabled=true;
+    var pg=document.getElementById('pager'); if(pg)pg.style.display='none';
+    var pc=document.getElementById('pgcaption'); if(pc)pc.textContent='';
+    var ph=document.getElementById('packheight'); if(ph)ph.innerHTML='';
+    return;
+  }
+
+  // graphics don't fit in printable area
+  if(perSheet===0){
+    els.readout.innerHTML=`<div class="warnline" style="font-size:13px">
+      ⚠ הגרפיקה (${lay.gwmm}×${lay.ghmm} מ״מ) לא נכנסת באזור המודפס
+      (${lay.printW.toFixed(0)}×${lay.printH.toFixed(0)} מ״מ אחרי שוליים).
+      הקטיני גרפיקה, הגדילי גיליון או הקטיני שוליים.</div>`;
+    { // explain exactly which dimension doesn't fit
+      const f=v=>(+v.toFixed(1)).toString();
+      const why=[];
+      if(lay.cols===0) why.push(`רוחב הגרפיקה ${f(lay.gwmm/10)} ס״מ גדול מהרוחב המודפס ${f(lay.printW/10)} ס״מ`);
+      if(lay.rows===0) why.push(`גובה הגרפיקה ${f(lay.ghmm/10)} ס״מ גדול מהגובה המודפס ${f(lay.printH/10)} ס״מ`);
+      const needM = Math.max(0, Math.min((lay.sheetW-(lay.cols?0:lay.gwmm))/2, (lay.sheetH-(lay.rows?0:lay.ghmm))/2));
+      els.sheetbox.innerHTML=`<div class="empty" style="line-height:1.8">אין פריסה אפשרית<br>
+        <span style="font-size:12px">${why.join('<br>')}<br>(גיליון ${f(lay.sheetW/10)}×${f(lay.sheetH/10)} פחות שוליים של ${f(lay.margin)} מ״מ מכל צד)
+        ${needM<lay.margin?`<br>כדי שייכנס צריך שוליים של ${f(Math.floor(needM*10)/10)} מ״מ לכל היותר`:''}</span></div>`;
+    }
+    els.stacklist.innerHTML=''; els.ptitle.textContent='—'; els.go.disabled=true; var pg=document.getElementById('pager'); if(pg)pg.style.display='none'; var pc=document.getElementById('pgcaption'); if(pc)pc.textContent=''; var ph=document.getElementById('packheight'); if(ph)ph.innerHTML='';
+    var tsp1=document.getElementById('typeStripPanel'); if(tsp1)tsp1.style.display='none';
+    return;
+  }
+
+  updateStackUI();
+  if(stackMode()){ renderStack(types, lay); return; }
+
+  const printTimes = Math.ceil(totalKits/perSheet);
+  const kitsPerCut = perSheet;
+  const sepTypes = els.noTypeSep.checked ? 0 : Math.max(0,nTypes-1);
+  // duplex types print 2 physical faces per unit, but count as ONE sheet unit in the kit.
+  // pages in the file: each unit = 1 (single) or 2 (duplex front+back) pages.
+  const dupCount = types.filter(t=>t.duplex && t.back).length;
+  const facesPerUnit = t => (t.duplex && t.back) ? 2 : 1;
+  const qtyOf = t => (t.qty!=null ? t.qty : perType);
+  const typePages = types.reduce((s,t)=> s + qtyOf(t)*facesPerUnit(t), 0);
+  const jobDuplex = dupCount>0;                       // separators match: 2 pages if duplex job
+  const sepPages = jobDuplex ? 2 : 1;
+  const kitPages = typePages + (sepTypes + 1)*sepPages; // separators (type + kit) × sidedness
+  const kitsMade = printTimes*perSheet;
+  const remainder = totalKits % perSheet;
+  // split-completion decision for the readout
+  const fullPrints = Math.floor(totalKits/perSheet);
+  const rem = totalKits - fullPrints*perSheet;
+  const halfYield = Math.ceil(perSheet/2);   // rough — actual respects odd grids, close enough for the note
+  const willSplit = rem>0;   // any remainder → a split completion file is produced too
+
+  // physical sheets to load into the printer, across all prints:
+  const netSheetsPerKit = typePages;                 // graphic sheets only (no separators)
+  const netSheetsJob    = netSheetsPerKit*printTimes; // net, whole job
+  const totalSheetsJob  = kitPages*printTimes;        // incl. separators, whole job
+  const sepSheetsJob    = totalSheetsJob - netSheetsJob; // separator sheets, whole job
+
+  // pack-height estimate for ONE printed kit stack (kitPages sheets)
+  // typical caliper: 170gsm ≈ 0.18mm/sheet, 300gsm ≈ 0.33mm/sheet
+  const h170 = (kitPages*0.18/10).toFixed(1);   // cm, one kit
+  const h300 = (kitPages*0.33/10).toFixed(1);   // cm, one kit
+  const H170 = (totalSheetsJob*0.18/10).toFixed(1); // cm, whole job
+  const H300 = (totalSheetsJob*0.33/10).toFixed(1);
+
+  els.readout.innerHTML = `
+    <div class="statgrid">
+      <div class="statbox"><span class="sk">סוגים</span><span class="sv">${nTypes}</span></div>
+      <div class="statbox"><span class="sk">מכל סוג</span><span class="sv">${ ((state.mode==='rep'&&els.repQtyPer.checked)||(state.mode==='multi'&&els.multiQtyPer.checked)) ? 'משתנה' : perType }</span></div>
+      <div class="statbox"><span class="sk">קיטים נדרשים</span><span class="sv">${totalKits}</span></div>
+    </div>
+    ${ lay.bleed>lay.margin ? `<div class="warnline">⚠ הגלישה (${lay.bleed}) גדולה מהשוליים (${lay.margin}) — הגלישה החיצונית תיחתך ע״י המדפסת. הגדילי שוליים ל-${lay.bleed} לפחות.</div>`:''}
+    <hr>
+    <div class="threerow">
+      <div class="framed"><span class="k">כל גיליון מפיק:</span><br><span class="big">${kitsPerCut}</span> <span class="k">קיטים · ${lay.cols}×${lay.rows}</span></div>
+      <div class="framed"><span class="k">להדפיס:</span><br><span class="big">${fullPrints}</span> <span class="k">פעמים</span>${ rem!==0 ? `<br><span style="font-size:10px;color:#1c7fa0">+ קובץ השלמה חצוי (${rem} יח׳)</span>`:''}</div>
+      <div class="framed"><span class="k">סה״כ דפים לעבודה:</span><br><span class="big">${netSheetsJob.toLocaleString()}</span></div>
+    </div>
+    <hr>
+    <div class="kitinfo">
+      <div class="kitinfo-r">
+        <div><span class="k">קובץ קיט בודד:</span> <span class="v">${kitPages}</span> עמודים</div>
+        <div class="k" style="font-size:11px">${typePages} גרפיקה${dupCount?` · כולל ${dupCount} דו-צדדי`:''} + ${sepTypes*sepPages} עמ׳ מפרידי סוג + ${sepPages} מפריד קיט${jobDuplex?' (דו-צדדי)':''}</div>
+        <div style="margin-top:3px"><span class="k">סה״כ דפים מפרידים בעבודה:</span> <span class="v">${sepSheetsJob.toLocaleString()}</span></div>
+      </div>
+      <div class="kitinfo-l">
+        <div class="k" style="font-weight:700;margin-bottom:2px">גובה ערימה משוער:</div>
+        <div><span class="k">קיט בודד — 170:</span> <span class="v">~${h170}</span> <span class="k">· 300:</span> <span class="v">~${h300} ס״מ</span></div>
+        <div><span class="k">כל העבודה — 170:</span> <span class="v">~${H170}</span> <span class="k">· 300:</span> <span class="v">~${H300} ס״מ</span></div>
+      </div>
+    </div>
+    ${ dupCount ? `<div class="k" style="font-size:11.5px">דו-צדדי: כל סוג כזה מודפס קדמי+אחורי (היפוך צד), ונספר כיישות אחת.</div>`:''}
+    ${ rem!==0 ? `<div class="warnline" style="color:#1c7fa0">ℹ יירדו <b>שני קבצים</b>: קיט מלא (הדפיסי ${fullPrints} פעם — ${fullPrints*perSheet} קיטים) + <b>קובץ השלמה חצוי</b> לשאר (${rem} ${rem===1?'קיט':'קיטים'}). ההחלטה אם להשתמש בחצוי או להדפיס גיליון מלא נוסף ולזרוק — שלך.</div>`:''}
+  `;
+
+  // pack-height panel under the preview is no longer used (moved into the summary)
+  const phEl=$('packheight'); if(phEl) phEl.innerHTML='';
+
+  // build a representative sheet plan to page through (one unit per type, + separators)
+  previewState.lay = lay;
+  previewState.types = types;
+  buildTypeStrip(types);
+  rebuildPreviewPlan();          // honours the selected type filter
+  buildStackList(types, perType);
+  els.ptitle.textContent = `${lay.sheetW}×${lay.sheetH} מ״מ · ${lay.cols}×${lay.rows}`;
+  els.go.disabled=false;
+}
+
+/* ---------- cut & stack: summary, pile list and preview plan ---------- */
+function renderStack(types, lay){
+  const P=planStack(types, lay), dup=anyDuplex(types);
+  const filePages = P.sheets*(dup?2:1);
+  const h170=(P.sheets*0.18/10).toFixed(1), h300=(P.sheets*0.33/10).toFixed(1);
+  const pileH170=((P.L+(P.numbered?1:0))*0.18/10).toFixed(1);
+  els.readout.innerHTML=`
+    <div class="statgrid">
+      <div class="statbox"><span class="sk">סוגים</span><span class="sv">${types.length}</span></div>
+      <div class="statbox"><span class="sk">יחידות</span><span class="sv">${P.units.toLocaleString()}</span></div>
+      <div class="statbox"><span class="sk">בכל גיליון</span><span class="sv">${P.cells}</span></div>
+    </div>
+    ${ lay.bleed>lay.margin ? `<div class="warnline">⚠ הגלישה (${lay.bleed}) גדולה מהשוליים (${lay.margin}).</div>`:''}
+    <hr>
+    <div class="threerow">
+      <div class="framed"><span class="k">ערימות:</span><br><span class="big">${P.cells}</span> <span class="k">· ${lay.cols}×${lay.rows}</span></div>
+      <div class="framed"><span class="k">להדפיס:</span><br><span class="big">1</span> <span class="k">פעם</span></div>
+      <div class="framed"><span class="k">סה״כ גיליונות:</span><br><span class="big">${P.sheets.toLocaleString()}</span></div>
+    </div>
+    <hr>
+    <div class="kitinfo">
+      <div class="kitinfo-r">
+        <div>${P.units} יחידות${P.seps?` + ${P.seps} מפרידים`:''}${P.numbered?` + ${P.cells} דפי מספור`:''}</div>
+        <div><span class="k">משבצות לבנות בסוף:</span> <span class="v">${P.blanks}</span></div>
+        <div class="k" style="font-size:11px">${filePages} עמודים בקובץ${dup?' (קדמי ואחורי)':''} · ${P.L+(P.numbered?1:0)} דפים בכל ערימה</div>
+      </div>
+      <div class="kitinfo-l">
+        <div class="k" style="font-weight:700;margin-bottom:2px">אחרי החיתוך:</div>
+        <div>ערימה 1 מעל 2${P.cells>2?' מעל 3':''}${P.cells>3?'… עד '+P.cells:''}${P.numbered?', ואז להוציא את דפי המספור':''}.</div>
+        <div class="k" style="margin-top:4px">גובה: כל ערימה ~${pileH170} ס״מ (170) · כל העבודה ~${h170} / ${h300} ס״מ</div>
+      </div>
+    </div>`;
+  // pile list under the canvas
+  const nm=i=>stackName(types[i],i);
+  let html='';
+  for(let p=0;p<P.cells;p++){
+    const runs=[];
+    for(let k=0;k<P.sheets;k++){
+      const it=P.at(k,p);
+      const key = !it ? 'blank' : it.kind==='num' ? 'num' : it.kind+':'+it.t;
+      const last=runs[runs.length-1];
+      if(last && last.key===key) last.n++; else runs.push({key, it, n:1});
+    }
+    const txt=runs.map(r=>{
+      if(r.key==='blank') return `<span class="run"><i style="background:#e3e7ea"></i>${r.n} לבנים</span>`;
+      if(r.key==='num')   return `<span class="run"><i style="background:#1c2230"></i>מספור</span>`;
+      if(r.it.kind==='sep') return `<span class="run"><i style="background:${colorHex(state.sepTypeColor)||'#ccc'}"></i>מפריד ${r.it.t+1}</span>`;
+      return `<span class="run"><i style="background:var(--accent)"></i><span style="direction:ltr;unicode-bidi:isolate">${nm(r.it.t)}</span> ×${r.n}</span>`;
+    }).join('');
+    html+=`<div class="pile"><span class="pn">${p+1}</span><div class="pc">${txt}</div></div>`;
+  }
+  els.stacklist.innerHTML=`<div class="k" style="font-weight:700;margin:6px 0 2px">מה יש בכל ערימה (מלמעלה למטה):</div>`+html;
+  // preview: every sheet, front (and back when duplex)
+  const plan=[];
+  for(let k=0;k<P.sheets;k++){
+    const tag = (P.numbered&&k===0) ? ' · דף מספור' : '';
+    plan.push({kind:'stack', k, back:false, label:`גיליון ${k+1} מתוך ${P.sheets}${tag}${dup?' · קדמי':''}`});
+    if(dup) plan.push({kind:'stack', k, back:true, label:`גיליון ${k+1} מתוך ${P.sheets}${tag} · אחורי (היפוך צד)`});
+  }
+  previewState.lay=lay; previewState.types=types; previewState.stack=P; previewState.plan=plan;
+  if(previewState.idx>=plan.length) previewState.idx=0;
+  renderPreviewPage();
+  els.ptitle.textContent = `${lay.sheetW}×${lay.sheetH} מ״מ · ${lay.cols}×${lay.rows}`;
+  els.go.disabled=false;
+}
+
+function drawStackPreview(lay, P, types, k, back){
+  const W=lay.sheetW, H=lay.sheetH;
+  els.sheetbox.style.setProperty('--ar', W/H);
+  const gw=lay.gwmm, gh=lay.ghmm, gp=lay.gap;
+  const pitchX=gw+gp, pitchY=gh+gp;
+  const blockW=lay.cols*gw+(lay.cols-1)*gp, blockH=lay.rows*gh+(lay.rows-1)*gp;
+  const offX=(W-blockW)/2, offY=(H-blockH)/2;
+  const FRAME=Math.min(Math.max(1,(+els.frameW.value)*10), 0.45*Math.min(gw,gh));
+  const sepHex=colorHex(state.sepTypeColor)||'#999';
+  const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  let out='';
+  for(let p=0;p<P.cells;p++){
+    const [r,c]=P.order[p];
+    const cc = back ? (lay.cols-1-c) : c;
+    const x=offX+cc*pitchX, y=offY+r*pitchY, cx=x+gw/2, cy=y+gh/2;
+    const it=P.at(k,p);
+    if(!it){
+      out+=`<rect x="${x}" y="${y}" width="${gw}" height="${gh}" fill="#f1f3f5"/>`+
+           `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${Math.min(gw,gh)*0.07}" fill="#aab2b9">ריק</text>`;
+    }else if(it.kind==='num'){
+      if(!back){
+        out+=`<text x="${cx}" y="${cy-gh*0.04}" text-anchor="middle" dominant-baseline="middle" font-size="${Math.min(gw,gh)*0.5}" font-weight="700" fill="#1c2230">${p+1}</text>`+
+             `<text x="${cx}" y="${y+gh*0.82}" text-anchor="middle" font-size="${Math.min(gw,gh)*0.055}" fill="#5a656d" direction="rtl">ערימה ${p+1} מתוך ${P.cells}</text>`;
+      }
+    }else if(it.kind==='sep'){
+      out+=`<rect x="${x+FRAME/2}" y="${y+FRAME/2}" width="${gw-FRAME}" height="${gh-FRAME}" fill="none" stroke="${sepHex}" stroke-width="${FRAME}"/>`;
+      if(!back){
+        const fs=Math.min(gw,gh)*0.06;
+        out+=`<text x="${cx}" y="${cy-fs*0.7}" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" font-weight="700" fill="#1c2230">${esc(stackName(types[it.t],it.t))}</text>`+
+             `<text x="${cx}" y="${cy+fs*0.9}" text-anchor="middle" dominant-baseline="middle" font-size="${fs*0.85}" fill="#1c2230" direction="rtl">כמות: ${it.qty}</text>`;
+      }
+    }else{
+      const t=types[it.t];
+      let th=null;
+      if(!back) th=t.thumb||(t.front&&t.front.thumb);
+      else if(t.duplex&&t.back) th=(t.back.pageThumbs&&t.back.pageThumbs[t.backPage||0])||t.back.thumb||t.thumb;
+      if(th) out+=svgThumb(th, x, y, gw, gh, back?backRot(t.rot||0):(t.rot||0));
+    }
+    out+=`<rect x="${x}" y="${y}" width="${gw}" height="${gh}" fill="none" stroke="#2f6f4e" stroke-width=".4"/>`;
+    if(!back) out+=`<text x="${x+3}" y="${y+gh-3}" font-size="${Math.min(gw,gh)*0.045}" fill="#7b3fe4" opacity=".75">${p+1}</text>`;
+  }
+  let mk='';
+  if(els.marks.checked){
+    const gapM=2, ml=4, xs=[], ys=[];
+    for(let c=0;c<lay.cols;c++){ const x=offX+c*pitchX; xs.push(x); xs.push(x+gw); }
+    for(let r=0;r<lay.rows;r++){ const y=offY+r*pitchY; ys.push(y); ys.push(y+gh); }
+    const uniq=a=>[...new Set(a.map(v=>+v.toFixed(3)))];
+    uniq(xs).forEach(x=>{ mk+=`<line x1="${x}" y1="${offY-gapM-ml}" x2="${x}" y2="${offY-gapM}" stroke="#111" stroke-width=".3"/><line x1="${x}" y1="${offY+blockH+gapM}" x2="${x}" y2="${offY+blockH+gapM+ml}" stroke="#111" stroke-width=".3"/>`; });
+    uniq(ys).forEach(y=>{ mk+=`<line x1="${offX-gapM-ml}" y1="${y}" x2="${offX-gapM}" y2="${y}" stroke="#111" stroke-width=".3"/><line x1="${offX+blockW+gapM}" y1="${y}" x2="${offX+blockW+gapM+ml}" y2="${y}" stroke="#111" stroke-width=".3"/>`; });
+  }
+  els.sheetbox.innerHTML=`<svg class="sheet" viewBox="0 0 ${W} ${H}" font-family="Google Sans, Noto Sans Hebrew, Arial, sans-serif">
+    <rect x="0" y="0" width="${W}" height="${H}" fill="#fff" stroke="#d9d5cc" stroke-width=".5"/>${out}${mk}</svg>`;
+}
+
+/* ---------- preview pager ---------- */
+const previewState = { plan:[], idx:0, lay:null, types:[], typeFilter:null };
+
+// ---- type selector strip: pick a type (or 'all') to drive the canvas ----
+function buildTypeStrip(types){
+  const strip = $('typeStrip'), panel = $('typeStripPanel');
+  if(!strip || !panel){ previewState.typeFilter=null; return; }   // strip removed: canvas shows the full kit
+  if(!types.length){ panel.style.display='none'; return; }
+  panel.style.display='';
+  // keep filter valid
+  if(previewState.typeFilter!=null && previewState.typeFilter>=types.length) previewState.typeFilter=null;
+  let html = `<div class="tchip allchip${previewState.typeFilter==null?' on':''}" data-t="all">
+      <span class="tnum">∑</span><span class="tnm">הגיליון המלא (כל הסוגים)</span></div>`;
+  types.forEach((t,i)=>{
+    const thumb = t.thumb || (t.front && t.front.thumb) || '';
+    const nm = typeName(t,i);
+    const np = (t.duplex && t.back) ? 2 : 1;
+    html += `<div class="tchip${previewState.typeFilter===i?' on':''}" data-t="${i}" title="${nm}">
+      <span class="tnum">${i+1}</span>
+      ${thumb?`<img src="${thumb}">`:''}
+      <span class="tnm">${nm}</span>
+      <span class="tpg">${np>1?'דו-צדדי':''}</span></div>`;
+  });
+  strip.innerHTML = html;
+  strip.querySelectorAll('.tchip').forEach(ch=>{
+    ch.onclick=()=>{
+      const v = ch.dataset.t;
+      previewState.typeFilter = (v==='all') ? null : (+v);
+      previewState.idx = 0;
+      buildTypeStrip(previewState.types);   // refresh 'on' state
+      rebuildPreviewPlan();
+    };
+  });
+  if($('typeStripHint')) $('typeStripHint').textContent = previewState.typeFilter==null
+    ? 'מציג את רצף הקיט המלא' : 'מציג סוג אחד — עמוד אחרי עמוד';
+}
+
+// a readable name for a type (derived from its source file + page)
+function typeName(t,i){
+  const f = t.front;
+  let base = f && f.name ? f.name.replace(/\.pdf$/i,'') : `סוג ${i+1}`;
+  if(base.length>26) base = base.slice(0,24)+'…';
+  const np = f && f.pages ? f.pages : 1;
+  if(np>1 && typeof t.frontPage==='number') base += ` · עמ׳ ${t.frontPage+1}`;
+  return base;
+}
+
+// build the page plan for the canvas, filtered to the selected type
+function rebuildPreviewPlan(){
+  const types = previewState.types;
+  if(previewState.typeFilter==null){
+    previewState.plan = buildSheetPlan(types);          // full kit sequence
+    $('canvasTitle').textContent = 'הגיליון המלא';
+  }else{
+    const i = previewState.typeFilter, t = types[i];
+    previewState.plan = buildTypePages(t, i);           // just this type's sheet(s)
+    $('canvasTitle').textContent = typeName(t,i);
+  }
+  if(previewState.idx>=previewState.plan.length) previewState.idx=0;
+  renderPreviewPage();
+}
+
+// one type → its sheet(s): front, and back if duplex
+function buildTypePages(t, i){
+  const out=[];
+  const baseThumb = t.thumb || (t.front && t.front.thumb);
+  const nm = typeName(t,i);
+  out.push({kind:'graphic', label:`${nm} — קדמי`, thumb:baseThumb, mirror:false});
+  if(t.duplex && t.back){
+    const bthumb = (t.back.pageThumbs&&t.back.pageThumbs[t.backPage||0]) || t.back.thumb || baseThumb;
+    out.push({kind:'graphic', label:`${nm} — אחורי (היפוך צד)`, thumb:bthumb, mirror:true});
+  }
+  return out;
+}
+function buildSheetPlan(types){
+  const plan=[];
+  types.forEach((t,i)=>{
+    const thumb = t.thumb || (t.front && t.front.thumb);
+    plan.push({kind:'graphic', label:`סוג ${i+1} — קדמי`, thumb, mirror:false, rot:t.rot||0});
+    if(t.duplex && t.back){
+      const bthumb = (t.back.pageThumbs&&t.back.pageThumbs[t.backPage||0]) || t.back.thumb || thumb;
+      plan.push({kind:'graphic', label:`סוג ${i+1} — אחורי (היפוך צד)`, thumb:bthumb, mirror:true, rot:backRot(t.rot||0)});
+    }
+    if(i<types.length-1 && !els.noTypeSep.checked)
+      plan.push({kind:'sep', label:`מפריד סוג`, color:state.sepTypeColor});
+  });
+  plan.push({kind:'sep', label:`מפריד קיט (סוף הקובץ)`, color:state.sepKitColor});
+  return plan;
+}
+function renderPreviewPage(){
+  const {plan,idx,lay}=previewState;
+  if(!plan.length||!lay){ return; }
+  const item=plan[Math.min(idx,plan.length-1)];
+  $('pager').style.display='flex';
+  $('pglabel').textContent=`${idx+1} מתוך ${plan.length}`;
+  $('pgPrev').disabled = idx<=0;
+  $('pgNext').disabled = idx>=plan.length-1;
+  $('pgFirst').disabled = idx<=0;
+  $('pgLast').disabled = idx>=plan.length-1;
+  $('pgcaption').textContent=item.label;
+  if(item.kind==='stack') drawStackPreview(lay, previewState.stack, previewState.types, item.k, item.back);
+  else if(item.kind==='sep') drawSeparatorPreview(lay, item.color);
+  else drawPreview(lay, item.thumb?{thumb:item.thumb}:null, item.mirror, item.rot||0);
+}
+$('pgPrev').onclick=()=>{ if(previewState.idx>0){previewState.idx--; renderPreviewPage();} };
+$('pgNext').onclick=()=>{ if(previewState.idx<previewState.plan.length-1){previewState.idx++; renderPreviewPage();} };
+$('pgFirst').onclick=()=>{ previewState.idx=0; renderPreviewPage(); };
+$('pgLast').onclick=()=>{ previewState.idx=Math.max(0,previewState.plan.length-1); renderPreviewPage(); };
+
+/* ---------- SVG preview of a single sheet ---------- */
+function svgThumb(href,x,y,w,h,rot){        // image filling a cell, turned clockwise by rot
+  rot=rot||0; const cx=x+w/2, cy=y+h/2, t=(rot===90||rot===270);
+  const iw=t?h:w, ih=t?w:h;
+  return `<image href="${href}" x="${cx-iw/2}" y="${cy-ih/2}" width="${iw}" height="${ih}" preserveAspectRatio="none"${rot?` transform="rotate(${rot} ${cx} ${cy})"`:''}/>`;
+}
+function drawPreview(lay, sample, mirror, rot){
+  const W=lay.sheetW, H=lay.sheetH;
+  els.sheetbox.style.setProperty('--ar', W/H);
+  const gw=lay.gwmm, gh=lay.ghmm, gp=lay.gap;
+  const pitchX=gw+gp, pitchY=gh+gp;
+  const blockW=lay.cols*gw+(lay.cols-1)*gp, blockH=lay.rows*gh+(lay.rows-1)*gp;
+  const offX=(W-blockW)/2, offY=(H-blockH)/2;
+  const marks = els.marks.checked;
+  const b = lay.bleed;                       // bleed mm
+  const hasImg = sample && sample.thumb;
+  let imgs='', frames='';
+  for(let r=0;r<lay.rows;r++) for(let c=0;c<lay.cols;c++){
+    const cc = mirror ? (lay.cols-1-c) : c;    // back side mirrors column position
+    const x=offX+cc*pitchX, y=offY+r*pitchY;
+    if(hasImg){
+      imgs+=svgThumb(sample.thumb, x-b, y-b, gw+2*b, gh+2*b, rot);
+    }else{
+      imgs+=`<rect x="${x}" y="${y}" width="${gw}" height="${gh}" fill="#eef3f0"/>`;
+    }
+    frames+=`<rect x="${x}" y="${y}" width="${gw}" height="${gh}"
+      fill="none" stroke="#2f6f4e" stroke-width=".4"/>`;
+  }
+  let bleedFrame='';
+  if(b>0 && gp===0){
+    bleedFrame=`<rect x="${offX-b}" y="${offY-b}" width="${blockW+2*b}" height="${blockH+2*b}"
+      fill="none" stroke="#a4451f" stroke-width=".4" stroke-dasharray="2 1.5"/>`;
+  }
+  const cells = imgs+frames+bleedFrame;
+  let mk='';
+  if(marks){
+    const gapM=2, ml=4;
+    // collect vertical cut lines (x positions) and horizontal (y positions)
+    const xs=[], ys=[];
+    for(let c=0;c<lay.cols;c++){ const x=offX+c*pitchX; xs.push(x); xs.push(x+gw); }
+    for(let r=0;r<lay.rows;r++){ const y=offY+r*pitchY; ys.push(y); ys.push(y+gh); }
+    const uniq=a=>[...new Set(a.map(v=>+v.toFixed(3)))];
+    uniq(xs).forEach(x=>{
+      mk+=`<line x1="${x}" y1="${offY-gapM-ml}" x2="${x}" y2="${offY-gapM}" stroke="#111" stroke-width=".3"/>`;
+      mk+=`<line x1="${x}" y1="${offY+blockH+gapM}" x2="${x}" y2="${offY+blockH+gapM+ml}" stroke="#111" stroke-width=".3"/>`;
+    });
+    uniq(ys).forEach(y=>{
+      mk+=`<line x1="${offX-gapM-ml}" y1="${y}" x2="${offX-gapM}" y2="${y}" stroke="#111" stroke-width=".3"/>`;
+      mk+=`<line x1="${offX+blockW+gapM}" y1="${y}" x2="${offX+blockW+gapM+ml}" y2="${y}" stroke="#111" stroke-width=".3"/>`;
+    });
+  }
+  els.sheetbox.innerHTML =
+    `<svg class="sheet" viewBox="0 0 ${W} ${H}">
+      <rect x="0" y="0" width="${W}" height="${H}" fill="#fff" stroke="#d9d5cc" stroke-width=".5"/>
+      ${cells}${mk}</svg>`;
+}
+
+/* ---------- SVG preview of a colour separator sheet ---------- */
+function drawSeparatorPreview(lay, colorId){
+  const W=lay.sheetW, H=lay.sheetH;
+  els.sheetbox.style.setProperty('--ar', W/H);
+  const gw=lay.gwmm, gh=lay.ghmm, gp=lay.gap;
+  const pitchX=gw+gp, pitchY=gh+gp;
+  const blockW=lay.cols*gw+(lay.cols-1)*gp, blockH=lay.rows*gh+(lay.rows-1)*gp;
+  const offX=(W-blockW)/2, offY=(H-blockH)/2;
+  const marks = els.marks.checked;
+  const hex = colorHex(colorId);
+  const FRAME=Math.min(Math.max(1,(+els.frameW.value)*10), 0.45*Math.min(gw,gh));
+  const SB=Math.max(0.5,(+els.bleed.value)||0);
+  let frame='';
+  if(hex){
+    for(let r=0;r<lay.rows;r++) for(let c=0;c<lay.cols;c++){
+      const x=offX+c*pitchX, y=offY+r*pitchY;
+      const bL=(gp>0||c===0)?SB:0, bR=(gp>0||c===lay.cols-1)?SB:0;
+      const bT=(gp>0||r===0)?SB:0, bB=(gp>0||r===lay.rows-1)?SB:0;
+      const fx=x-bL, fy=y-bT, fw=gw+bL+bR, fh=gh+bT+bB;
+      frame+=
+        `<rect x="${fx}" y="${fy}" width="${fw}" height="${FRAME}" fill="${hex}"/>`+
+        `<rect x="${fx}" y="${fy+fh-FRAME}" width="${fw}" height="${FRAME}" fill="${hex}"/>`+
+        `<rect x="${fx}" y="${fy+FRAME}" width="${FRAME}" height="${fh-2*FRAME}" fill="${hex}"/>`+
+        `<rect x="${fx+fw-FRAME}" y="${fy+FRAME}" width="${FRAME}" height="${fh-2*FRAME}" fill="${hex}"/>`;
+    }
+  }
+  let mk='';
+  if(marks){
+    const gapM=2, ml=4;
+    const xs=[], ys=[];
+    for(let c=0;c<lay.cols;c++){ const x=offX+c*pitchX; xs.push(x); xs.push(x+gw); }
+    for(let r=0;r<lay.rows;r++){ const y=offY+r*pitchY; ys.push(y); ys.push(y+gh); }
+    const uniq=a=>[...new Set(a.map(v=>+v.toFixed(3)))];
+    uniq(xs).forEach(x=>{
+      mk+=`<line x1="${x}" y1="${offY-gapM-ml}" x2="${x}" y2="${offY-gapM}" stroke="#111" stroke-width=".3"/>`;
+      mk+=`<line x1="${x}" y1="${offY+blockH+gapM}" x2="${x}" y2="${offY+blockH+gapM+ml}" stroke="#111" stroke-width=".3"/>`;
+    });
+    uniq(ys).forEach(y=>{
+      mk+=`<line x1="${offX-gapM-ml}" y1="${y}" x2="${offX-gapM}" y2="${y}" stroke="#111" stroke-width=".3"/>`;
+      mk+=`<line x1="${offX+blockW+gapM}" y1="${y}" x2="${offX+blockW+gapM+ml}" y2="${y}" stroke="#111" stroke-width=".3"/>`;
+    });
+  }
+  els.sheetbox.innerHTML =
+    `<svg class="sheet" viewBox="0 0 ${W} ${H}">
+      <rect x="0" y="0" width="${W}" height="${H}" fill="#fff" stroke="#d9d5cc" stroke-width=".5"/>
+      ${frame}${mk}</svg>`;
+}
+
+/* ---------- stack order list ---------- */
+function sepLabel(colorId, text){
+  const hex=colorHex(colorId);
+  const dot = hex
+    ? `<span style="display:inline-block;width:12px;height:12px;border-radius:3px;
+        background:${hex};margin-inline-start:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.2)"></span>`
+    : '';
+  const cls = hex ? '' : 'white';
+  return `<div class="sr ${cls}"><span class="n">— — —</span>${text}${dot}</div>`;
+}
+function buildStackList(types, perType){
+  let html='';
+  const n=types.length;
+  for(let t=0;t<n;t++){
+    const ty=types[t];
+    const nm = ty.front ? ty.front.name : `סוג ${t+1}`;
+    const dup = (ty.duplex && ty.back) ? ' · דו-צדדי' : '';
+    html+=`<div class="sr"><span class="idx" style="background:#7b3fe4;color:#fff;
+      min-width:22px;height:22px;border-radius:5px;display:inline-flex;align-items:center;
+      justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700">${t+1}</span>
+      <span class="nm" style="direction:ltr">${nm}</span>
+      <span class="cnt">${ty.qty!=null?ty.qty:perType} יח׳${dup}</span></div>`;
+    if(t<n-1 && !els.noTypeSep.checked)
+      html+=sepLabel(state.sepTypeColor, 'מפריד סוג');
+  }
+  html+=sepLabel(state.sepKitColor, 'מפריד קיט (סוף הקובץ)');
+  els.stacklist.innerHTML=html;
+}
+
+['gw','gh','perType','totalKits','sheetW','sheetH','margin','bleed','gap','marks','frameW'].forEach(id=>
+  els[id].addEventListener('input',recompute));
+els.noTypeSep.addEventListener('change',recompute);
+['gw','gh'].forEach(id=>els[id].addEventListener('change',()=>{ updateTrimNote(); renderTypes(); renderRep(); }));
+els.marks.addEventListener('change',recompute);
+$('numPages').addEventListener('change',recompute);
+els.multiQtyPer.addEventListener('change',()=>{
+  const on=els.multiQtyPer.checked && state.mode==='multi';
+  els.perType.disabled = on || (els.repQtyPer.checked && state.mode==='rep');
+  els.perType.style.opacity = els.perType.disabled ? .45 : 1;
+  renderTypes(); recompute();
+});
+els.kitSplit.addEventListener('change',()=>{
+  const v=els.kitSplit.value;
+  $('splitMethodField').style.display = (v!=='1')?'':'none';
+  if(v==='custom') openCustomSplit();
+  recompute();
+});
+els.splitMethod.addEventListener('change',recompute);
+
+// single-cut checkbox toggles the gap field
+els.singleCut.addEventListener('change',()=>{
+  $('gapField').style.display = els.singleCut.checked ? 'none' : '';
+  recompute();
+});
+
+// auto-bleed checkbox: disable manual bleed field when using file's built-in bleed
+els.autoBleed.addEventListener('change',()=>{
+  els.bleed.disabled = els.autoBleed.checked;
+  els.bleed.style.opacity = els.autoBleed.checked ? .45 : 1;
+  recompute();
+});
+
+// swap width <-> height
+function swapVals(aId,bId){ const a=$(aId),b=$(bId); const t=a.value; a.value=b.value; b.value=t; recompute(); }
+$('swapG').onclick=()=>swapVals('gw','gh');
+$('swapS').onclick=()=>swapVals('sheetW','sheetH');
+
+// ---- size preset pickers (menu + add + star-default + persist) ----
+function loadPresets(key, defaults){
+  try{ const s=localStorage.getItem(key); if(s){ const a=JSON.parse(s); if(Array.isArray(a)&&a.length) return a; } }catch(e){}
+  return defaults.map(p=>({...p}));
+}
+function savePresets(key, list){ try{ localStorage.setItem(key, JSON.stringify(list)); }catch(e){} }
+let gPresets = loadPresets('kit_gPresets', GRAPHIC_PRESETS);
+let sPresets = loadPresets('kit_sPresets', SHEET_PRESETS);
+
+function renderPresetMenu(menuId, list, key, applyFn){
+  const menu=$(menuId); menu.innerHTML='';
+  list.sort((a,b)=>a.w-b.w);
+  list.forEach((p,idx)=>{
+    const it=document.createElement('div'); it.className='pm-item';
+    const star = p.def ? '★' : '☆';
+    it.innerHTML=`<span class="pm-star" title="קבעי כברירת מחדל">${star}</span>`+
+      `<span class="pm-pick">${p.w} × ${p.h} ס״מ</span>`+
+      `<span class="pm-del" title="מחקי">✕</span>`;
+    it.querySelector('.pm-pick').onclick=()=>{ applyFn(p.w,p.h); menu.classList.remove('open'); };
+    it.querySelector('.pm-star').onclick=(e)=>{ e.stopPropagation();
+      const wasDef=p.def; list.forEach(x=>x.def=false); p.def=!wasDef;   // toggle; only one default
+      savePresets(key,list); renderPresetMenu(menuId,list,key,applyFn);
+    };
+    it.querySelector('.pm-del').onclick=(e)=>{ e.stopPropagation(); list.splice(idx,1); savePresets(key,list); renderPresetMenu(menuId,list,key,applyFn); };
+    menu.appendChild(it);
+  });
+  const add=document.createElement('div'); add.className='pm-add';
+  add.innerHTML=`<input type="number" step="0.1" min="1" placeholder="רוחב" class="pm-w">
+    <input type="number" step="0.1" min="1" placeholder="גובה" class="pm-h"><button type="button">+</button>`;
+  add.querySelector('button').onclick=()=>{
+    const w=parseFloat(add.querySelector('.pm-w').value), h=parseFloat(add.querySelector('.pm-h').value);
+    if(w>0&&h>0){ list.push({w,h}); savePresets(key,list); renderPresetMenu(menuId,list,key,applyFn); }
+  };
+  menu.appendChild(add);
+}
+function wirePicker(btnId, menuId, list, key, applyFn){
+  renderPresetMenu(menuId, list, key, applyFn);
+  $(menuId).addEventListener('click',e=>e.stopPropagation());
+  $(btnId).onclick=(e)=>{ e.stopPropagation();
+    document.querySelectorAll('.preset-menu').forEach(m=>{ if(m.id!==menuId) m.classList.remove('open'); });
+    $(menuId).classList.toggle('open');
+  };
+}
+const applyG=(w,h)=>{ els.gw.value=w; els.gh.value=h; recompute(); };
+const applyS=(w,h)=>{ els.sheetW.value=w; els.sheetH.value=h; recompute(); };
+wirePicker('gPresetBtn','gPresetMenu', gPresets, 'kit_gPresets', applyG);
+wirePicker('sPresetBtn','sPresetMenu', sPresets, 'kit_sPresets', applyS);
+document.addEventListener('click',()=>document.querySelectorAll('.preset-menu').forEach(m=>m.classList.remove('open')));
+
+// apply saved default sizes on load (if any preset is starred)
+(function applyDefaults(){
+  const gd=gPresets.find(p=>p.def); if(gd){ els.gw.value=gd.w; els.gh.value=gd.h; }
+  const sd=sPresets.find(p=>p.def); if(sd){ els.sheetW.value=sd.w; els.sheetH.value=sd.h; }
+})();
+
+/* ---------- BUILD PDF ---------- */
+/* ---------- clear all loaded files (two clicks: click, then confirm) ---------- */
+(function(){
+  const btn=$('clearAll'); let timer=null;
+  const reset=()=>{ btn.classList.remove('confirm'); btn.querySelector('span').textContent='נקה הכל'; timer=null; };
+  btn.onclick=()=>{
+    if(!btn.classList.contains('confirm')){
+      btn.classList.add('confirm'); btn.querySelector('span').textContent='בטוח?';
+      timer=setTimeout(reset,3000); return;
+    }
+    clearTimeout(timer); reset();
+    state.files=[]; state.rows=[]; state.fixedB=null;
+    { const jn=$('jobName'); if(jn) jn.value=''; }
+    if(typeof previewState!=='undefined'){ previewState.typeFilter=null; previewState.idx=0; }
+    renderTypes(); renderRep(); if(typeof renderFixedB==='function') renderFixedB();
+    const n=$('trimNote'); if(n) n.innerHTML='';
+    $('prog').classList.remove('on');
+    recompute();
+  };
+})();
+/* ---------- widen the file list by dragging its left edge; ↺ returns it ---------- */
+(function(){
+  const wrap=$('typesWrap'), grip=$('typesGrip'), list=$('types');
+  let startX=0, startW=0, baseW=0;
+  const setW=w=>{
+    baseW = baseW || wrap.clientWidth;
+    w = Math.max(baseW, Math.min(w, window.innerWidth-40));
+    if(w<=baseW+4){ reset(); return; }
+    if(!wrap.classList.contains('wide')){
+      wrap.style.height = wrap.offsetHeight+'px';          // keep the space, so nothing below moves
+    }
+    wrap.classList.add('wide');
+    wrap.style.setProperty('--tw', w+'px');
+  };
+  const reset=()=>{ wrap.classList.remove('wide'); wrap.style.height=''; wrap.style.removeProperty('--tw'); };
+  grip.addEventListener('pointerdown',e=>{
+    e.preventDefault(); grip.setPointerCapture(e.pointerId);
+    baseW = wrap.clientWidth;
+    startX = e.clientX; startW = wrap.classList.contains('wide') ? list.offsetWidth : baseW;
+    wrap.classList.add('dragging');
+  });
+  grip.addEventListener('pointermove',e=>{
+    if(!wrap.classList.contains('dragging')) return;
+    setW(startW + (startX - e.clientX));                  // dragging left = wider (RTL panel on the right)
+  });
+  const end=()=>wrap.classList.remove('dragging');
+  grip.addEventListener('pointerup',end); grip.addEventListener('pointercancel',end);
+  grip.addEventListener('dblclick',reset);
+  $('typesReset').onclick=reset;
+  // when files are cleared or the list empties, go back to normal
+  new MutationObserver(()=>{ if(!list.children.length) reset(); }).observe(list,{childList:true});
+})();
+/* ---------- installed app: version + updates from GitHub ---------- */
+const APP_VERSION = 1;
+(function(){
+  if(!window.desk) return;                     // artifact / browser: nothing to show
+  const bar=$('appbar'), ver=$('appver'), upd=$('appupd');
+  bar.hidden=false;
+  const show=v=>{ ver.textContent=`שולחן קיטים · גרסה ${v}`; };
+  show(APP_VERSION);
+  async function check(manual){
+    upd.innerHTML='<span>בודק עדכון…</span>';
+    const u=await desk.checkUpdate();
+    if(u && u.ok) show(u.current||APP_VERSION);
+    if(u && u.ok && u.available){
+      upd.innerHTML=`<button id="bUpd">יש גרסה חדשה (${u.latest}) – לעדכן</button>${u.notes?` <span>${u.notes.replace(/</g,'&lt;')}</span>`:''}`;
+      $('bUpd').onclick=async()=>{ const b=$('bUpd'); b.disabled=true; b.textContent='מעדכן…';
+        const r=await desk.applyUpdate(); if(!r.ok){ b.disabled=false; b.textContent='העדכון נכשל – לנסות שוב'; b.title=r.error||''; } };
+    }else if(u && u.ok){
+      upd.innerHTML=`<button class="ghost" id="bChk">בדיקת עדכון</button>${manual?' <span>✓ זו הגרסה האחרונה</span>':''}`;
+      $('bChk').onclick=()=>check(true);
+    }else{
+      upd.innerHTML=`<button class="ghost" id="bChk">בדיקת עדכון</button> <span>אין חיבור לבדיקה</span>`;
+      $('bChk').onclick=()=>check(true);
+    }
+  }
+  check(false);
+})();
+var lastSavedPath=null;   // installed app: where the last PDF was saved
+var _dlCap; // artifact downloads capability: undefined=not asked, null=unavailable, object=ready
+$('go').onclick = async ()=>{
+  try{ await build(); }
+  catch(err){
+    console.error(err);
+    setProg(1,'⚠ שגיאה ביצירת הקובץ: '+(err&&err.message?err.message:err));
+    els.go.disabled=false;
+  }
+};
+function setProg(p,txt){ $('prog').classList.add('on'); $('barfill').style.width=(p*100)+'%'; $('proglab').textContent=txt; }
+
+async function build(){
+  const { PDFDocument } = PDFLib;
+  const types = getTypes();
+  const nTypes = types.length;
+  const perType=Math.max(1,+els.perType.value|0);
+  const totalKits=Math.max(1,+els.totalKits.value|0);
+  const lay=computeLayout();
+  const perSheet=lay.per;
+  const sheetsPerUnit=Math.ceil(totalKits/perSheet);
+  const marks=els.marks.checked;
+  const W=lay.sheetW*MM, H=lay.sheetH*MM;
+  const gw=lay.gwmm*MM, gh=lay.ghmm*MM;
+  const gp=lay.gap*MM;
+  const pitchX=gw+gp, pitchY=gh+gp;
+  const blockW=lay.cols*gw+(lay.cols-1)*gp, blockH=lay.rows*gh+(lay.rows-1)*gp;
+  const offX=(W-blockW)/2, offY=(H-blockH)/2;
+
+  els.go.disabled=true;
+  setProg(.02,'טוען קבצי מקור…');
+
+  const out = await PDFDocument.create();
+  const b = lay.bleed*MM;                    // bleed the user says is built into the files
+
+  // embed one graphic (a {bytes} object) at a given page index, clipped to TrimBox+bleed.
+  const useAutoBleed = els.autoBleed.checked;
+  async function embedGraphic(graphic, pageIndex){
+    if(!graphic) return null;
+    const src = await PDFDocument.load(graphic.bytes);
+    const pages = src.getPages();
+    const sp = pages[Math.min(pageIndex||0, pages.length-1)];
+    const mb = sp.getMediaBox();
+    let tb; try{ tb = sp.getTrimBox(); }catch(e){ tb=null; }
+    if(!tb || !tb.width || !tb.height) tb = {x:mb.x,y:mb.y,width:mb.width,height:mb.height};
+    let left, bottom, right, top;
+    if(useAutoBleed){
+      // use the file's built-in BleedBox (fall back to media if none), clamped to media
+      let bx; try{ bx = sp.getBleedBox(); }catch(e){ bx=null; }
+      if(!bx || !bx.width || !bx.height) bx = mb;
+      left   = Math.max(mb.x,           bx.x);
+      bottom = Math.max(mb.y,           bx.y);
+      right  = Math.min(mb.x+mb.width,  bx.x+bx.width);
+      top    = Math.min(mb.y+mb.height, bx.y+bx.height);
+    }else{
+      left   = Math.max(mb.x,           tb.x - b);
+      bottom = Math.max(mb.y,           tb.y - b);
+      right  = Math.min(mb.x+mb.width,  tb.x+tb.width  + b);
+      top    = Math.min(mb.y+mb.height, tb.y+tb.height + b);
+    }
+    const pg = await out.embedPage(sp, { left, bottom, right, top });
+    return { pg, bl:tb.x-left, bb:tb.y-bottom, br:right-(tb.x+tb.width), bt:top-(tb.y+tb.height),
+             tw:tb.width, th:tb.height };
+  }
+
+  // build embedded front/back for every type
+  const embedded=[];
+  for(let i=0;i<nTypes;i++){
+    const t=types[i];
+    let front=null, back=null;
+    try{ front = await embedGraphic(t.front, t.frontPage||0); }catch(e){ front=null; }
+    if(t.duplex && t.back){
+      try{ back = await embedGraphic(t.back, t.backPage||0); }catch(e){ back=null; }
+    }
+    embedded.push({front, back, duplex:!!(t.duplex&&t.back), rot:t.rot||0});
+    setProg(.02+.2*(i+1)/nTypes,`מטמיע סוג ${i+1}/${nTypes}…`);
+  }
+
+  function drawMarks(page){
+    if(!marks) return;
+    const gapc=2*MM, mlmax=4*MM, lw=0.35;
+    const mlTop = Math.min(mlmax, Math.max(0, offY-gapc));
+    const mlBot = Math.min(mlmax, Math.max(0, H-(offY+blockH)-gapc));
+    const mlL   = Math.min(mlmax, Math.max(0, offX-gapc));
+    const mlR   = Math.min(mlmax, Math.max(0, W-(offX+blockW)-gapc));
+    const xs=[], ys=[];
+    for(let c=0;c<lay.cols;c++){ const x=offX+c*pitchX; xs.push(x); xs.push(x+gw); }
+    for(let r=0;r<lay.rows;r++){ const y=offY+r*pitchY; ys.push(y); ys.push(y+gh); }
+    const uniq=a=>[...new Set(a.map(v=>+v.toFixed(3)))];
+    uniq(xs).forEach(x=>{
+      if(mlTop>0) page.drawLine({start:{x,y:offY-gapc-mlTop},end:{x,y:offY-gapc},thickness:lw});
+      if(mlBot>0) page.drawLine({start:{x,y:offY+blockH+gapc},end:{x,y:offY+blockH+gapc+mlBot},thickness:lw});
+    });
+    uniq(ys).forEach(y=>{
+      if(mlL>0) page.drawLine({start:{x:offX-gapc-mlL,y},end:{x:offX-gapc,y},thickness:lw});
+      if(mlR>0) page.drawLine({start:{x:offX+blockW+gapc,y},end:{x:offX+blockW+gapc+mlR,y},thickness:lw});
+    });
+  }
+
+  // draw an imposed graphic into a region of `page`. region = {page, cols, rows, ox, oy}
+  // where ox/oy is the bottom-left of the region's cell-block in points, cols/rows its grid.
+  function imposeInto(page, rec, mirror, region, rot){
+    if(!(rec && rec.pg)) return;
+    const pg=rec.pg;
+    rot = ((rot||0)%360+360)%360;                 // clockwise degrees
+    const turned = rot===90 || rot===270;
+    // scale: the trim (after turning) fills the cell exactly
+    const k1 = turned ? gh/rec.tw : gw/rec.tw;    // along the source width
+    const k2 = turned ? gw/rec.th : gh/rec.th;    // along the source height
+    // bleed that ends up on each side of the cell
+    const B = rot===0   ? {L:rec.bl*k1, R:rec.br*k1, B:rec.bb*k2, T:rec.bt*k2}
+            : rot===90  ? {L:rec.bb*k2, R:rec.bt*k2, B:rec.br*k1, T:rec.bl*k1}     // clockwise
+            : rot===180 ? {L:rec.br*k1, R:rec.bl*k1, B:rec.bt*k2, T:rec.bb*k2}
+            :             {L:rec.bt*k2, R:rec.bb*k2, B:rec.bl*k1, T:rec.br*k1};    // 270
+    const hasGapL = gp>0.01;
+    const { pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath, degrees } = PDFLib;
+    const blkH = region.rows*gh + (region.rows-1)*gp;
+    const dw=(rec.bl+rec.tw+rec.br)*k1, dh=(rec.bb+rec.th+rec.bt)*k2;   // drawn size before turning
+    for(let r=0;r<region.rows;r++) for(let c=0;c<region.cols;c++){
+      if(region.ignored && region.ignored.has(r+','+c)) continue;   // ignored → white
+      if(region.only && region.only!==r+','+c) continue;            // cut&stack: one cell at a time
+      const cc = mirror ? (region.cols-1-c) : c;
+      const X = region.ox + cc*pitchX;
+      const Y = region.oy + blkH - (r*pitchY) - gh;
+      const halfGap = gp/2;
+      const bL = (cc===0)             ? B.L : (hasGapL ? Math.min(halfGap, B.L) : 0);
+      const bR = (cc===region.cols-1) ? B.R : (hasGapL ? Math.min(halfGap, B.R) : 0);
+      const bB = (r===region.rows-1)  ? B.B : (hasGapL ? Math.min(halfGap, B.B) : 0);
+      const bT = (r===0)              ? B.T : (hasGapL ? Math.min(halfGap, B.T) : 0);
+      const clipX=X-bL, clipY=Y-bB, clipW=gw+bL+bR, clipH=gh+bB+bT;
+      page.pushOperators(
+        pushGraphicsState(),
+        moveTo(clipX,clipY), lineTo(clipX+clipW,clipY),
+        lineTo(clipX+clipW,clipY+clipH), lineTo(clipX,clipY+clipH),
+        closePath(), clip(), endPath()
+      );
+      // pdf-lib turns counter-clockwise around (x,y); pick (x,y) so the trim lands on the cell
+      let x, y, ang;
+      if(rot===0){        x=X-rec.bl*k1;          y=Y-rec.bb*k2;          ang=0;   }
+      else if(rot===90){  x=X-rec.bb*k2;          y=Y+gh+rec.bl*k1;       ang=-90; }   // = 270 ccw
+      else if(rot===180){ x=X+gw+rec.bl*k1;       y=Y+gh+rec.bb*k2;       ang=180; }
+      else {              x=X+gw+rec.bb*k2;       y=Y-rec.bl*k1;          ang=90;  }   // 270 cw = 90 ccw
+      page.drawPage(pg,{ x, y, width:dw, height:dh, rotate:degrees(ang) });
+      page.pushOperators(popGraphicsState());
+    }
+  }
+
+  function addImposedSheet(rec, mirror){
+    const page=out.addPage([W,H]);
+    imposeInto(page, rec, mirror, {cols:lay.cols, rows:lay.rows, ox:offX, oy:offY});
+    drawMarks(page);
+    return page;
+  }
+  // hex -> pdf-lib rgb (0..1)
+  function hexRgb(hex){
+    const h=hex.replace('#',''); 
+    return PDFLib.rgb(parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255);
+  }
+  // Frame width per cell (from field), clamped so it never exceeds ~45% of the smaller side.
+  const FRAME_W = Math.min(
+    Math.max(1,(+els.frameW.value)*10)*MM,
+    0.45*Math.min(gw,gh)
+  );
+  // Per-cell separator bleed: reuse the graphics bleed on the shared edges so frames meet cleanly,
+  // and a guaranteed minimum outward on block-outer edges so no white edge remains after cutting.
+  const SEP_BLEED = Math.max(5, (+els.bleed.value)||0) * MM;
+
+  function sepInto(page, colorId, region){
+    if(!colorId) return;
+    const col=hexRgb(colorHex(colorId));
+    const hasGapL = gp>0.01;
+    const blkH = region.rows*gh + (region.rows-1)*gp;
+    for(let r=0;r<region.rows;r++) for(let c0=0;c0<region.cols;c0++){
+      if(region.only && region.only!==r+','+c0) continue;            // cut&stack: one cell
+      const c = region.mirror ? (region.cols-1-c0) : c0;             // back side mirrors columns
+      const x=region.ox + c*pitchX, y=region.oy + blkH - (r*pitchY) - gh;
+      const bL=(hasGapL||c===0)             ? SEP_BLEED : 0;
+      const bR=(hasGapL||c===region.cols-1) ? SEP_BLEED : 0;
+      const bB=(hasGapL||r===region.rows-1) ? SEP_BLEED : 0;
+      const bT=(hasGapL||r===0)             ? SEP_BLEED : 0;
+      const fx=x-bL, fy=y-bB, fw=gw+bL+bR, fh=gh+bB+bT;
+      page.drawRectangle({x:fx, y:fy+fh-FRAME_W, width:fw, height:FRAME_W, color:col});
+      page.drawRectangle({x:fx, y:fy, width:fw, height:FRAME_W, color:col});
+      page.drawRectangle({x:fx, y:fy+FRAME_W, width:FRAME_W, height:fh-2*FRAME_W, color:col});
+      page.drawRectangle({x:fx+fw-FRAME_W, y:fy+FRAME_W, width:FRAME_W, height:fh-2*FRAME_W, color:col});
+    }
+  }
+
+  function addSeparator(colorId){
+    const page=out.addPage([W,H]);
+    sepInto(page, colorId, {cols:lay.cols, rows:lay.rows, ox:offX, oy:offY});
+    drawMarks(page);
+    return page;
+  }
+
+  // ----- build the KIT sheet-spec list (ordered list of every sheet in one kit) -----
+  const useTypeSep = !els.noTypeSep.checked;
+  const jobDuplex = embedded.some(e=>e.duplex);
+  const sepPages = jobDuplex ? 2 : 1;
+  const qtyOf = t => (t.qty!=null ? t.qty : perType);
+  const specs=[];   // each: {kind:'g', rec, mirror, rot} or {kind:'s', color}
+  for(let t=0;t<nTypes;t++){
+    const em=embedded[t];
+    const q=qtyOf(types[t]);
+    for(let u=0;u<q;u++){
+      specs.push({kind:'g', rec:em.front, mirror:false, rot:em.rot});
+      if(em.duplex) specs.push({kind:'g', rec:em.back, mirror:true, rot:backRot(em.rot)});
+    }
+    if(useTypeSep && t<nTypes-1) for(let i=0;i<sepPages;i++) specs.push({kind:'s', color:state.sepTypeColor});
+  }
+  for(let i=0;i<sepPages;i++) specs.push({kind:'s', color:state.sepKitColor});
+
+  // per-type spec chunk (graphics of that type + its trailing type-separator) — used for
+  // "split by types". Kit separator is appended to the last chunk.
+  const typeChunks=[];
+  for(let t=0;t<nTypes;t++){
+    const em=embedded[t]; const q=qtyOf(types[t]); const chunk=[];
+    for(let u=0;u<q;u++){ chunk.push({kind:'g', rec:em.front, mirror:false, rot:em.rot}); if(em.duplex) chunk.push({kind:'g', rec:em.back, mirror:true, rot:backRot(em.rot)}); }
+    if(useTypeSep && t<nTypes-1) for(let i=0;i<sepPages;i++) chunk.push({kind:'s', color:state.sepTypeColor});
+    typeChunks.push(chunk);
+  }
+  const kitSepSpecs=[]; for(let i=0;i<sepPages;i++) kitSepSpecs.push({kind:'s', color:state.sepKitColor});
+
+  function renderSpecInto(page, spec, region){
+    if(spec.kind==='g') imposeInto(page, spec.rec, spec.mirror, region, spec.rot);
+    else sepInto(page, spec.color, region);
+  }
+
+  // build N groups of specs. method 'pages' = even page split; 'types' = whole types balanced.
+  function buildSplitGroups(N){
+    const method = els.splitMethod.value;
+    if(method==='types'){
+      // distribute whole types across N groups as evenly as possible (bigger groups first)
+      const groups=Array.from({length:N},()=>[]);
+      const base=Math.floor(nTypes/N), extra=nTypes%N;   // first `extra` groups get one more type
+      let ti=0;
+      for(let g=0; g<N; g++){
+        const cnt=base + (g<extra?1:0);
+        for(let k=0;k<cnt && ti<nTypes;k++,ti++) groups[g].push(...typeChunks[ti]);
+      }
+      // kit separator goes at the end of the LAST non-empty group
+      for(let g=N-1; g>=0; g--){ if(groups[g].length){ groups[g].push(...kitSepSpecs); break; } }
+      return groups.filter(gr=>gr.length);
+    }
+    // pages method: even split of the flat spec list
+    const groupLen=Math.ceil(specs.length/N);
+    const groups=[];
+    for(let g=0; g<N; g++) groups.push(specs.slice(g*groupLen,(g+1)*groupLen));
+    return groups.filter(gr=>gr.length);
+  }
+
+
+  // ===== cut & stack file (different quantity per type, no kits) =====
+  if(stackMode()){ await buildStackFile(); return; }
+  async function buildStackFile(){
+    const P = planStack(types, lay);
+    const dup = embedded.some(e=>e.duplex);
+    const full = {cols:lay.cols, rows:lay.rows, ox:offX, oy:offY};
+    const ink = '#1c2230';
+    const fontStack = '"Google Sans","Noto Sans Hebrew","Rubik",Arial,sans-serif';
+    try{ await document.fonts.ready; }catch(e){}
+    // render centred text lines to a PNG (keeps Hebrew/RTL exactly as the browser shows it)
+    async function textPng(lines, wPt, hPt){
+      const sc=300/72, cw=Math.max(8,Math.round(wPt*sc)), ch=Math.max(8,Math.round(hPt*sc));
+      const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+      const g=cv.getContext('2d'); g.direction='rtl'; g.textAlign='center'; g.textBaseline='middle'; g.fillStyle=ink;
+      const fitted=lines.map(l=>{
+        let px=l.pt*sc; g.font=`${l.w||600} ${px}px ${fontStack}`;
+        while(g.measureText(l.text).width>cw*0.9 && px>6){ px*=0.93; g.font=`${l.w||600} ${px}px ${fontStack}`; }
+        return {...l, px};
+      });
+      const tot=fitted.reduce((a,l)=>a+l.px*1.3,0); let y=(ch-tot)/2;
+      for(const l of fitted){ g.fillStyle=l.color||ink; g.font=`${l.w||600} ${l.px}px ${fontStack}`; y+=l.px*0.65; g.fillText(l.text,cw/2,y); y+=l.px*0.65; }
+      const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
+      return await out.embedPng(new Uint8Array(await blob.arrayBuffer()));
+    }
+    const cellXY=(r,c,mirror)=>{ const cc=mirror?(lay.cols-1-c):c; return {x:offX+cc*pitchX, y:offY+blockH-(r*pitchY)-gh}; };
+    const m=Math.min(gw,gh);
+    // labels: one per type separator, one per pile number
+    const sepImg={}, numImg={};
+    const inner = Math.max(0, FRAME_W);
+    for(const it of P.stream) if(it.kind==='sep' && !sepImg[it.t]){
+      sepImg[it.t]=await textPng([
+        {text:stackName(types[it.t],it.t), pt:m*0.075, w:700},
+        {text:`כמות: ${it.qty}`, pt:m*0.065, w:600}
+      ], gw-2*inner, gh-2*inner);
+    }
+    if(P.numbered) for(let p=0;p<P.cells;p++){
+      const below = p<P.cells-1 ? `מעל ערימה ${p+2}` : 'הערימה התחתונה';
+      numImg[p]=await textPng([
+        {text:String(p+1), pt:m*0.42, w:700},
+        {text:`ערימה ${p+1} מתוך ${P.cells}`, pt:m*0.06, w:600, color:'#5a656d'},
+        {text:below, pt:m*0.05, w:500, color:'#5a656d'}
+      ], gw, gh);
+    }
+    setProg(.25,'בונה גיליונות…');
+    for(let k=0;k<P.sheets;k++){
+      for(const side of (dup?[0,1]:[0])){
+        const back = side===1;
+        const page = out.addPage([W,H]);
+        for(let p=0;p<P.cells;p++){
+          const it=P.at(k,p); if(!it) continue;
+          const [r,c]=P.order[p];
+          const only=r+','+c;
+          if(it.kind==='g'){
+            const em=embedded[it.t];
+            if(!back) imposeInto(page, em.front, false, {...full, only}, em.rot);
+            else if(em.duplex) imposeInto(page, em.back, true, {...full, only}, backRot(em.rot));
+          }else if(it.kind==='sep'){
+            sepInto(page, state.sepTypeColor, {...full, only, mirror:back});
+            if(!back && sepImg[it.t]){ const {x,y}=cellXY(r,c,false); page.drawImage(sepImg[it.t],{x:x+inner,y:y+inner,width:gw-2*inner,height:gh-2*inner}); }
+          }else if(it.kind==='num' && !back){
+            const {x,y}=cellXY(r,c,false); page.drawImage(numImg[p],{x,y,width:gw,height:gh});
+          }
+        }
+        drawMarks(page);
+      }
+      setProg(.25+.6*(k+1)/P.sheets,`בונה גיליון ${k+1}/${P.sheets}…`);
+    }
+    setProg(.9,'שומר…');
+    const stamp=new Date().toISOString().slice(0,10);
+    const bytes=await out.save();
+    await downloadPdf(bytes, outName(`STACK_${P.units}units_${P.sheets}sheets_${stamp}.pdf`));
+    setProg(1, `✓ הקובץ ירד — מדפיסים פעם אחת (${P.sheets} גיליונות${dup?', דו-צדדי':''})`);
+    els.go.disabled=false;
+  }
+
+  // ----- render the kit file -----
+  const splitMode = els.kitSplit.value;                 // '1' | '2' | '4' | 'custom'
+  const kitSplitN = (splitMode==='custom') ? 0 : Math.max(1, +splitMode|0);
+  const isCustom = splitMode==='custom' && countRegions()>1;
+  let done=0;
+  if(isCustom || kitSplitN>1){
+    const regions = isCustom ? makeCustomRegions() : planKitSplitRegions(kitSplitN);
+    const groups  = buildSplitGroups(regions.length);
+    const N = Math.min(regions.length, groups.length);
+    const maxLen = Math.max(...groups.map(g=>g.length));
+    let font=null; try{ font=await digitLabels(out, regions.length); }catch(e){}
+    for(let i=0;i<maxLen;i++){
+      const page=out.addPage([W,H]);
+      for(let g=0; g<N; g++){
+        const spec = groups[g][i];
+        if(spec) renderSpecInto(page, spec, regions[g]);   // else region stays white
+      }
+      drawSplitMarks(page, regions);
+      drawSplitLabels(page, regions, font);
+      done++; setProg(.22+.55*done/maxLen,`בונה קיט מפוצל… ${done}/${maxLen}`);
+    }
+  }else{
+    for(const spec of specs){
+      const page=out.addPage([W,H]);
+      renderSpecInto(page, spec, {cols:lay.cols, rows:lay.rows, ox:offX, oy:offY});
+      drawMarks(page);
+      done++; setProg(.22+.55*done/specs.length,`בונה קיט… ${done}/${specs.length}`);
+    }
+  }
+
+  // build regions from the custom cut model. vCuts/hCuts define a grid of rectangular blocks.
+  // Each block becomes a region positioned with equal margins (centre gaps = 2× edge).
+  function makeCustomRegions(){
+    // column ranges split by vCuts (cut BEFORE column c). e.g. vCuts={3} on 7 cols → [0..2],[3..6]
+    const vb=[0, ...[...customSplit.vCuts].sort((a,b)=>a-b), lay.cols];
+    const hb=[0, ...[...customSplit.hCuts].sort((a,b)=>a-b), lay.rows];
+    const colRanges=[], rowRanges=[];
+    for(let i=0;i<vb.length-1;i++) colRanges.push([vb[i], vb[i+1]]);   // [start,end)
+    for(let i=0;i<hb.length-1;i++) rowRanges.push([hb[i], hb[i+1]]);
+    // geometry: place each block with equal margins. Use uniform edge based on the largest row.
+    // simplest robust layout: keep each block at its natural grid position (same pitch), and add
+    // the standard 2mm+ dividers where cuts are. We position blocks so cut gaps = 2× edge margin.
+    const nc=colRanges.length, nr=rowRanges.length;
+    // total cells width per col-range (in cells) — blocks may differ in size, so lay them out
+    // proportionally with equal dividers. Edge E and centre 2E, consistent across the sheet.
+    // horizontal:
+    const colCellCounts=colRanges.map(([s,e])=>e-s);
+    const rowCellCounts=rowRanges.map(([s,e])=>e-s);
+    const totalCw=colCellCounts.reduce((a,b)=>a+b,0);
+    const totalRh=rowCellCounts.reduce((a,b)=>a+b,0);
+    // widths in points of each block (cells*gw + internal gaps)
+    const colW = colCellCounts.map(n=> n*gw + (n-1)*gp);
+    const rowH = rowCellCounts.map(n=> n*gh + (n-1)*gp);
+    const sumW = colW.reduce((a,b)=>a+b,0), sumH=rowH.reduce((a,b)=>a+b,0);
+    // dividers: nc+1 vertical gaps (2 edges + (nc-1) centres). edge E, centres 2E.
+    // sumW + 2E + (nc-1)*2E = W → E=(W-sumW)/(2nc)
+    const EX = Math.max((W - sumW)/(2*nc), 2*MM);
+    const EY = Math.max((H - sumH)/(2*nr), 2*MM);
+    // compute x offsets (RTL: first block on the right). We'll compute left positions then flip.
+    const regions=[];
+    // reading order: row 0 top; within row, col 0 = rightmost (RTL)
+    let yTop = H - EY;   // top inner edge
+    for(let ri=0; ri<nr; ri++){
+      const bh=rowH[ri];
+      const oy = yTop - bh;
+      let xRight = W - EX;   // right inner edge
+      for(let ci=0; ci<nc; ci++){
+        const bw=colW[ci];
+        const ox = xRight - bw;
+        regions.push({
+          cols: colCellCounts[ci], rows: rowCellCounts[ri],
+          ox, oy,
+          // remember which sheet-cells are ignored inside this block (relative), to leave white
+          ignored: filterIgnored(colRanges[ci], rowRanges[ri])
+        });
+        xRight = ox - 2*EX;
+      }
+      yTop = oy - 2*EY;
+    }
+    return regions;
+  }
+  function filterIgnored(colRange, rowRange){
+    const set=new Set();
+    customSplit.ignored.forEach(k=>{
+      const [r,c]=k.split(',').map(Number);
+      if(c>=colRange[0]&&c<colRange[1]&&r>=rowRange[0]&&r<rowRange[1])
+        set.add((r-rowRange[0])+','+(c-colRange[0]));
+    });
+    return set;
+  }
+
+  function makeRegionsV(nParts){        // stack nParts vertically
+    const per=Math.floor(lay.rows/nParts); if(per<1) return null;
+    const blkH=per*gh+(per-1)*gp;
+    const E=Math.max((H - nParts*blkH)/(2*nParts), 2*MM);
+    const regs=[]; for(let k=0;k<nParts;k++) regs.push({cols:lay.cols, rows:per, ox:offX, oy:E+k*(blkH+2*E)});
+    return regs.reverse();              // index 0 = top
+  }
+  function makeRegionsH(nParts){        // place nParts side by side horizontally
+    const per=Math.floor(lay.cols/nParts); if(per<1) return null;
+    const blkW=per*gw+(per-1)*gp;
+    const E=Math.max((W - nParts*blkW)/(2*nParts), 2*MM);
+    const regs=[]; for(let k=0;k<nParts;k++) regs.push({cols:per, rows:lay.rows, ox:E+k*(blkW+2*E), oy:offY});
+    return regs.reverse();              // index 0 = right (RTL)
+  }
+  function makeRegionsGrid(nc, nr){     // nc columns × nr rows of regions (e.g. 2×2)
+    const perC=Math.floor(lay.cols/nc), perR=Math.floor(lay.rows/nr);
+    if(perC<1 || perR<1) return null;
+    const blkW=perC*gw+(perC-1)*gp, blkH=perR*gh+(perR-1)*gp;
+    const EX=Math.max((W - nc*blkW)/(2*nc), 2*MM);
+    const EY=Math.max((H - nr*blkH)/(2*nr), 2*MM);
+    const regs=[];
+    // order: reading order top→bottom, right→left (RTL). region index 0 = top-right.
+    for(let rr=0; rr<nr; rr++) for(let cc=0; cc<nc; cc++){
+      const ox = EX + cc*(blkW+2*EX);
+      const oyFromBottom = EY + rr*(blkH+2*EY);
+      const oy = H - blkH - oyFromBottom;   // rr=0 → top
+      regs.push({cols:perC, rows:perR, ox: W - blkW - ox, oy});  // W-...-ox → right-first
+    }
+    return regs;
+  }
+  function planKitSplitRegions(N){
+    const sheetTall = H>=W;
+    // 1) try pure long-side strips first (widest, easiest pieces)
+    let regs = sheetTall ? makeRegionsV(N) : makeRegionsH(N);
+    if(regs) return regs;
+    // 2) try the other single direction
+    regs = sheetTall ? makeRegionsH(N) : makeRegionsV(N);
+    if(regs) return regs;
+    // 3) grid split: try every factor pair nc×nr = N, pick the one that fits and wastes least
+    const pairs=[];
+    for(let a=1;a<=N;a++){ if(N%a===0) pairs.push([a, N/a]); }
+    let best=null, bestWaste=Infinity;
+    for(const [a,b] of pairs){
+      // orient so more divisions go on the axis with more cells
+      const tries = [[a,b],[b,a]];
+      for(const [nc,nr] of tries){
+        const perC=Math.floor(lay.cols/nc), perR=Math.floor(lay.rows/nr);
+        if(perC<1||perR<1) continue;
+        const used = nc*perC * nr*perR;               // cells used across all regions
+        const waste = lay.cols*lay.rows - used;
+        if(waste < bestWaste){ bestWaste=waste; best=[nc,nr]; }
+      }
+    }
+    if(best) return makeRegionsGrid(best[0], best[1]);
+    return [{cols:lay.cols,rows:lay.rows,ox:offX,oy:offY}];   // give up → whole block
+  }
+  function drawSplitMarks(page, regions){
+    if(!marks) return;
+    const gapc=2*MM, ml=4*MM, lw=0.35;
+    regions.forEach(R=>{
+      const blkH=R.rows*gh+(R.rows-1)*gp;
+      const xs=new Set(), ys=new Set();
+      for(let c=0;c<R.cols;c++){ xs.add(R.ox+c*pitchX); xs.add(R.ox+c*pitchX+gw); }
+      for(let r=0;r<R.rows;r++){ ys.add(R.oy+blkH-(r*pitchY)-gh); ys.add(R.oy+blkH-(r*pitchY)); }
+      const XS=[...xs],YS=[...ys], minX=Math.min(...XS),maxX=Math.max(...XS),minY=Math.min(...YS),maxY=Math.max(...YS);
+      XS.forEach(x=>{ page.drawLine({start:{x,y:maxY+gapc},end:{x,y:Math.min(H,maxY+gapc+ml)},thickness:lw});
+                      page.drawLine({start:{x,y:minY-gapc},end:{x,y:Math.max(0,minY-gapc-ml)},thickness:lw}); });
+      YS.forEach(y=>{ page.drawLine({start:{x:minX-gapc,y},end:{x:Math.max(0,minX-gapc-ml),y},thickness:lw});
+                      page.drawLine({start:{x:maxX+gapc,y},end:{x:Math.min(W,maxX+gapc+ml),y},thickness:lw}); });
+    });
+  }
+  function drawSplitLabels(page, regions, font){
+    if(!font) return;
+    const sz=9, off=3*MM;
+    regions.forEach((R,k)=>{
+      const blkH=R.rows*gh+(R.rows-1)*gp;
+      const L=font.imgs[String(k+1)]; const h=sz*1.15;
+      if(L) page.drawImage(L.img,{x:R.ox+2, y:R.oy+blkH+off-sz*0.2, width:h*L.ar, height:h});
+    });
+  }
+
+  setProg(.8,'שומר קיט…');
+  out.setTitle('Single kit imposition A3');
+  const stamp=new Date().toISOString().slice(0,10);
+  const kitBytes = await out.save();
+  await downloadPdf(kitBytes, outName(`KIT_${nTypes}types_print${sheetsPerUnit}x_${stamp}.pdf`));
+
+  // ----- COMPLETION (split) file for the remainder, if worthwhile -----
+  const fullPrints = Math.floor(totalKits/perSheet);
+  const remainder  = totalKits - fullPrints*perSheet;
+  const splitPlan  = planSplitLayout(lay.cols, lay.rows);      // {dir, halfCols/halfRows, drop...}
+  const splitYield = splitPlan ? splitPlan.firstCells : 0;      // kits a split sheet makes
+  const wantSplit  = remainder>0 && splitPlan && kitSplitN===1 && !isCustom;   // skip when the kit itself is split
+
+  if(wantSplit){
+    setProg(.85,'בונה קובץ השלמה…');
+    const comp = await PDFDocument.create();
+    // re-embed graphics into the completion doc (embeds are doc-scoped)
+    const emb2=[];
+    for(let i=0;i<nTypes;i++){
+      const t=types[i];
+      let f=null,bk=null;
+      try{ f=await embedGraphicInto(comp,t.front,t.frontPage||0);}catch(e){}
+      if(t.duplex && t.back){ try{ bk=await embedGraphicInto(comp,t.back,t.backPage||0);}catch(e){} }
+      emb2.push({front:f,back:bk,duplex:!!(t.duplex&&t.back)});
+    }
+    // rebuild specs pointing at comp embeds
+    const specs2=[];
+    for(let t=0;t<nTypes;t++){
+      const em=emb2[t]; const q=qtyOf(types[t]);
+      for(let u=0;u<q;u++){ specs2.push({kind:'g',rec:em.front,mirror:false,rot:em.rot}); if(em.duplex) specs2.push({kind:'g',rec:em.back,mirror:true,rot:backRot(em.rot)}); }
+      if(useTypeSep && t<nTypes-1) for(let i=0;i<sepPages;i++) specs2.push({kind:'s',color:state.sepTypeColor});
+    }
+    for(let i=0;i<sepPages;i++) specs2.push({kind:'s',color:state.sepKitColor});
+
+    await renderCompletion(comp, specs2, splitPlan);
+    const compBytes = await comp.save();
+    await downloadPdf(compBytes, outName(`KIT_completion_${remainder}kits_${stamp}.pdf`), 250);
+  }
+
+  setProg(1, wantSplit
+    ? `✓ שני קבצים ירדו: קיט מלא (×${fullPrints||sheetsPerUnit}) + השלמה (${remainder} יח׳)`
+    : `✓ קיט בודד ירד — הדפיסי אותו ${sheetsPerUnit} פעמים`);
+  els.go.disabled=false;
+
+  // ---- helpers used above ----
+  // cache the artifact downloads capability (null when running as a plain file or not granted)
+  async function getDownloads(){
+    if(_dlCap!==undefined) return _dlCap;
+    try{ _dlCap = (window.claude && claude.use) ? await claude.use('downloads') : null; }
+    catch(e){ _dlCap=null; }
+    return _dlCap;
+  }
+  function blobDownload(blob, name, delay){
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=name;
+    setTimeout(()=>{ a.click(); setTimeout(()=>URL.revokeObjectURL(url),4000); }, delay||0);
+  }
+  async function downloadPdf(bytes, name, delay){
+    if(window.desk && desk.savePdf){             // installed app → the computer's own "Save as" window
+      const r=await desk.savePdf({name, data:bytes});
+      if(r && r.path) lastSavedPath=r.path;
+      return;
+    }
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const cap=await getDownloads();
+    if(cap){                                   // running as an artifact → use the host save prompt
+      try{ await cap.save({filename:name, data:blob}); return; }
+      catch(e){ if(e&&e.code==='declined') return; /* otherwise fall through to blob */ }
+    }
+    blobDownload(blob, name, delay);            // plain downloaded HTML file
+  }
+  async function embedGraphicInto(doc, graphic, pageIndex){
+    if(!graphic) return null;
+    const src=await PDFDocument.load(graphic.bytes);
+    const pages=src.getPages(); const sp=pages[Math.min(pageIndex||0,pages.length-1)];
+    const mb=sp.getMediaBox(); let tb; try{tb=sp.getTrimBox();}catch(e){tb=null;}
+    if(!tb||!tb.width||!tb.height) tb={x:mb.x,y:mb.y,width:mb.width,height:mb.height};
+    let left,bottom,right,top;
+    if(useAutoBleed){ let bx; try{bx=sp.getBleedBox();}catch(e){bx=null;} if(!bx||!bx.width) bx=mb;
+      left=Math.max(mb.x,bx.x);bottom=Math.max(mb.y,bx.y);right=Math.min(mb.x+mb.width,bx.x+bx.width);top=Math.min(mb.y+mb.height,bx.y+bx.height);
+    }else{ left=Math.max(mb.x,tb.x-b);bottom=Math.max(mb.y,tb.y-b);right=Math.min(mb.x+mb.width,tb.x+tb.width+b);top=Math.min(mb.y+mb.height,tb.y+tb.height+b); }
+    const pg=await doc.embedPage(sp,{left,bottom,right,top});
+    return {pg,bl:tb.x-left,bb:tb.y-bottom,br:right-(tb.x+tb.width),bt:top-(tb.y+tb.height),tw:tb.width,th:tb.height};
+  }
+  // decide the split geometry (even halves, or drop one row/col to white)
+  function planSplitLayout(cols, rows){
+    const opts=[];
+    if(cols%2===0) opts.push({dir:'V', halfCols:cols/2, useRows:rows, drop:0, firstCells:cols/2*rows});
+    else if(cols>1) opts.push({dir:'V', halfCols:(cols-1)/2, useRows:rows, drop:rows, dropCol:true, firstCells:(cols-1)/2*rows});
+    if(rows%2===0) opts.push({dir:'H', halfRows:rows/2, useCols:cols, drop:0, firstCells:cols*rows/2});
+    else if(rows>1) opts.push({dir:'H', halfRows:(rows-1)/2, useCols:cols, drop:cols, dropRow:true, firstCells:cols*(rows-1)/2});
+    if(!opts.length) return null;
+    // Prefer, in order: (1) least waste; (2) cut ACROSS the sheet's LONG side — a 'H' split
+    //    (top/bottom) when the sheet is tall, a 'V' split when it's wide — so each half is a wide,
+    //    easy-to-stack piece rather than a long thin strip; (3) more kits.
+    const sheetTall = H >= W;
+    const cutsLongSide = o => (sheetTall && o.dir==='H') || (!sheetTall && o.dir==='V');
+    opts.sort((a,b)=> a.drop-b.drop
+                    || (cutsLongSide(b)?1:0)-(cutsLongSide(a)?1:0)
+                    || b.firstCells-a.firstCells);
+    return opts[0];
+  }
+  // render the completion file: pair spec[i] (first half) with spec[i+H] (second half)
+  async function renderCompletion(doc, specList, plan){
+    const K=specList.length;
+    // half-split point. In a duplex job pages come in F,B pairs — the split must land on a
+    // pair boundary (even index) so a half never starts/ends mid-pair.
+    let Hh=Math.ceil(K/2);
+    if(jobDuplex && Hh%2!==0) Hh++;   // bump to the next even boundary
+    // Requirement: the centre white gap must be exactly 2× the outer edge gap, so the guillotine
+    // cut down the middle leaves each half with the same margin as the sheet edge.
+    // With edges E and centre D and two half-blocks of width HB: 2E + 2·HB + D = sheetW, and D = 2E.
+    // => D = (sheetW − 2·HB) / 2 , E = D/2.
+    let firstRegion, secondRegion;
+    if(plan.dir==='V'){
+      const hc=plan.halfCols;
+      const halfBW = hc*gw + (hc-1)*gp;            // width of one half-block
+      const divider = Math.max((W - 2*halfBW)/2, 2*MM);
+      const edge = divider/2;
+      const oyR = offY;
+      const secondOx = edge;                        // left half at left edge
+      const firstOx  = edge + halfBW + divider;     // right half after left + centre gap
+      firstRegion  = {cols:hc, rows:plan.useRows, ox:firstOx,  oy:oyR};
+      secondRegion = {cols:hc, rows:plan.useRows, ox:secondOx, oy:oyR};
+    }else{
+      const hr=plan.halfRows;
+      const halfBH = hr*gh + (hr-1)*gp;            // height of one half-block
+      const divider = Math.max((H - 2*halfBH)/2, 2*MM);
+      const edge = divider/2;
+      const oxT = offX;
+      const bottomOy = edge;                        // bottom half at bottom edge
+      const topOy    = edge + halfBH + divider;     // top half after bottom + centre gap
+      firstRegion  = {cols:plan.useCols, rows:hr, ox:oxT, oy:topOy};
+      secondRegion = {cols:plan.useCols, rows:hr, ox:oxT, oy:bottomOy};
+    }
+    // embed a font for the small part-number labels ("1" / "2")
+    let compFont=null;
+    try{ compFont = await digitLabels(doc, 2); }catch(e){}
+    for(let i=0;i<Hh;i++){
+      const page=doc.addPage([W,H]);
+      renderSpecInto(page, specList[i], firstRegion);            // first half
+      const j=i+Hh;
+      if(j<K) renderSpecInto(page, specList[j], secondRegion);   // second half (else white)
+      drawMarksCompletion(page, plan, firstRegion, secondRegion);
+      drawPartLabels(page, plan, firstRegion, secondRegion, compFont);
+    }
+  }
+  function drawMarksCompletion(page, plan, R1, R2){
+    if(!marks) return;
+    const gapc=2*MM, mlmax=4*MM, lw=0.35;
+    const xs=new Set(), ys=new Set();
+    [R1,R2].forEach(R=>{
+      const blkH=R.rows*gh+(R.rows-1)*gp;
+      for(let c=0;c<R.cols;c++){ xs.add(R.ox+c*pitchX); xs.add(R.ox+c*pitchX+gw); }
+      for(let r=0;r<R.rows;r++){ ys.add(R.oy+blkH-(r*pitchY)-gh); ys.add(R.oy+blkH-(r*pitchY)); }
+    });
+    const XS=[...xs], YS=[...ys];
+    const minX=Math.min(...XS), maxX=Math.max(...XS), minY=Math.min(...YS), maxY=Math.max(...YS);
+    XS.forEach(x=>{
+      page.drawLine({start:{x,y:maxY+gapc},end:{x,y:Math.min(H,maxY+gapc+mlmax)},thickness:lw});
+      page.drawLine({start:{x,y:minY-gapc},end:{x,y:Math.max(0,minY-gapc-mlmax)},thickness:lw});
+    });
+    YS.forEach(y=>{
+      page.drawLine({start:{x:minX-gapc,y},end:{x:Math.max(0,minX-gapc-mlmax),y},thickness:lw});
+      page.drawLine({start:{x:maxX+gapc,y},end:{x:Math.min(W,maxX+gapc+mlmax),y},thickness:lw});
+    });
+    // CENTRE cut marks — short ticks (like the others) at the middle of the white divider
+    const blkH1=R1.rows*gh+(R1.rows-1)*gp, blkH2=R2.rows*gh+(R2.rows-1)*gp;
+    if(plan.dir==='V'){
+      // divider between the two halves runs vertically; cut mark = vertical tick top & bottom
+      const midX=(R1.ox < R2.ox) ? (R1.ox+gw+ (R2.ox-(R1.ox+gw))/2) : (R2.ox+gw + (R1.ox-(R2.ox+gw))/2);
+      const top=Math.max(R1.oy+blkH1, R2.oy+blkH2), bot=Math.min(R1.oy, R2.oy);
+      page.drawLine({start:{x:midX,y:top+gapc},end:{x:midX,y:Math.min(H,top+gapc+mlmax)},thickness:lw});
+      page.drawLine({start:{x:midX,y:bot-gapc},end:{x:midX,y:Math.max(0,bot-gapc-mlmax)},thickness:lw});
+    }else{
+      // divider runs horizontally; cut mark = horizontal tick left & right
+      const midY=(R1.oy < R2.oy) ? (R1.oy+blkH1 + (R2.oy-(R1.oy+blkH1))/2) : (R2.oy+blkH2 + (R1.oy-(R2.oy+blkH2))/2);
+      const left=Math.min(R1.ox,R2.ox), right=Math.max(R1.ox+ R1.cols*pitchX-gp, R2.ox+ R2.cols*pitchX-gp);
+      page.drawLine({start:{x:left-gapc,y:midY},end:{x:Math.max(0,left-gapc-mlmax),y:midY},thickness:lw});
+      page.drawLine({start:{x:right+gapc,y:midY},end:{x:Math.min(W,right+gapc+mlmax),y:midY},thickness:lw});
+    }
+  }
+  function drawPartLabels(page, plan, R1, R2, font){
+    if(!font) return;
+    const sz=9, off=3*MM;   // 9pt, 3mm outside the block
+    const blkH1=R1.rows*gh+(R1.rows-1)*gp, blkH2=R2.rows*gh+(R2.rows-1)*gp;
+    const put=(txt,x,y)=>{ const L=font.imgs[txt]; const h=sz*1.15; if(L) page.drawImage(L.img,{x, y:y-sz*0.2, width:h*L.ar, height:h}); };
+    if(plan.dir==='V'){
+      // labels above the top of each half (outside), near its outer side
+      put('1', R1.ox+2, R1.oy+blkH1+off);       // first half (right)
+      put('2', R2.ox+2, R2.oy+blkH2+off);       // second half (left)
+    }else{
+      // labels to the right of each half (outside), near its top
+      const rightX = Math.max(R1.ox+R1.cols*pitchX-gp, R2.ox+R2.cols*pitchX-gp) + off;
+      put('1', rightX, R1.oy+blkH1-sz);         // first half (top)
+      put('2', rightX, R2.oy+blkH2-sz);         // second half (bottom)
+    }
+  }
+}
+</script>
+</body>
+</html>
