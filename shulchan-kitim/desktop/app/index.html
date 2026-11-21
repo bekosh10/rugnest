@@ -671,7 +671,7 @@
                   <label class="on" id="sd-single"><input type="radio" name="sided" value="single" checked>חד-צדדי</label>
                   <label id="sd-dup"><input type="radio" name="sided" value="dup">דו-צדדי זהה</label>
                   <label id="sd-fixedb"><input type="radio" name="sided" value="fixedb">צד B קבוע</label>
-                  <label id="sd-pair"><input type="radio" name="sided" value="pair">דו-צדדי מזווג</label>
+                  <label id="sd-pair"><input type="radio" name="sided" value="pair">קדמי + אחורי לסירוגין</label>
                 </div>
                 <!-- fixed B-side slot (only shown in fixedb mode) -->
                 <div id="fixedb-wrap" style="display:none;margin-bottom:12px">
@@ -1586,7 +1586,7 @@ function recompute(){
   let errMsg='';
   if(state.mode==='multi' && state.sided==='pair'){
     const oddF = state.files.find(f=>f && !f.err && (f.pages||1)%2!==0);
-    if(oddF) errMsg = `⚠ "דו-צדדי מזווג" דורש מספר עמודים זוגי בכל קובץ. הקובץ "${oddF.name}" מכיל ${oddF.pages} עמודים (אי-זוגי). הסירי אותו או בחרי מצב אחר.`;
+    if(oddF) errMsg = `⚠ "קדמי + אחורי לסירוגין" דורש מספר עמודים זוגי בכל קובץ. הקובץ "${oddF.name}" מכיל ${oddF.pages} עמודים (אי-זוגי). הסירי אותו או בחרי מצב אחר.`;
   }
   if(!errMsg && state.mode==='rep'){
     for(let i=0;i<state.rows.length;i++){
@@ -2417,7 +2417,7 @@ document.addEventListener('click',()=>document.querySelectorAll('.preset-menu').
   new MutationObserver(()=>{ if(!list.children.length) reset(); }).observe(list,{childList:true});
 })();
 /* ---------- installed app: version + updates from GitHub ---------- */
-const APP_VERSION = 3;
+const APP_VERSION = 4;
 (function(){
   if(!window.desk) return;                     // artifact / browser: nothing to show
   const bar=$('appbar'), ver=$('appver'), upd=$('appupd');
