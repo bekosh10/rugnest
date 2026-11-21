@@ -1795,8 +1795,9 @@ function drawStackPreview(lay, P, types, k, back){
            `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${Math.min(gw,gh)*0.07}" fill="#aab2b9">ריק</text>`;
     }else if(it.kind==='num'){
       if(!back){
-        out+=`<text x="${cx}" y="${cy-gh*0.04}" text-anchor="middle" dominant-baseline="middle" font-size="${Math.min(gw,gh)*0.5}" font-weight="700" fill="#1c2230">${p+1}</text>`+
-             `<text x="${cx}" y="${y+gh*0.82}" text-anchor="middle" font-size="${Math.min(gw,gh)*0.055}" fill="#5a656d" direction="rtl">ערימה ${p+1} מתוך ${P.cells}</text>`;
+        const mm=Math.min(gw,gh);
+        out+=`<text x="${cx}" y="${cy-mm*0.03}" text-anchor="middle" dominant-baseline="middle" font-size="${mm*0.17}" font-weight="700" fill="#1c2230">${p+1}</text>`+
+             `<text x="${cx}" y="${cy+mm*0.1}" text-anchor="middle" dominant-baseline="middle" font-size="${mm*0.045}" fill="#5a656d" direction="rtl">ערימה ${p+1} מתוך ${P.cells}</text>`;
       }
     }else if(it.kind==='sep'){
       out+=`<rect x="${x+FRAME/2}" y="${y+FRAME/2}" width="${gw-FRAME}" height="${gh-FRAME}" fill="none" stroke="${sepHex}" stroke-width="${FRAME}"/>`;
@@ -2217,7 +2218,7 @@ document.addEventListener('click',()=>document.querySelectorAll('.preset-menu').
   new MutationObserver(()=>{ if(!list.children.length) reset(); }).observe(list,{childList:true});
 })();
 /* ---------- installed app: version + updates from GitHub ---------- */
-const APP_VERSION = 1;
+const APP_VERSION = 2;
 (function(){
   if(!window.desk) return;                     // artifact / browser: nothing to show
   const bar=$('appbar'), ver=$('appver'), upd=$('appupd');
@@ -2530,11 +2531,9 @@ async function build(){
       ], gw-2*inner, gh-2*inner);
     }
     if(P.numbered) for(let p=0;p<P.cells;p++){
-      const below = p<P.cells-1 ? `מעל ערימה ${p+2}` : 'הערימה התחתונה';
-      numImg[p]=await textPng([
-        {text:String(p+1), pt:m*0.42, w:700},
-        {text:`ערימה ${p+1} מתוך ${P.cells}`, pt:m*0.06, w:600, color:'#5a656d'},
-        {text:below, pt:m*0.05, w:500, color:'#5a656d'}
+      numImg[p]=await textPng([                     // small number = little ink across many sheets
+        {text:String(p+1), pt:m*0.14, w:700},
+        {text:`ערימה ${p+1} מתוך ${P.cells}`, pt:m*0.045, w:500, color:'#5a656d'}
       ], gw, gh);
     }
     setProg(.25,'בונה גיליונות…');
