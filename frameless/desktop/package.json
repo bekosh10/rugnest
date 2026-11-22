@@ -1,0 +1,56 @@
+{
+  "name": "frameless",
+  "productName": "מערכת לפריימלסים",
+  "description": "מערכת לפריימלסים – הגדלת PDF לדפוס וסקיצה",
+  "author": "Campus",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "electron ."
+  },
+  "build": {
+    "appId": "il.campus.frameless",
+    "productName": "מערכת לפריימלסים",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "build/icon.png"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "icon": "build/icon.png",
+      "artifactName": "frameless-mac-${arch}.${ext}",
+      "extendInfo": {
+        "LSMinimumSystemVersion": "11.0"
+      }
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "publish": null,
+    "fileAssociations": [
+      {
+        "ext": "pdfjob",
+        "name": "Frameless job",
+        "role": "Editor",
+        "icon": "build/icon.png"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  }
+}
