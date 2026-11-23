@@ -136,6 +136,11 @@
   .appbar button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:5px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
   .appbar button.ghost{background:var(--paper);color:var(--accent)}
   .appbar button:disabled{opacity:.6;cursor:default}
+  body:not(.qtyper) .qtyper-only{display:none}
+  .seg{display:inline-flex;border:1px solid var(--accent);border-radius:9px;overflow:hidden}
+  .seg button{border:0;background:var(--paper);color:var(--accent);font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;cursor:pointer}
+  .seg button+button{border-inline-start:1px solid var(--accent)}
+  .seg button.on{background:var(--accent);color:#fff}
   .trimnote{font-size:11.5px;color:var(--warn);line-height:1.5}
   .trimnote:empty{display:none}
   @keyframes flashIn{0%{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}100%{}}
@@ -553,6 +558,15 @@
           <div class="sg kit-only">
             <span class="sglab">כמות קיטים סה״כ</span>
             <div class="sg-inputs"><input type="number" id="totalKits" value="100" min="1" step="1"></div>
+          </div>
+          </div>
+          <div class="srow1 qtyper-only">
+          <div class="sg">
+            <span class="sglab">כמות שונה לכל סוג — איך לסדר</span>
+            <div class="seg" id="stackKind">
+              <button type="button" data-k="stack" class="on" title="כל משבצת בגיליון היא ערימה אחרת. מדפיסים פעם אחת ומניחים ערימה על ערימה">חיתוך וערימה</button>
+              <button type="button" data-k="same" title="כל המשבצות בגיליון זהות, כמו קיט. כל ערימה מכילה את כל הסוגים בכמויות שלהם, ומדפיסים כמה פעמים שצריך">ערימות זהות</button>
+            </div>
           </div>
           </div>
         <div class="trimnote" id="trimNote"></div>
@@ -1533,9 +1547,9 @@ async function digitLabels(doc, n){
   }
   return {imgs};
 }
-function stackMode(){
-  return (state.mode==='multi' && els.multiQtyPer.checked) || (state.mode==='rep' && els.repQtyPer.checked);
-}
+function qtyPerOn(){ return (state.mode==='multi' && els.multiQtyPer.checked) || (state.mode==='rep' && els.repQtyPer.checked); }
+// different quantity per type: 'stack' = cut & stack (each cell its own pile), 'same' = identical piles (kit)
+function stackMode(){ return qtyPerOn() && state.stackKind!=='same'; }
 function stackOrder(lay){ const o=[]; for(let r=0;r<lay.rows;r++) for(let c=lay.cols-1;c>=0;c--) o.push([r,c]); return o; }
 function stackName(t,i){
   const f=t.front; let nm = f&&f.name ? f.name.replace(/\.pdf$/i,'') : `סוג ${i+1}`;
@@ -1560,10 +1574,14 @@ function planStack(types, lay){
 function updateStackUI(){
   const on=stackMode();
   document.body.classList.toggle('stackmode', on);
+  document.body.classList.toggle('qtyper', qtyPerOn());
+  document.querySelectorAll('#stackKind button').forEach(b=>b.classList.toggle('on', b.dataset.k===(state.stackKind||'stack')));
+  const badge=document.querySelector('.stackbadge'); if(badge) badge.textContent = 'חיתוך וערימה · כמויות שונות';
   els.totalKits.disabled=on; els.kitSplit.disabled=on;
   const gl=$('goLabel'); if(gl) gl.textContent = on ? 'יצירת PDF — חיתוך וערימה' : 'יצירת PDF — קיט בודד';
 }
 function anyDuplex(types){ return types.some(t=>t.duplex && t.back); }
+document.querySelectorAll('#stackKind button').forEach(b=>{ b.onclick=()=>{ state.stackKind=b.dataset.k; previewState.idx=0; recompute(); }; });
 function computeLayout(){
   const gw=+els.gw.value, gh=+els.gh.value;               // cm (TRIM size, final after cut)
   const gwmm=gw*10, ghmm=gh*10;
@@ -2437,7 +2455,7 @@ document.addEventListener('click',()=>document.querySelectorAll('.preset-menu').
   new MutationObserver(()=>{ if(!list.children.length) reset(); }).observe(list,{childList:true});
 })();
 /* ---------- installed app: version + updates from GitHub ---------- */
-const APP_VERSION = 5;
+const APP_VERSION = 6;
 (function(){
   if(!window.desk) return;                     // artifact / browser: nothing to show
   const bar=$('appbar'), ver=$('appver'), upd=$('appupd');
