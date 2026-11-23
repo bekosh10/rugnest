@@ -955,6 +955,21 @@ $('#bExport').onclick = async () => {
         files.push({ sub: S.shellVersion >= 2 ? [mc] : mc, name: `${(S.so && S.so.soNumber) || 'הזמנה'} הזמנת עבודה ${mc}.pdf`, data: b });
       }
     } catch (e) { console.error(e); }
+    // EFI folder: magnet layouts – print sheets in a folder per type, cut files separately (one per type)
+    try {
+      const so = ((S.so && S.so.soNumber) || '').replace(/\D/g, '') || 'order';
+      const byTab = {};
+      for (const f of files) { const it = f.it; if (it && it.machine === 'מגנטי') { const d = await PDFLib.PDFDocument.load(f.data); const z = d.getPage(0).getSize(); (byTab[it.tab] = byTab[it.tab] || []).push({ bytes: f.data, w: z.width, h: z.height, qty: it.qty, color: it.row.color }); } }
+      const nested = S.shellVersion >= 2, efi = [];
+      for (const [t, gs] of Object.entries(byTab)) {
+        const job = layJob(t), base = `${so} tamnoon ${job}`.toLowerCase();
+        const r = await C.buildLayoutPdfs(gs, { ...layOpts(t), splitPrint: true }, `${so} tamnoon ${job}`, PDFLib);
+        for (const ps of r.printSheets)
+          efi.push({ sub: nested ? ['EFI', job.toLowerCase()] : 'EFI', name: `${base}${ps.collect ? ' hashlamot' : ''} ${String(ps.no).padStart(3, '0')}x${ps.copies}.pdf`, data: ps.bytes });
+        efi.push({ sub: nested ? ['EFI', 'cut'] : 'EFI', name: `${base} cut.pdf`, data: r.cut });
+      }
+      files.push(...efi);
+    } catch (e) { console.error(e); toast('פריסת EFI לא נוצרה: ' + esc(e.message || e)); }
     files.forEach(f => delete f.it);
     failed.forEach(it => P.missing.push({ tab: it.tab, row: it.row, reason: 'לא הצלחתי ליצור את הקובץ – צריך קובץ מהלקוח' }));
     const report = await C.buildReport(P, S.table, S.so, ExcelJS);
@@ -1212,7 +1227,7 @@ $('#bLayout').onclick = async () => {
     const kinds = [...new Set([...tabs.map(tabKind), 'a3', 'strip', ...Object.keys(cfg.width || {}).filter(k => /^(a\d|strip|[\d.]+x[\d.]+)$/.test(k))])];
     const d = document.createElement('div'); d.className = 'modal-bg';
     const fill = () => {
-      const so = soNo() || 'order', star = isWin ? 'x' : '*';
+      const so = soNo() || 'order', star = 'x';
       const kw = k => t.width[k] != null ? t.width[k] : kindDefWidth(k), kc = k => t.collect[k] != null ? t.collect[k] : kindDefCollect(k);
       d.innerHTML = `<div class="modal"><button class="mx" title="סגירה">✕</button><h3>⚙ הגדרות פריסה וייצוא</h3>
         <h4 style="margin:6px 0 6px">פריסה</h4>
@@ -1265,7 +1280,7 @@ $('#bLayout').onclick = async () => {
     if (!desk) { toast('הייצוא עובד רק בתוכנה המותקנת'); return; }
     if (!cfg.printDir || !cfg.cutDir) { toast('קודם בוחרים תיקיות לפרינט ולקאט בהגדרות'); if (!(await settings()) || !cfg.printDir || !cfg.cutDir) return; }
     await busy('מייצא פריסה…', async () => {
-      const star = isWin ? 'x' : '*'; let n = 0, old = false;
+      const star = 'x'; let n = 0, old = false;
       try {
         for (const t of tabs) {
           const gs = groupsOf[t]; if (!gs.length) continue;
