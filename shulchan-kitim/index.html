@@ -438,6 +438,25 @@
   .pg-grp{display:flex;gap:8px}
   .canvas-col .prev-head-bar #canvasTitle{display:none}
   .pgcaption{font-size:12px;color:var(--muted);text-align:center;margin-top:8px;min-height:16px;font-weight:600}
+  /* centre of the pager: page counter + view toggles */
+  .pgmid{display:flex;align-items:center;gap:8px}
+  .vbtn{width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--muted);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:.12s}
+  .vbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .vbtn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .vbtn[hidden]{display:none}
+  /* front + back side by side */
+  .sheet-preview.duo{background:none;border:0;box-shadow:none;aspect-ratio:auto;display:flex;gap:4%;align-items:flex-start}
+  .duo-half{flex:1;min-width:0}
+  .duo-sheet{width:100%;aspect-ratio:var(--ar,1.414);background:#fff;border:1px solid #b9c2c8;border-radius:4px;position:relative;
+    box-shadow:0 2px 6px rgba(24,32,36,.18),0 10px 28px rgba(24,32,36,.12)}
+  .duo-cap{text-align:center;font-size:12px;font-weight:700;color:var(--ink);margin-top:6px}
+  /* hide / show the side frames */
+  .desk.noP .pages-col,.desk.noS .summary-col{display:none}
+  .desk.noP{grid-template-columns:minmax(0,1fr) 300px}
+  .desk.noS{grid-template-columns:300px minmax(0,1fr)}
+  .desk.noP.noS{grid-template-columns:minmax(0,1fr)}
+  @media(max-width:1350px){.desk.noP,.desk.noP.noS{grid-template-columns:minmax(0,1fr)}.desk.noS{grid-template-columns:300px minmax(0,1fr)}}
   .stack-note{font-size:12px;color:var(--muted);margin-bottom:14px;background:var(--accent-soft);
     border-right:3px solid var(--accent);padding:8px 11px;border-radius:5px}
   /* שולחן table surface behind the sheet */
@@ -654,7 +673,12 @@
                 <button class="pgbtn" id="pgFirst" type="button" title="לעמוד הראשון"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6l6 6-6 6"/><path d="M12 6l6 6-6 6"/></svg></button>
                 <button class="pgbtn" id="pgPrev" type="button" title="הקודם"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
               </div>
-              <span class="pglabel" id="pglabel">1 מתוך 1</span>
+              <div class="pgmid">
+                <button class="vbtn" id="tglP" type="button" title="הסתרה / הצגה של מסגרת העמודים"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><path d="M17.5 8v8" stroke-width="3"/></svg></button>
+                <span class="pglabel" id="pglabel">1 מתוך 1</span>
+                <button class="vbtn" id="tglDuo" type="button" title="קדמי ואחורי זה לצד זה" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="2" y="6" width="9" height="12" rx="1.2"/><rect x="13" y="6" width="9" height="12" rx="1.2"/></svg></button>
+                <button class="vbtn" id="tglS" type="button" title="הסתרה / הצגה של סיכום העבודה"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M6.5 8v8" stroke-width="3"/></svg></button>
+              </div>
               <div class="pg-grp">
                 <button class="pgbtn" id="pgNext" type="button" title="הבא"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
                 <button class="pgbtn" id="pgLast" type="button" title="לעמוד האחרון"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6 6 6"/><path d="M19 6l-6 6 6 6"/></svg></button>
@@ -1803,7 +1827,7 @@ function renderStack(types, lay){
   for(let k=0;k<P.sheets;k++){
     const tag = (P.numbered&&k===0) ? ' · דף מספור' : '';
     plan.push({kind:'stack', k, back:false, label:`גיליון ${k+1} מתוך ${P.sheets}${tag}${dup?' · קדמי':''}`});
-    if(dup) plan.push({kind:'stack', k, back:true, label:`גיליון ${k+1} מתוך ${P.sheets}${tag} · אחורי (היפוך צד)`});
+    if(dup) plan.push({kind:'stack', k, back:true, isBack:true, label:`גיליון ${k+1} מתוך ${P.sheets}${tag} · אחורי (היפוך צד)`});
   }
   previewState.lay=lay; previewState.types=types; previewState.stack=P; previewState.plan=plan;
   if(previewState.idx>=plan.length) previewState.idx=0;
@@ -2072,7 +2096,7 @@ function buildSplitPreviewPlan(types, lay){
   const plan=[];
   for(let k=0;k<L;k++){
     const parts=previewState.split.groups.map((g,gi)=>{ const it=g[k]; return `${gi+1}: ${!it?'ריק':it.kind==='s'?'מפריד':nm(it.t)+(it.back?' (אחורי)':'')}`; });
-    plan.push({kind:'split', k, label:`גיליון ${k+1} מתוך ${L} · ${parts.join(' · ')}`});
+    plan.push({kind:'split', k, isBack: anyDuplex(types) && k%2===1, label:`גיליון ${k+1} מתוך ${L} · ${parts.join(' · ')}`});
   }
   return plan;
 }
@@ -2146,7 +2170,7 @@ function buildSheetPlan(types){
     plan.push({kind:'graphic', label:`סוג ${i+1} — קדמי`, thumb, mirror:false, rot:t.rot||0});
     if(t.duplex && t.back){
       const bthumb = (t.back.pageThumbs&&t.back.pageThumbs[t.backPage||0]) || t.back.thumb || thumb;
-      plan.push({kind:'graphic', label:`סוג ${i+1} — אחורי (היפוך צד)`, thumb:bthumb, mirror:true, rot:backRot(t.rot||0)});
+      plan.push({kind:'graphic', label:`סוג ${i+1} — אחורי (היפוך צד)`, isBack:true, thumb:bthumb, mirror:true, rot:backRot(t.rot||0)});
     }
     if(i<types.length-1 && !els.noTypeSep.checked)
       plan.push({kind:'sep', label:`מפריד סוג`, color:state.sepTypeColor});
@@ -2154,26 +2178,72 @@ function buildSheetPlan(types){
   plan.push({kind:'sep', label:`מפריד קיט (סוף הקובץ)`, color:state.sepKitColor});
   return plan;
 }
-function renderPreviewPage(){
-  const {plan,idx,lay}=previewState;
-  if(!plan.length||!lay){ return; }
-  const item=plan[Math.min(idx,plan.length-1)];
-  $('pager').style.display='flex';
-  $('pglabel').textContent=`${idx+1} מתוך ${plan.length}`;
-  $('pgPrev').disabled = idx<=0;
-  $('pgNext').disabled = idx>=plan.length-1;
-  $('pgFirst').disabled = idx<=0;
-  $('pgLast').disabled = idx>=plan.length-1;
-  $('pgcaption').textContent=item.label;
+// view = one sheet, or a front + its back shown side by side
+function pvViews(){
+  const {plan}=previewState, v=[];
+  const duo=previewState.duo!==false;
+  for(let i=0;i<plan.length;i++){
+    if(duo && !plan[i].isBack && plan[i+1] && plan[i+1].isBack){ v.push([i,i+1]); i++; }
+    else v.push([i]);
+  }
+  return v;
+}
+function pvViewIdx(views){ const i=previewState.idx; const n=views.findIndex(w=>w.includes(i)); return n<0?0:n; }
+function drawPlanItem(item){
+  const lay=previewState.lay;
   if(item.kind==='split') drawSplitPreview(lay, item.k);
   else if(item.kind==='stack') drawStackPreview(lay, previewState.stack, previewState.types, item.k, item.back);
   else if(item.kind==='sep') drawSeparatorPreview(lay, item.color);
   else drawPreview(lay, item.thumb?{thumb:item.thumb}:null, item.mirror, item.rot||0);
 }
-$('pgPrev').onclick=()=>{ if(previewState.idx>0){previewState.idx--; renderPreviewPage();} };
-$('pgNext').onclick=()=>{ if(previewState.idx<previewState.plan.length-1){previewState.idx++; renderPreviewPage();} };
-$('pgFirst').onclick=()=>{ previewState.idx=0; renderPreviewPage(); };
-$('pgLast').onclick=()=>{ previewState.idx=Math.max(0,previewState.plan.length-1); renderPreviewPage(); };
+function renderPreviewPage(){
+  const {plan,lay}=previewState;
+  if(!plan.length||!lay){ return; }
+  if(previewState.idx>=plan.length) previewState.idx=0;
+  const hasBacks=plan.some(p=>p.isBack);
+  $('tglDuo').hidden=!hasBacks;
+  $('tglDuo').classList.toggle('on', previewState.duo!==false);
+  const views=pvViews(), vi=pvViewIdx(views), view=views[vi];
+  previewState.idx=view[0];
+  $('pager').style.display='flex';
+  $('pglabel').textContent=`${vi+1} מתוך ${views.length}`;
+  $('pgPrev').disabled = vi<=0;
+  $('pgNext').disabled = vi>=views.length-1;
+  $('pgFirst').disabled = vi<=0;
+  $('pgLast').disabled = vi>=views.length-1;
+  const box=els.sheetbox;
+  box.classList.remove('duo');
+  if(view.length===1){
+    $('pgcaption').textContent=plan[view[0]].label;
+    drawPlanItem(plan[view[0]]);
+    return;
+  }
+  const F=plan[view[0]], B=plan[view[1]];
+  drawPlanItem(F); const fHtml=box.innerHTML;
+  drawPlanItem(B); const bHtml=box.innerHTML;
+  const ar=box.style.getPropertyValue('--ar');
+  $('pgcaption').textContent=F.label.replace(/\s*[·—]\s*קדמי\s*$/,'');
+  box.classList.add('duo');
+  box.innerHTML=`<div class="duo-half"><div class="duo-sheet" style="--ar:${ar}">${fHtml}</div><div class="duo-cap">קדמי</div></div>`+
+                `<div class="duo-half"><div class="duo-sheet" style="--ar:${ar}">${bHtml}</div><div class="duo-cap">אחורי (היפוך צד)</div></div>`;
+}
+function pvGo(to){ const views=pvViews(); const n=Math.max(0,Math.min(views.length-1,to)); previewState.idx=views[n][0]; renderPreviewPage(); }
+$('pgPrev').onclick=()=>pvGo(pvViewIdx(pvViews())-1);
+$('pgNext').onclick=()=>pvGo(pvViewIdx(pvViews())+1);
+$('pgFirst').onclick=()=>pvGo(0);
+$('pgLast').onclick=()=>pvGo(1e9);
+(function(){
+  const LS=k=>{ try{ return localStorage.getItem('sk.'+k); }catch(e){ return null; } };
+  const SS=(k,v)=>{ try{ localStorage.setItem('sk.'+k,v); }catch(e){} };
+  const desk=document.querySelector('.desk');
+  previewState.duo = LS('duo')!=='0';
+  const apply=()=>{ desk.classList.toggle('noP', LS('noP')==='1'); desk.classList.toggle('noS', LS('noS')==='1');
+    $('tglP').classList.toggle('on', !desk.classList.contains('noP')); $('tglS').classList.toggle('on', !desk.classList.contains('noS')); };
+  apply();
+  $('tglP').onclick=()=>{ SS('noP', desk.classList.contains('noP')?'0':'1'); apply(); };
+  $('tglS').onclick=()=>{ SS('noS', desk.classList.contains('noS')?'0':'1'); apply(); };
+  $('tglDuo').onclick=()=>{ previewState.duo = previewState.duo===false; SS('duo', previewState.duo?'1':'0'); renderPreviewPage(); };
+})();
 
 /* ---------- SVG preview of a single sheet ---------- */
 function svgThumb(href,x,y,w,h,rot){        // image filling a cell, turned clockwise by rot
@@ -2455,7 +2525,7 @@ document.addEventListener('click',()=>document.querySelectorAll('.preset-menu').
   new MutationObserver(()=>{ if(!list.children.length) reset(); }).observe(list,{childList:true});
 })();
 /* ---------- installed app: version + updates from GitHub ---------- */
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 (function(){
   if(!window.desk) return;                     // artifact / browser: nothing to show
   const bar=$('appbar'), ver=$('appver'), upd=$('appupd');
