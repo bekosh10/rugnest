@@ -19,7 +19,7 @@ const norm = s => String(s == null ? '' : s)
   .toLowerCase();
 const clean = s => String(s == null ? '' : s).replace(BIDI, '').replace(/\s+/g, ' ').trim();
 const numsOf = s => (norm(s).match(/\d+(?:\.\d+)?/g) || []).map(Number);
-const STOP = new Set(['לבן', 'אדום', 'כחול', 'שחור', 'צבעוני', 'פס', 'collection', 'הזדמנות', 'אחרונה', 'by', 'tamnoon']);
+const STOP = new Set(['לבן', 'אדום', 'כחול', 'שחור', 'צבעוני', 'פס', 'collection', 'הזדמנות', 'אחרונה', 'by', 'tamnon']);
 const wordsOf = s => norm(s).split(' ').filter(w => w && !/^\d+(\.\d+)?$/.test(w));
 const matchWords = s => wordsOf(s).filter(w => !STOP.has(w));
 
@@ -27,7 +27,7 @@ const matchWords = s => wordsOf(s).filter(w => !STOP.has(w));
 const SYN = {
   'אקטיב': ['active'],
   "פיג'מות": ['pajamas', 'pajama'],
-  'בייבי': ['baby', 'nb', 'years', 'tamnoon'],
+  'בייבי': ['baby', 'nb', 'years', 'tamnon'],
   'ניו': ['new'], 'קולקשן': ['collection'],
   'סייל': ['sale'],
   'מכנס': ['מכנסי'],
@@ -1071,7 +1071,7 @@ function layerKit(PDFLib, doc) {
   };
 }
 // groups[i].bytes = single-page pdf of the sign
-// label: e.g. "26006897 tamnoon magneti A3" – goes 5 cm left of the 2nd bottom dot (print file only)
+// label: e.g. "26006897 tamnon magneti A3" – goes 5 cm left of the 2nd bottom dot (print file only)
 async function buildLayoutPdfs(groups, o, label, PDFLib) {
   for (const g of groups) if (!g.w) { const d = await PDFLib.PDFDocument.load(g.bytes); const { width, height } = d.getPage(0).getSize(); g.w = width; g.h = height; }
   const sheets = planLayout(groups, o);

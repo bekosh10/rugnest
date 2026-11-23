@@ -962,8 +962,8 @@ $('#bExport').onclick = async () => {
       for (const f of files) { const it = f.it; if (it && it.machine === 'מגנטי') { const d = await PDFLib.PDFDocument.load(f.data); const z = d.getPage(0).getSize(); (byTab[it.tab] = byTab[it.tab] || []).push({ bytes: f.data, w: z.width, h: z.height, qty: it.qty, color: it.row.color }); } }
       const nested = S.shellVersion >= 2, efi = [];
       for (const [t, gs] of Object.entries(byTab)) {
-        const job = layJob(t), base = `${so} tamnoon ${job}`.toLowerCase();
-        const r = await C.buildLayoutPdfs(gs, { ...layOpts(t), splitPrint: true }, `${so} tamnoon ${job}`, PDFLib);
+        const job = layJob(t), base = `${so} tamnon ${job}`.toLowerCase();
+        const r = await C.buildLayoutPdfs(gs, { ...layOpts(t), splitPrint: true }, `${so} tamnon ${job}`, PDFLib);
         for (const ps of r.printSheets)
           efi.push({ sub: nested ? ['EFI', job.toLowerCase()] : 'EFI', name: `${base}${ps.collect ? ' hashlamot' : ''} ${String(ps.no).padStart(3, '0')}x${ps.copies}.pdf`, data: ps.bytes });
         efi.push({ sub: nested ? ['EFI', 'cut'] : 'EFI', name: `${base} cut.pdf`, data: r.cut });
@@ -1202,7 +1202,7 @@ $('#bLayout').onclick = async () => {
     const sheets = C.planLayout(gs, o), CMP = 72 / 2.54, sc = 0.9;   // px per cm
     const prints = sheets.reduce((a, s) => a + s.copies, 0), units = sheets.reduce((a, s) => a + s.copies * s.cells.length, 0);
     bg.querySelector('#lInfo').textContent = `${sheets.length} גיליונות שונים · ${prints} הדפסות · ${units} שלטים (בהזמנה ${gs.reduce((a, g) => a + g.qty, 0)})`;
-    const label = `${soNo()} tamnoon ${layJob(cur)}`;
+    const label = `${soNo()} tamnon ${layJob(cur)}`;
     bg.querySelector('#laySh').innerHTML = sheets.map((s, si) => {
       const W = s.W / CMP, H = s.H / CMP;
       const cells = s.cells.map(c => {
@@ -1244,11 +1244,11 @@ $('#bLayout').onclick = async () => {
         <div class="muted">גיליון השלמות: שורה אחרונה של סוג עם 2 שלטים או פחות עוברת לגיליון השלמות בסוף.</div>
         <h4 style="margin:14px 0 4px">פרינט</h4>
         <div>תיקייה: <b dir="ltr" style="unicode-bidi:isolate">${esc(t.printDir || '— לא נבחרה —')}</b> <button class="small" id="pP">בחירה…</button></div>
-        <div class="muted" style="margin-top:4px">קובץ לכל גיליון: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnoon magneti a3 001${star}6.pdf</span> (מספר גיליון ${star} כמות הדפסות).</div>
+        <div class="muted" style="margin-top:4px">קובץ לכל גיליון: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnon magneti a3 001${star}6.pdf</span> (מספר גיליון ${star} כמות הדפסות).</div>
         <label style="display:block;margin-top:6px"><input type="checkbox" id="pProof" ${t.proof ? 'checked' : ''}> גם קובץ proof לבדיקה (גרפיקה + חיתוך) בתיקיית הפרינט</label>
         <h4 style="margin:14px 0 4px">קאט</h4>
         <div>תיקייה: <b dir="ltr" style="unicode-bidi:isolate">${esc(t.cutDir || '— לא נבחרה —')}</b> <button class="small" id="pC">בחירה…</button></div>
-        <div class="muted" style="margin-top:4px">קובץ אחד עם כל הגיליונות: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnoon magneti a3 cut.pdf</span></div>
+        <div class="muted" style="margin-top:4px">קובץ אחד עם כל הגיליונות: <span dir="ltr" style="unicode-bidi:isolate">${esc(so)} tamnon magneti a3 cut.pdf</span></div>
         <div class="foot"><button class="primary" id="sSave">שמירה</button><button id="sX">ביטול</button></div></div>`;
       const read = () => {
         d.querySelectorAll('[data-w]').forEach(i => { const v = +i.value; if (v > 10) t.width[i.dataset.w] = v; });
@@ -1284,8 +1284,8 @@ $('#bLayout').onclick = async () => {
       try {
         for (const t of tabs) {
           const gs = groupsOf[t]; if (!gs.length) continue;
-          const r = await C.buildLayoutPdfs(gs, { ...optsFor(t), splitPrint: true }, `${soNo()} tamnoon ${layJob(t)}`, PDFLib);
-          const base = `${soNo() || 'order'} tamnoon ${layJob(t)}`.toLowerCase();
+          const r = await C.buildLayoutPdfs(gs, { ...optsFor(t), splitPrint: true }, `${soNo()} tamnon ${layJob(t)}`, PDFLib);
+          const base = `${soNo() || 'order'} tamnon ${layJob(t)}`.toLowerCase();
           const pf = r.printSheets.map(ps => ({ name: `${base}${ps.collect ? ' hashlamot' : ''} ${String(ps.no).padStart(3, '0')}${star}${ps.copies}.pdf`, data: ps.bytes }));
           if (cfg.proof) pf.push({ name: `${base} proof.pdf`, data: r.proof });
           const cf = [{ name: `${base} cut.pdf`, data: r.cut }];
