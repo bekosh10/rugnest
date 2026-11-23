@@ -943,6 +943,8 @@ async function buildItemPdf(item, arts, PDFLib, cache) {
 
 /* ================================================================ EFI LAYOUT (print + cut, like Griffin) */
 const CM = 72 / 2.54;
+// classic xref table, no object streams – like Griffin (PDF 1.5 style) – older RIP interpreters need it
+const RIP_SAVE = { useObjectStreams: false };
 const LAYOUT_DEF = { width: 124, maxLen: 295, gap: 2.5, top: 1.3, bottom: 2, side: 0.8, bleed: 0.3, collect: false, collectTop: 3.2 };
 // A3 or strip – by the tab name; "פס"/"פסים"/"פסי מדף" wins ("שילוט A3 פסים" is strips)
 function layoutKind(tabName) { const t = tabName || ''; return /פס|strip/i.test(t) ? 'strip' : /a3/i.test(t) ? 'a3' : 'strip'; }
@@ -1170,9 +1172,9 @@ async function buildLayoutPdfs(groups, o, label, PDFLib) {
       const reg = props.get(PDFLib.PDFName.of('Pr1')), cut = props.get(PDFLib.PDFName.of('Pr2'));
       d.catalog.set(PDFLib.PDFName.of('OCProperties'), d.context.obj({ OCGs: [cut, reg], D: { Order: [cut, reg], ON: [cut, reg] } }));
     }
-    printSheets.push({ bytes: await d.save(), copies: sheets[i].copies, no: i + 1, collect: !!sheets[i].collect });
+    printSheets.push({ bytes: await d.save(RIP_SAVE), copies: sheets[i].copies, no: i + 1, collect: !!sheets[i].collect });
   }
-  return { print: await pr.save(), printSheets, cut: await cu.save(), proof: await pf.save(), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies, collect: !!s.collect })) };
+  return { print: await pr.save(RIP_SAVE), printSheets, cut: await cu.save(RIP_SAVE), proof: await pf.save(RIP_SAVE), sheets: sheets.map(s => ({ w: s.W / CM, h: s.H / CM, n: s.cells.length, copies: s.copies, collect: !!s.collect })) };
 }
 
 /* ================================================================ REPORT (xlsx) */
