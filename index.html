@@ -189,6 +189,7 @@ svg .hitr{fill:transparent;cursor:pointer}
 .item.sel{outline:3px solid #2563eb;outline-offset:1px}
 .pickbtn{align-self:flex-start;color:var(--accent);border-color:var(--accent)}.pickbtn svg{width:15px;height:15px;stroke:var(--accent)}
 .againbtn{color:var(--ink)}
+.turnnote{font-size:12px;color:var(--muted);margin-top:4px}
 .maph{font-size:15px;margin:18px 0 4px}.maplist{display:flex;flex-direction:column;gap:6px;margin:8px 0}
 .maprow{display:grid;grid-template-columns:1fr 1.4fr auto auto;gap:6px;align-items:center}
 .maprow input{min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--raise);color:var(--ink);font:inherit;font-size:13px}
@@ -406,6 +407,7 @@ svg .hitr.droptgt{fill:rgba(37,99,235,.25);stroke:#2563eb;stroke-width:4;vector-
     </div>
     <div class="tgroup" role="group" aria-label="כלים">
       <button class="tbtn" id="setBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>הגדרות</span></button>
+      <button class="tbtn" id="mapBtn" type="button" title="מיפוי שמות: שם בהזמנה ← תיקייה בתיקיית השטיחים"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span>מיפוי שמות</span></button>
     </div>
     <span class="vsep"></span>
     <button class="btn expbtn2" id="expBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 18v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1"/></svg>ייצוא</button>
@@ -962,7 +964,7 @@ async function buildPrint(sheetList, s, progress) {
       const ek = i.fileKey + '|' + bb.toFixed(3);
       if (!embCache.has(ek)) embCache.set(ek, await doc.embedPage(sp, { left: tb.x - bb, bottom: tb.y - bb, right: tb.x + tw + bb, top: tb.y + th + bb }));
       const emb = embCache.get(ek);
-      if (i.rot) { const s1 = h / tw, s2 = w / th; page.drawPage(emb, { x: x + w + bb * s2, y: y - bb * s1, width: (tw + 2 * bb) * s1, height: (th + 2 * bb) * s2, rotate: degrees(90) }); }
+      if (artTurn(i.rot, tw, th, w, h)) { const s1 = h / tw, s2 = w / th; page.drawPage(emb, { x: x + w + bb * s2, y: y - bb * s1, width: (tw + 2 * bb) * s1, height: (th + 2 * bb) * s2, rotate: degrees(90) }); }
       else { const s1 = w / tw, s2 = h / th; page.drawPage(emb, { x: x - bb * s1, y: y - bb * s2, width: (tw + 2 * bb) * s1, height: (th + 2 * bb) * s2 }); }
     }
     if (s.label) {   // to the left of the 5th (orientation) dot, on the same line, bottom edge
@@ -1033,13 +1035,17 @@ const cpx = sh => (sh.copies > 1 ? `_x${sh.copies}` : '');
 const thumbs = new Map(); const thumbBusy = new Set();
 const fileDims = new Map();   // key -> {w,h} cm of the file's page, as saved (w = across)
 // will the graphic be stretched? (file lying the other way, or a different size than ordered)
+// the artwork is turned 90° when its file is saved the other way round from the place it gets on the sheet
+const artTurn = (rot, aw, ah, bw, bh) => { const aL = aw > ah * 1.02, aP = ah > aw * 1.02, bL = bw > bh * 1.02, bP = bh > bw * 1.02; return (aL && bP) || (aP && bL) ? true : (aL || aP) && (bL || bP) ? false : !!rot; };
+const artTurnItem = i => { const tc = i.fileKey && trimCheck.get(i.fileKey), d = tc ? { w: tc.tw, h: tc.th } : i.fileKey && fileDims.get(i.fileKey); return d ? artTurn(i.rot, d.w, d.h, i.pw, i.pl) : !!i.rot; };
 function stretchInfo(r) {
   if (!r.fileKey) return null;
   const tc = trimCheck.get(r.fileKey), d = tc ? { w: tc.tw, h: tc.th } : fileDims.get(r.fileKey);
   if (!d) return null;
   const f1 = n => Math.round(n * 10) / 10;
-  if (!isFullSize(r) && ((r.w < r.l - 1 && d.w > d.h + 1) || (r.w > r.l + 1 && d.w < d.h - 1)))
-    return { kind: 'orient', text: `הקובץ שמור ${d.w > d.h ? 'לרוחב' : 'לגובה'} (${f1(d.w)}×${f1(d.h)}) וההזמנה ${r.w}×${r.l}. השטיח יימתח. לחצי ⇄ כדי להחליף רוחב ואורך` };
+  const sizeOk = Math.abs(Math.min(d.w, d.h) - Math.min(r.w, r.l)) <= 1.5 && Math.abs(Math.max(d.w, d.h) - Math.max(r.w, r.l)) <= 1.5;
+  if (!isFullSize(r) && sizeOk && ((r.w < r.l - 1 && d.w > d.h + 1) || (r.w > r.l + 1 && d.w < d.h - 1)))
+    return { kind: 'orient', auto: true, text: `הקובץ שמור ${d.w > d.h ? 'לרוחב' : 'לגובה'} (${f1(d.w)}×${f1(d.h)}). הגרפיקה מסובבת לבד ב-90°, בלי מתיחה` }; if (false) return { kind: 'orient', text: `הקובץ שמור ${d.w > d.h ? 'לרוחב' : 'לגובה'} (${f1(d.w)}×${f1(d.h)}) וההזמנה ${r.w}×${r.l}. השטיח יימתח. לחצי ⇄ כדי להחליף רוחב ואורך` };
   if (!isFullSize(r) && (Math.abs(Math.min(d.w, d.h) - Math.min(r.w, r.l)) > 1.5 || Math.abs(Math.max(d.w, d.h) - Math.max(r.w, r.l)) > 1.5))
     return { kind: 'size', text: `גודל הקובץ ${f1(d.w)}×${f1(d.h)} שונה מההזמנה ${r.w}×${r.l}. השטיח יימתח` };
   return null;
@@ -1108,7 +1114,7 @@ function renderRows() {
   for (const ord of orders) {
     const list = byOrder.get(ord);
     const problems = [];
-    for (const r of list) { const [cls] = rowState(r); if (cls === 'bad') problems.push(`${r.match && r.match.kind === 'size' ? 'אין בגודל' : 'חסר'}: ${r.name} ${r.w}×${r.l}`); else if (stretchInfo(r)) problems.push(`יימתח: ${r.name} ${r.w}×${r.l}`); }
+    for (const r of list) { const [cls] = rowState(r); if (cls === 'bad') problems.push(`${r.match && r.match.kind === 'size' ? 'אין בגודל' : 'חסר'}: ${r.name} ${r.w}×${r.l}`); else { const si0 = stretchInfo(r); if (si0 && !si0.auto) problems.push(`יימתח: ${r.name} ${r.w}×${r.l}`); } }
     const pnote = parseNotes.find(n => n.order === ord && n.cls === 'bad');
     if (pnote && !list.length) problems.push('לא נקראה מההזמנה אף שורה');
     const waiting = !rugFiles.size && list.length > 0;
@@ -1146,7 +1152,8 @@ function renderRows() {
       d.addEventListener('click', e => { if (e.target.closest('input,select,.xdel,.kbtn,[data-q]')) return; selectRow(r.id); });
       d.querySelector('.swapbtn').onclick = e => { e.stopPropagation(); [r.w, r.l] = [r.l, r.w]; setStatus(`${r.name}: עכשיו ${r.w}×${r.l}`); update(); };
       const si = stretchInfo(r);
-      if (si) { const wn = document.createElement('div'); wn.className = 'stretchwarn'; wn.textContent = '❗ ' + si.text; d.append(wn); d.classList.add('stretch'); }
+      if (si && si.auto) { const wn = document.createElement('div'); wn.className = 'turnnote'; wn.textContent = '↻ ' + si.text; d.append(wn); }
+      else if (si) { const wn = document.createElement('div'); wn.className = 'stretchwarn'; wn.textContent = '❗ ' + si.text; d.append(wn); d.classList.add('stretch'); }
       d.querySelector('.kbtn').onclick = () => { r.kind = KIND_ORDER[(KIND_ORDER.indexOf(kk) + 1) % 3]; update(); };
       if (cls !== 'ok') {
         const sug = rugFiles.size ? suggestFile(r) : null;
@@ -1269,7 +1276,7 @@ function renderAlerts() {
     if (m.kind === 'size') { add('size', ord, `${label}. ${m.target ? `בתיקייה ${m.target} (מיפוי)` : 'בתיקייה'} יש רק: ${m.sizes.join(', ')}.`); missN += r.qty; continue; }
     if (m.kind === 'none' || !r.fileKey) { add('missing', ord, m.target ? `${label}. לפי המיפוי חיפשתי ב-${m.target}, ולא נמצא שם קובץ.` : `${label}. אין בתיקייה קובץ בשם הזה בדיוק.`); missN += r.qty; continue; }
     okN += r.qty;
-    const si = stretchInfo(r); if (si) add('filesize', ord, `${label}. ${si.text}.`);
+    const si = stretchInfo(r); if (si) add(si.auto ? 'info' : 'filesize', ord, `${label}. ${si.text}.`);
   }
   for (const t of tooBig) add('big', t.order || '', `${t.name} ${t.w}×${t.l} לא נכנס בגיליון המקסימלי ולא סודר.`);
   const bad = ['missing', 'size', 'filesize', 'parse', 'big'].reduce((a, k) => a + G[k].length, 0), warn = G.check.length;
@@ -1331,7 +1338,7 @@ function sheetSvg(sh, big) {
     s += `<rect class="rugbox${i.fileKey ? '' : ' miss'}" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}"/>`;
     if (t && i.cover) s += `<image href="${t}" x="0" y="0" width="${i.pw}" height="${i.pl}" preserveAspectRatio="xMidYMid slice"/>`;
     else if (t) {
-      if (i.rot) s += `<image href="${t}" x="0" y="0" width="${i.pl}" height="${i.pw}" preserveAspectRatio="none" transform="translate(${i.X + i.pw} ${i.Y}) rotate(90)"/>`;
+      if (artTurnItem(i)) s += `<image href="${t}" x="0" y="0" width="${i.pl}" height="${i.pw}" preserveAspectRatio="none" transform="translate(${i.X + i.pw} ${i.Y}) rotate(90)"/>`;
       else s += `<image href="${t}" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}" preserveAspectRatio="none"/>`;
     }
     if (!i.cover) s += `<rect class="cutl" x="${i.X}" y="${i.Y}" width="${i.pw}" height="${i.pl}"/>`;
@@ -1808,6 +1815,7 @@ async function mapRowName(r) {
   saveNameMap(); rematchAll(); update(); setStatus(`נשמר מיפוי: ${nm} ← ${target}`);
 }
 $('setBtn').onclick = () => { renderMap(); $('setDlg').hidden = false; $('sMaxW').focus(); };
+$('mapBtn').onclick = () => { renderMap(); $('setDlg').hidden = false; const h = document.querySelector('#setDlg .maph'); if (h) h.scrollIntoView({ block: 'start' }); if (!NAME_MAP.length) $('mapAdd').click(); };
 $('setX').onclick = $('setOk').onclick = () => { $('setDlg').hidden = true; $('setBtn').focus(); };
 $('setDlg').addEventListener('click', e => { if (e.target === $('setDlg')) $('setDlg').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('setDlg').hidden) $('setDlg').hidden = true; if (e.key === 'Escape' && !$('expDlg').hidden) $('expDlg').hidden = true; });
